@@ -1,0 +1,58 @@
+# Constitution
+
+**Project:** mnemo-jvm-warden
+**Ratified:** 2026-07-12
+
+Short by design. Every feature's decisions (Stages 2–4) are checked against these
+principles, so each is written to be *checkable* — you can point at a code decision and
+say whether it holds.
+
+## Principles
+
+### §1 — Simplicity first (YAGNI)
+
+Build the simplest thing that satisfies the current slice. No abstraction, interface,
+config flag, or generality without a present caller that needs it. *Prevents* speculative
+flexibility and dead code that cost more than the value they were meant to add. *A decision
+violates this when* it adds an interface with one implementation and no second caller now,
+or a knob nothing reads.
+
+### §2 — Depend on abstractions at the volatile seams (SRP + DIP)
+
+Each type has one reason to change. Safety and orchestration logic depends on narrow ports
+(e.g. `HeapController`, a resize port), never directly on a concrete GC driver or the
+Kubernetes client. *Prevents* the core state machine being welded to ZGC or Fabric8, which
+would make supporting a new collector or client a rewrite. *A decision violates this when*
+the shrink/grow logic imports a concrete GC or K8s type instead of a port.
+
+### §3 — Small, intention-revealing units (Clean Code)
+
+Functions and classes stay small and single-purpose; names state intent; comments explain
+*why*, not *what*. No single method that releases, verifies, and resizes in one blob.
+*Prevents* unreadable safety-critical code where a reviewer cannot see the ordering. *A
+decision violates this when* a unit spans multiple concerns, or a name needs a comment to
+decode.
+
+### §4 — The agent earns its footprint (efficiency)
+
+Warden is a memory-efficiency product; its own sidecar must be lean — no busy-polling, no
+unbounded buffers, no heavyweight dependency on the hot path. Overhead must stay
+proportionate to the savings delivered. *Prevents* the irony of a right-sizer that wastes
+the memory it reclaims. *A decision violates this when* it adds a tight poll loop, a heavy
+dependency to the sidecar, or an allocation on a per-tick path.
+
+### §5 — No unverified shrink (safety invariant)
+
+Any operation that lowers a cgroup limit or memory request is gated on a verified
+precondition — RSS confirmed below the target — and the ordering invariants
+(shrink → verify → resize; grow → resize → raise) are enforced in code, not by convention.
+*Prevents* OOMKilling a live pod, the one failure that makes Warden worse than doing
+nothing. *A decision violates this when* a resize-down is issued without a preceding RSS
+gate, or when ordering is left to caller discipline.
+
+## Out of scope
+
+- **Formatting and mechanical style** (indentation, import order, line length) — owned by
+  the formatter/linter, not this document.
+- **Choice of GC or Kubernetes-client library** — §2 keeps these swappable rather than
+  fixing a specific one here.
