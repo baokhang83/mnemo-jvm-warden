@@ -8,12 +8,6 @@ lowers the Pod's resource footprint — reclaiming idle infrastructure without
 killing the pod, dropping its warm state, or risking your high-availability
 posture.
 
-> [!IMPORTANT]
-> **Use HPA to scale your stateless web traffic. Use Warden for your
-> minimum-replica baselines, your heavy stateful nodes, and your slow-booting
-> monoliths** — the places where horizontal scaling is too slow, too dangerous,
-> or simply not allowed.
-
 ---
 
 ## The gap Warden fills
