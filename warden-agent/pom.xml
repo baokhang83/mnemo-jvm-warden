@@ -21,4 +21,22 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!-- The agent has zero runtime deps (all JDK), so a plain jar with a Main-Class
+           manifest is directly runnable via `java -jar` — no shade/uber-jar needed. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>io.github.baokhang83.mnemo.warden.agent.WardenAgent</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
