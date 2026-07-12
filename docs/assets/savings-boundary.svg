@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 340" width="920" height="340" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-end">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- card background -->
+  <rect x="1" y="1" width="918" height="338" rx="16" fill="#0b1120" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- ============ ZONE A: WARDEN ============ -->
+  <rect x="26" y="40" width="388" height="250" rx="14" fill="#0e1a2f" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="46" y="70" fill="#38bdf8" font-size="17" font-weight="700">WARDEN does</text>
+  <text x="200" y="70" fill="#64748b" font-size="11">what the product actually performs</text>
+
+  <!-- step 1 -->
+  <rect x="42" y="86" width="356" height="40" rx="8" fill="#13233d"/>
+  <circle cx="62" cy="106" r="11" fill="#0b1120" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="62" y="110" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">1</text>
+  <text x="84" y="111" fill="#e2e8f0" font-size="13.5">Release JVM memory — GC + uncommit</text>
+
+  <!-- step 2 (safety gate, highlighted) -->
+  <rect x="42" y="132" width="356" height="40" rx="8" fill="#0f2b28" stroke="#2dd4bf" stroke-width="1.5"/>
+  <circle cx="62" cy="152" r="11" fill="#0b1120" stroke="#2dd4bf" stroke-width="1.5"/>
+  <text x="62" y="156" fill="#2dd4bf" font-size="12" font-weight="700" text-anchor="middle">2</text>
+  <text x="84" y="157" fill="#e2e8f0" font-size="13.5">Verify RSS actually dropped <tspan fill="#2dd4bf" font-weight="700">✓ safety gate</tspan></text>
+
+  <!-- step 3 -->
+  <rect x="42" y="178" width="356" height="40" rx="8" fill="#13233d"/>
+  <circle cx="62" cy="198" r="11" fill="#0b1120" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="62" y="202" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">3</text>
+  <text x="84" y="203" fill="#e2e8f0" font-size="13.5">Lower the pod's memory <tspan fill="#7dd3fc" font-weight="700">REQUEST</tspan> <tspan fill="#94a3b8">(in place)</tspan></text>
+
+  <!-- caption -->
+  <text x="46" y="248" fill="#64748b" font-size="11">Warden's causal responsibility</text>
+  <text x="46" y="264" fill="#94a3b8" font-size="11" font-weight="600">ENDS at the request change ▲</text>
+
+  <!-- ============ HAND-OFF ============ -->
+  <text x="442" y="150" fill="#94a3b8" font-size="11" text-anchor="middle" font-weight="600">hand-off</text>
+  <line x1="420" y1="165" x2="461" y2="165" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="442" y="188" fill="#64748b" font-size="9.5" text-anchor="middle">needs a CA</text>
+
+  <!-- ============ ZONE B: KUBERNETES (dimmed, conditional) ============ -->
+  <rect x="468" y="40" width="424" height="250" rx="14" fill="#0d1626" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="488" y="64" fill="#94a3b8" font-size="17" font-weight="700">KUBERNETES does</text>
+  <text x="488" y="82" fill="#64748b" font-size="11">requires a Cluster Autoscaler — <tspan fill="#748099" font-weight="600">not Warden's action</tspan></text>
+
+  <!-- step 1 -->
+  <rect x="484" y="92" width="392" height="38" rx="8" fill="#111c2e" opacity="0.85"/>
+  <circle cx="504" cy="111" r="4" fill="#64748b"/>
+  <text x="524" y="116" fill="#cbd5e1" font-size="13.5">Scheduler bin-packs the freed reservation</text>
+
+  <!-- step 2 -->
+  <rect x="484" y="136" width="392" height="38" rx="8" fill="#111c2e" opacity="0.85"/>
+  <circle cx="504" cy="155" r="4" fill="#64748b"/>
+  <text x="524" y="160" fill="#cbd5e1" font-size="13.5">Autoscaler drains a node</text>
+
+  <!-- step 3 (outcome) -->
+  <rect x="484" y="180" width="392" height="38" rx="8" fill="#0e2117" opacity="0.9"/>
+  <circle cx="504" cy="199" r="4" fill="#4ade80"/>
+  <text x="524" y="204" fill="#4ade80" font-size="13.5" font-weight="700">Actual $ saved</text>
+
+  <!-- caption -->
+  <text x="488" y="248" fill="#64748b" font-size="11">Emergent &amp; conditional — Warden enables it, doesn't do it.</text>
+  <text x="488" y="264" fill="#94a3b8" font-size="11" font-weight="600">No autoscaler ⇒ freed capacity, but <tspan fill="#f59e0b">$0 saved</tspan>.</text>
+</svg>

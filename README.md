@@ -79,17 +79,10 @@ nodes (that's the autoscaler). Everything past the request change is *emergent
 cluster behaviour that Warden enables but does not perform*, and does not
 guarantee:
 
-```
-┌──────────── WARDEN does ────────────┐      ┌──── KUBERNETES does (needs a ─────┐
-│                                      │      │      Cluster Autoscaler) ─────────┤
-│  release JVM memory (GC + uncommit)  │      │                                   │
-│    → verify RSS actually dropped     │  ⇢   │  scheduler bin-packs the freed    │
-│    → lower the pod's memory REQUEST   │      │  reservation → autoscaler drains  │
-│      (+ limit, in place, no restart) │      │  a node → actual $ saved          │
-└──────────────────────────────────────┘      └───────────────────────────────────┘
-     Warden's causal responsibility            not Warden's action; conditional —
-     ENDS at the request change  ──────┘        no autoscaler ⇒ no billed saving
-```
+<p align="center">
+  <img src="docs/assets/savings-boundary.svg" width="900"
+       alt="Two zones separated by a hand-off. WARDEN does: release JVM memory (GC + uncommit), verify RSS actually dropped (safety gate), lower the pod's memory request in place — Warden's responsibility ends at the request change. KUBERNETES does (requires a Cluster Autoscaler, not Warden's action): scheduler bin-packs the freed reservation, autoscaler drains a node, actual money saved. With no autoscaler, capacity is freed but nothing is billed-saved.">
+</p>
 
 The `⇢` is a hand-off, not a step Warden takes. On a fixed node pool with no
 autoscaler, Warden's lower-request still frees *schedulable* capacity but zero
