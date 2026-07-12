@@ -1,3 +1,5 @@
+<img width="1774" height="887" alt="image" src="https://github.com/user-attachments/assets/2d0dbecf-bab6-4f56-9bd2-bb8c0b48cdef" />
+
 # mnemo-jvm-warden
 
 **JVM-aware vertical right-sizing for Kubernetes.** Warden makes a running JVM
