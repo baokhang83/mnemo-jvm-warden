@@ -17,8 +17,8 @@ In ~95% of production environments, [Horizontal Pod Autoscaling
 is the right answer: scale from 10 replicas to 2 when traffic drops, and you
 save money. Warden does **not** compete with that.
 
-But there are three well-known scenarios where *removing replicas* fails, and
-where shrinking the pods you keep is the only lever left:
+But there are three well-known scenarios where *removing replicas* is not an option, and 
+shrinking the pods you keep is the only lever left:
 
 ### 1. Minimum-replica HA baselines
 
