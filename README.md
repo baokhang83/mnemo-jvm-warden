@@ -71,15 +71,30 @@ saves nothing — you still pay for the node. Kubernetes cost is driven by
 *requests*, because that's what the scheduler bin-packs against and what
 [Cluster
 Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler)
-uses to decide it can drain and delete a node. Warden's savings chain is:
+uses to decide it can drain and delete a node.
+
+**Warden's action boundary ends at "lower the request."** It resizes an existing
+pod in place — it never changes the number of pods (that's HPA) or the number of
+nodes (that's the autoscaler). Everything past the request change is *emergent
+cluster behaviour that Warden enables but does not perform*, and does not
+guarantee:
 
 ```
-Warden shrinks JVM RSS
-  →  lowers the Pod's memory *request* (in-place, no restart)
-  →  scheduler sees reclaimable capacity
-  →  Cluster Autoscaler consolidates nodes
-  →  actual $ saved
+┌──────────── WARDEN does ────────────┐      ┌──── KUBERNETES does (needs a ─────┐
+│                                      │      │      Cluster Autoscaler) ─────────┤
+│  release JVM memory (GC + uncommit)  │      │                                   │
+│    → verify RSS actually dropped     │  ⇢   │  scheduler bin-packs the freed    │
+│    → lower the pod's memory REQUEST   │      │  reservation → autoscaler drains  │
+│      (+ limit, in place, no restart) │      │  a node → actual $ saved          │
+└──────────────────────────────────────┘      └───────────────────────────────────┘
+     Warden's causal responsibility            not Warden's action; conditional —
+     ENDS at the request change  ──────┘        no autoscaler ⇒ no billed saving
 ```
+
+The `⇢` is a hand-off, not a step Warden takes. On a fixed node pool with no
+autoscaler, Warden's lower-request still frees *schedulable* capacity but zero
+*billed* capacity — so the savings story is only as real as your consolidation
+setup.
 
 **You can't change `-Xmx` on a running JVM.** Max heap is fixed at launch. What
 *is* movable at runtime is the soft ceiling and committed memory:
