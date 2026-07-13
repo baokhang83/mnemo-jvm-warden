@@ -1,0 +1,64 @@
+# Example: the Warden agent running as a native sidecar next to a target JVM.
+#
+# `restartPolicy: Always` on an initContainer makes it a NATIVE SIDECAR (Kubernetes 1.29+):
+# it starts before the app container, stays up for the pod's whole life, and is stopped last.
+# That start-before / stop-after ordering is what lets the agent manage the target JVM safely
+# for the app's entire lifetime.
+#
+# Apply to a kind cluster (see deploy/README.md); both containers should reach Ready.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: warden-example
+  labels:
+    app.kubernetes.io/name: warden-example
+spec:
+  # Lets the Warden sidecar see the target JVM's PID — the prerequisite for the Attach API
+  # (W-102). The current no-op agent does not use it; it is here to document the intent.
+  shareProcessNamespace: true
+
+  initContainers:
+    - name: warden
+      image: ghcr.io/baokhang83/mnemo-jvm-warden:latest
+      imagePullPolicy: IfNotPresent
+      restartPolicy: Always # <-- native sidecar
+      ports:
+        - name: health
+          containerPort: 8080
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: health
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: health
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+
+  containers:
+    - name: app
+      # The target JVM Warden manages. A real long-running JVM — the JDK's Simple Web Server —
+      # using the default collector (G1), which the agent's GcDetector recognises.
+      image: eclipse-temurin:21-jdk
+      command: ["jwebserver", "-b", "0.0.0.0", "-p", "8000"]
+      ports:
+        - name: http
+          containerPort: 8000
+      readinessProbe:
+        httpGet:
+          path: /
+          port: http
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
