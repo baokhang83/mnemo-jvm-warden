@@ -1,0 +1,7 @@
+# Keep the build context small and reproducible.
+**/target/
+.git/
+.github/
+docs/
+*.md
+.fluencyloop/
