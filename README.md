@@ -2,6 +2,9 @@
 
 # mnemo-jvm-warden
 
+[![build](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml/badge.svg)](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml)
+[![coverage](https://baokhang83.github.io/mnemo-jvm-warden/badges/jacoco.svg)](https://baokhang83.github.io/mnemo-jvm-warden/)
+
 **JVM-aware vertical right-sizing for Kubernetes.** Warden makes a running JVM
 give memory back to the OS during predictable low-traffic windows, then safely
 lowers the Pod's resource footprint — reclaiming idle infrastructure without

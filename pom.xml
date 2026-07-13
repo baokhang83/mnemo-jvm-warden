@@ -22,6 +22,7 @@
     <module>warden-controller</module>
     <module>warden-agent</module>
     <module>examples</module>
+    <module>coverage</module>
   </modules>
 
   <properties>
@@ -31,6 +32,7 @@
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -65,7 +67,37 @@
           <artifactId>maven-jar-plugin</artifactId>
           <version>${maven-jar-plugin.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-maven-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
+
+    <plugins>
+      <!-- Runs in every module: instruments tests so each writes a jacoco.exec, which the
+           coverage module then merges via report-aggregate. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <!-- Only instrument Warden's own code. Coverage should measure our code, not the
+               JDK; this also avoids JaCoCo choking on JDK-internal classes that the HTTP tests
+               load when the build runs on a newer JDK than the plugin supports. -->
+          <includes>
+            <include>io/github/baokhang83/**</include>
+          </includes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 </project>
