@@ -14,7 +14,7 @@ metadata:
     app.kubernetes.io/name: warden-example
 spec:
   # Lets the Warden sidecar see the target JVM's PID — the prerequisite for the Attach API
-  # (W-102). The current no-op agent does not use it; it is here to document the intent.
+  # (W-102). The agent attaches to whichever JVM this reveals that isn't itself.
   shareProcessNamespace: true
 
   initContainers:

@@ -50,6 +50,15 @@ precondition — RSS confirmed below the target — and the ordering invariants
 nothing. *A decision violates this when* a resize-down is issued without a preceding RSS
 gate, or when ordering is left to caller discipline.
 
+### §6 — Recovery reuses the normal path (no shadow retry logic)
+
+A retry, reconnect, or abort path is the same code as the path it recovers from, re-entered,
+not a parallel implementation of it. *Prevents* the recovery path silently drifting out of
+sync with the happy path it's supposed to mirror &mdash; the exact place a safety-critical
+system tends to rot unnoticed, since the recovery path runs rarely and gets tested even less.
+*A decision violates this when* "handle the failure" and "do the normal thing" are two
+different blocks of logic that could disagree about what happens next.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by
