@@ -1,8 +1,8 @@
 {
-  "feature": "w-102-attach-to-target-jvm-via-attach-api-with-reconnect-and",
-  "branch": "feature/w-102-attach-to-target-jvm-via-attach-api-with-reconnect-and",
+  "feature": "w-103-zgc-driver-softmaxheapsize-get-set-via-hotspotdiagnost",
+  "branch": "feature/w-103-zgc-driver-softmaxheapsize-get-set-via-hotspotdiagnost",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-102-attach-to-target-jvm-via-attach-api-with-reconnect-and/sessions/slice-3-attachsupervisor-wardenagent-wiring.md",
-  "base_ref": "feature/example-native-sidecar-manifest-target-jvm-warden-as-init-co",
+  "last_session": "docs/fluencyloop/features/w-103-zgc-driver-softmaxheapsize-get-set-via-hotspotdiagnost/sessions/slice-1-zgcsoftmax-unsupportedcollectorexception.md",
+  "base_ref": "main",
   "updated": "2026-07-19"
 }
