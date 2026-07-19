@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TargetLocator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.attach</a> &gt; <span class="el_source">TargetLocator.java</span></div><h1>TargetLocator.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.attach;
+
+import com.sun.tools.attach.VirtualMachine;
+import com.sun.tools.attach.VirtualMachineDescriptor;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+
+/**
+ * Finds the target JVM's PID among the processes visible to the agent.
+ *
+ * &lt;p&gt;With {@code shareProcessNamespace: true} (see {@code deploy/example-sidecar.yaml}), {@link
+ * VirtualMachine#list()} sees every JVM in the pod, including the agent itself. A normal pod has
+ * exactly one other JVM &amp;mdash; the app &amp;mdash; so excluding the agent's own PID is enough to
+ * identify it without any required configuration. {@link #ENV_TARGET_PID} is an escape hatch for
+ * the rare pod that runs more than one other JVM.
+ */
+public final class TargetLocator {
+
+  /** Overrides target selection with an explicit PID; only needed when more than one non-agent
+   *  JVM is visible. */
+  public static final String ENV_TARGET_PID = &quot;WARDEN_TARGET_PID&quot;;
+
+  private TargetLocator() {}
+
+  /** Finds the target using the live process list and environment. */
+  public static Optional&lt;VirtualMachineDescriptor&gt; findTarget() {
+<span class="nc" id="L28">    return findTarget(VirtualMachine.list(), ProcessHandle.current().pid(), System::getenv);</span>
+  }
+
+  /**
+   * Package-private seam so tests can supply a fake process list and environment without
+   * spawning real JVMs (mirrors {@code AgentConfig.fromEnv(Function)}).
+   */
+  static Optional&lt;VirtualMachineDescriptor&gt; findTarget(
+      List&lt;VirtualMachineDescriptor&gt; candidates, long selfPid, Function&lt;String, String&gt; env) {
+<span class="fc" id="L37">    String override = env.apply(ENV_TARGET_PID);</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">    if (override != null &amp;&amp; !override.isBlank()) {</span>
+<span class="fc" id="L39">      return candidates.stream().filter(d -&gt; d.id().equals(override.trim())).findFirst();</span>
+    }
+
+<span class="fc bfc" id="L42" title="All 2 branches covered.">    List&lt;VirtualMachineDescriptor&gt; others = candidates.stream().filter(d -&gt; !isSelf(d, selfPid)).toList();</span>
+    // Ambiguous with 0 or 2+ candidates: stay unattached rather than guess which one is the app.
+<span class="fc bfc" id="L44" title="All 2 branches covered.">    return others.size() == 1 ? Optional.of(others.get(0)) : Optional.empty();</span>
+  }
+
+  private static boolean isSelf(VirtualMachineDescriptor descriptor, long selfPid) {
+    try {
+<span class="fc bfc" id="L49" title="All 2 branches covered.">      return Long.parseLong(descriptor.id()) == selfPid;</span>
+<span class="nc" id="L50">    } catch (NumberFormatException e) {</span>
+<span class="nc" id="L51">      return false;</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
