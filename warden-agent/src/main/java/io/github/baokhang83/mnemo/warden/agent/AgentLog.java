@@ -12,11 +12,11 @@ import java.time.Instant;
  * stdout is never torn down, so logging there is reliable end-to-end &mdash; and for a sidecar,
  * stdout <em>is</em> the log stream (12-factor). This stays dependency-free per &sect;4.
  */
-final class AgentLog {
+public final class AgentLog {
 
   private AgentLog() {}
 
-  static void info(String message) {
+  public static void info(String message) {
     System.out.println(Instant.now() + " INFO  warden-agent - " + message);
   }
 }

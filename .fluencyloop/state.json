@@ -1,0 +1,8 @@
+{
+  "feature": "w-102-attach-to-target-jvm-via-attach-api-with-reconnect-and",
+  "branch": "feature/w-102-attach-to-target-jvm-via-attach-api-with-reconnect-and",
+  "stage": "build",
+  "last_session": "docs/fluencyloop/features/w-102-attach-to-target-jvm-via-attach-api-with-reconnect-and/sessions/slice-3-attachsupervisor-wardenagent-wiring.md",
+  "base_ref": "feature/example-native-sidecar-manifest-target-jvm-warden-as-init-co",
+  "updated": "2026-07-19"
+}
