@@ -17,9 +17,9 @@ import javax.management.ObjectName;
  * Forces a full collection on an attached target and waits for the collector's asynchronous
  * uncommit to actually return pages to the OS.
  *
- * <p>Unlike W-103's {@code ZgcSoftMax}, this is not ZGC-specific: {@link #forTarget(AttachedJvm)}
- * checks {@link GcCapabilities#supported()} (uncommit support), which is also true for G1 (via
- * periodic GC) &mdash; only {@link Collector#OTHER} gets rejected.
+ * <p>Not collector-specific: {@link #forTarget(AttachedJvm)} checks {@link
+ * GcCapabilities#supported()} (uncommit support), true for ZGC, Shenandoah, and G1 (via periodic
+ * GC) &mdash; only {@link Collector#OTHER} gets rejected.
  *
  * <p>{@code GC.run} is invoked over JMX as the zero-arg {@code gcRun} operation on the
  * {@code com.sun.management:type=DiagnosticCommand} MBean &mdash; the remote equivalent of

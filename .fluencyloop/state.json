@@ -1,8 +1,8 @@
 {
-  "feature": "w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm",
-  "branch": "feature/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm",
+  "feature": "w-106-shenandoah-driver-generalize-zgcsoftmax-to-softmax-via",
+  "branch": "feature/w-106-shenandoah-driver-generalize-zgcsoftmax-to-softmax-via",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm/sessions/slice-2-fix-cross-container-cgroup-resolution-for-real-ci.md",
+  "last_session": "docs/fluencyloop/features/w-106-shenandoah-driver-generalize-zgcsoftmax-to-softmax-via/sessions/slice-1-generalize-zgcsoftmax-to-softmax.md",
   "base_ref": "main",
   "updated": "2026-07-20"
 }
