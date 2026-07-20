@@ -6,6 +6,12 @@ A pod with two containers: a target JVM (`app`) and the Warden agent (`warden`) 
 **native sidecar** — an `initContainer` with `restartPolicy: Always`, which starts before the app,
 runs for the pod's whole life, and stops last (Kubernetes 1.29+).
 
+Also includes a `ServiceAccount`/`Role`/`RoleBinding` granting the sidecar the least-privilege
+RBAC it needs to resize its own `app` container in place (`patch` on `pods/resize`, `get` on
+`pods`, both scoped by `resourceNames` to this one pod) — the in-place resize subresource is GA
+from Kubernetes 1.35 (verified against a real 1.36 kind cluster; requires the
+`InPlacePodVerticalScaling` feature gate on earlier versions).
+
 ### Run it on kind
 
 ```bash

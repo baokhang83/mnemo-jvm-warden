@@ -5,7 +5,45 @@
 # That start-before / stop-after ordering is what lets the agent manage the target JVM safely
 # for the app's entire lifetime.
 #
+# Also grants the least-privilege RBAC PodResizeClient (W-201) needs to resize its own pod's
+# `app` container: `patch` on the `pods/resize` subresource and `get` on `pods`, scoped by
+# resourceNames to this one pod — nothing else in the namespace is touchable.
+#
+# Requires Kubernetes 1.35+ (in-place pod resize is GA there; verified against a real 1.36
+# kind cluster) or an earlier version with the `InPlacePodVerticalScaling` feature gate on.
+#
 # Apply to a kind cluster (see deploy/README.md); both containers should reach Ready.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: warden-example
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: warden-example-resize
+rules:
+  - apiGroups: [""]
+    resources: ["pods/resize"]
+    resourceNames: ["warden-example"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["warden-example"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: warden-example-resize
+subjects:
+  - kind: ServiceAccount
+    name: warden-example
+roleRef:
+  kind: Role
+  name: warden-example-resize
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: v1
 kind: Pod
 metadata:
@@ -13,6 +51,8 @@ metadata:
   labels:
     app.kubernetes.io/name: warden-example
 spec:
+  serviceAccountName: warden-example
+
   # Lets the Warden sidecar see the target JVM's PID — the prerequisite for the Attach API
   # (W-102). The agent attaches to whichever JVM this reveals that isn't itself.
   shareProcessNamespace: true
@@ -62,3 +102,10 @@ spec:
           memory: 256Mi
         limits:
           memory: 512Mi
+      # A JVM's own heap adapts to a lower/higher container memory limit without needing the
+      # container itself to restart (that's the whole point of W-103's SoftMaxHeapSize driver) —
+      # so memory resizes apply in place. CPU is left at the kubelet's default resize policy
+      # (RestartContainer) since Warden never resizes it.
+      resizePolicy:
+        - resourceName: memory
+          restartPolicy: NotRequired
