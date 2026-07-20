@@ -39,6 +39,28 @@ class RssReaderParsingTest {
 
   private static final String REAL_NMT_SUMMARY_DISABLED = "Native memory tracking is not enabled";
 
+  // Captured verbatim from /proc/<pid>/cgroup on a real GitHub Actions runner: no container
+  // boundary at all, so the target sits deep in the host's own cgroup tree.
+  private static final String REAL_CGROUP_NO_CONTAINER_BOUNDARY = "0::/system.slice/hosted-compute-agent.service\n";
+
+  // Captured verbatim from /proc/<pid>/cgroup, read from a sidecar targeting a sibling
+  // container's PID in a real kind pod: the "/.." marks the target's cgroup as outside the
+  // reader's own (private) cgroup namespace.
+  private static final String REAL_CGROUP_SIBLING_CONTAINER =
+      "0::/../cri-containerd-7771495e3a0363588a20dd8c3fd02a5679de692a7b2d9cf94b94247488ac9c6e.scope\n";
+
+  @Test
+  void parsesCgroupPathWithNoContainerBoundary() {
+    assertEquals("/system.slice/hosted-compute-agent.service", RssReader.parseCgroupPath(REAL_CGROUP_NO_CONTAINER_BOUNDARY));
+  }
+
+  @Test
+  void parsesCgroupPathEscapingToASiblingContainer() {
+    assertEquals(
+        "/../cri-containerd-7771495e3a0363588a20dd8c3fd02a5679de692a7b2d9cf94b94247488ac9c6e.scope",
+        RssReader.parseCgroupPath(REAL_CGROUP_SIBLING_CONTAINER));
+  }
+
   @Test
   void parsesInactiveFileFromRealMemoryStat() {
     assertEquals(83_902_464L, RssReader.parseInactiveFile(REAL_MEMORY_STAT));

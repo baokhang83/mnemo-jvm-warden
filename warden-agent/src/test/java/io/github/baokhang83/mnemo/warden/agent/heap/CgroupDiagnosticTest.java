@@ -36,6 +36,11 @@ class CgroupDiagnosticTest {
       if (Files.exists(viaRoot)) {
         list(viaRoot);
       }
+
+      Path resolved = RssReader.resolveCgroupRoot(pid);
+      System.out.println("=== RssReader.resolveCgroupRoot(" + pid + ") = " + resolved + " ===");
+      System.out.println("=== " + resolved.resolve("memory.current") + " exists? "
+          + Files.exists(resolved.resolve("memory.current")) + " ===");
     }
   }
 

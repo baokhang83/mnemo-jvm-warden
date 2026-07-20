@@ -47,8 +47,36 @@ public final class RssReader {
 
   /** @throws UnsupportedCgroupVersionException if the target is not on cgroup v2 */
   public static RssReader forTarget(AttachedJvm target) throws IOException {
-    Path cgroupRoot = Path.of("/proc", Long.toString(target.pid()), "root", "sys", "fs", "cgroup");
+    Path cgroupRoot = resolveCgroupRoot(target.pid());
     return forTarget(target.pid(), cgroupRoot, target.mbeanConnection());
+  }
+
+  /**
+   * {@code /proc/<pid>/root/sys/fs/cgroup} is only already the target's own resolved cgroup when
+   * the target has its own private cgroup namespace &mdash; true for a separate container in a
+   * pod (verified against a real kind pod), signaled by a {@code "/.."} escape prefix in {@code
+   * /proc/<pid>/cgroup}, since that marks the target's cgroup as living outside the *reader's*
+   * own cgroup namespace. Without that escape &mdash; no container boundary at all, verified on a
+   * real GitHub Actions runner &mdash; crossing into {@code /proc/<pid>/root} only changes the
+   * mount namespace, not the cgroup one, so the reported path must be appended by hand.
+   */
+  static Path resolveCgroupRoot(long pid) throws IOException {
+    Path procRoot = Path.of("/proc", Long.toString(pid), "root", "sys", "fs", "cgroup");
+    String cgroupFile = Files.readString(Path.of("/proc", Long.toString(pid), "cgroup"));
+    String relative = parseCgroupPath(cgroupFile);
+    if (relative.contains("..")) {
+      return procRoot;
+    }
+    String trimmed = relative.startsWith("/") ? relative.substring(1) : relative;
+    return trimmed.isEmpty() ? procRoot : procRoot.resolve(trimmed);
+  }
+
+  /** Package-private so the parsing logic is directly testable against captured real output. */
+  static String parseCgroupPath(String cgroupFileContents) {
+    // cgroup v2 unified hierarchy: a single line "0::<path>".
+    String line = cgroupFileContents.lines().findFirst().orElse("0::/");
+    int separator = line.indexOf("::");
+    return separator >= 0 ? line.substring(separator + 2) : "/";
   }
 
   /** Package-private seam so tests can point at a fake cgroup layout instead of a real one. */
