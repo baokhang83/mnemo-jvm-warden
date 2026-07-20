@@ -5,6 +5,7 @@ coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,Collector,0,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,GcDetector,0,65,0,9,0,15,0,9,0,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,UnsupportedCgroupVersionException,0,5,0,0,0,2,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,RssReading,0,12,0,0,0,1,0,1,0,1
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,G1PeriodicGc,0,51,0,2,0,14,0,5,0,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,RssReader,21,243,4,8,5,39,4,17,0,15
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,UncommitResult,0,9,0,0,0,1,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,DeepGc,18,134,4,12,5,38,4,11,0,7
