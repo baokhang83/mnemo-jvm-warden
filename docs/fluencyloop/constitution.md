@@ -59,6 +59,17 @@ system tends to rot unnoticed, since the recovery path runs rarely and gets test
 *A decision violates this when* "handle the failure" and "do the normal thing" are two
 different blocks of logic that could disagree about what happens next.
 
+### §7 — A verification poll needs positive evidence, not absence of change
+
+A poll that waits for a state transition (uncommit, RSS drop, resize completion) may only
+declare success once it has observed the transition actually happen. "No change since the
+last sample" is never itself proof of settling &mdash; it is indistinguishable from "the
+transition hasn't started yet." *Prevents* a false-positive completion that trusts silence
+instead of evidence, which is exactly what let W-104's first uncommit check report
+`completed: true` after ~750ms of nothing happening, four seconds before the real work would
+even begin. *A decision violates this when* a stability/completion check can be satisfied by
+a value that never moved at all.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by

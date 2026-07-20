@@ -1,8 +1,8 @@
 {
-  "feature": "w-103-zgc-driver-softmaxheapsize-get-set-via-hotspotdiagnost",
-  "branch": "feature/w-103-zgc-driver-softmaxheapsize-get-set-via-hotspotdiagnost",
+  "feature": "w-104-deep-gc-uncommit-trigger-gc-run-and-wait-for-asynchron",
+  "branch": "feature/w-104-deep-gc-uncommit-trigger-gc-run-and-wait-for-asynchron",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-103-zgc-driver-softmaxheapsize-get-set-via-hotspotdiagnost/sessions/slice-1-zgcsoftmax-unsupportedcollectorexception.md",
+  "last_session": "docs/fluencyloop/features/w-104-deep-gc-uncommit-trigger-gc-run-and-wait-for-asynchron/sessions/slice-1-deepgc-uncommitresult.md",
   "base_ref": "main",
-  "updated": "2026-07-19"
+  "updated": "2026-07-20"
 }
