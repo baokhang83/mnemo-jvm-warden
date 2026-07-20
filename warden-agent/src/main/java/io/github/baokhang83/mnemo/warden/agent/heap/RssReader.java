@@ -17,9 +17,10 @@ import javax.management.ObjectName;
  * (constitution §5) gates on.
  *
  * <p>The agent and target are <em>separate containers</em> in the same pod, so the agent's own
- * {@code /sys/fs/cgroup} is the wrong cgroup entirely. Verified against a real two-container pod:
- * {@code /proc/<pid>/root/sys/fs/cgroup}, reached through the shared PID namespace, resolves into
- * the target's own mount namespace and returns its real numbers.
+ * {@code /sys/fs/cgroup} is the wrong cgroup entirely. {@link #resolveCgroupRoot} finds the right
+ * one by reading {@code /proc/<pid>/cgroup} and combining it with {@code /proc/<pid>/root} &mdash;
+ * see its javadoc for the two real environments (private cgroup namespace vs. none) this had to
+ * be verified against before it worked in both.
  *
  * <p>Raw {@code memory.current} is not by itself trustworthy: verified on a real target that it
  * counted ~80MB of reclaimable page cache as "used." {@link #currentRss()} instead reports

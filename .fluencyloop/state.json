@@ -2,7 +2,7 @@
   "feature": "w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm",
   "branch": "feature/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm/sessions/slice-1-rssreader-rssreading.md",
+  "last_session": "docs/fluencyloop/features/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm/sessions/slice-2-fix-cross-container-cgroup-resolution-for-real-ci.md",
   "base_ref": "main",
   "updated": "2026-07-20"
 }
