@@ -1,8 +1,8 @@
 {
-  "feature": "w-107-g1-driver-periodic-gc-interval-knob-real-g1-uncommit-v",
-  "branch": "feature/w-107-g1-driver-periodic-gc-interval-knob-real-g1-uncommit-v",
+  "feature": "w-201-in-place-resize-client-via-raw-jdk-httpclient-against",
+  "branch": "feature/w-201-in-place-resize-client-via-raw-jdk-httpclient-against",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-107-g1-driver-periodic-gc-interval-knob-real-g1-uncommit-v/sessions/slice-1-g1periodicgc-deepgc-g1-test.md",
+  "last_session": "docs/fluencyloop/features/w-201-in-place-resize-client-via-raw-jdk-httpclient-against/sessions/slice-2-podresizeclient-deploy-manifest-rbac.md",
   "base_ref": "main",
   "updated": "2026-07-20"
 }
