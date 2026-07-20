@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SoftMax.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.heap</a> &gt; <span class="el_source">SoftMax.java</span></div><h1>SoftMax.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.heap;
+
+import com.sun.management.HotSpotDiagnosticMXBean;
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import java.io.IOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.util.List;
+
+/**
+ * Reads and writes a collector's runtime soft heap ceiling ({@code SoftMaxHeapSize}) on an
+ * attached target &amp;mdash; ZGC and Shenandoah both honor it (verified against a real Shenandoah
+ * target on the project's actual runtime image, {@code eclipse-temurin:21-jdk}, since it's the
+ * exact same VM option on both collectors); G1 does not.
+ *
+ * &lt;p&gt;Deliberately not (yet) a {@code HeapController}: {@code currentRss()} and
+ * {@code deepGcAndUncommit()} belong to {@link RssReader} and {@link DeepGc}. A
+ * {@code HeapController} implementation gets assembled once the M2 resize state machine actually
+ * needs the whole contract.
+ *
+ * &lt;p&gt;{@link #forTarget(AttachedJvm)} checks the target's real capabilities via {@link GcDetector}
+ * before ever touching the VM option: {@code HotSpotDiagnosticMXBean.setVMOption} succeeds
+ * silently on collectors that ignore {@code SoftMaxHeapSize} (G1 included, verified against a
+ * real target), so there is no exception to catch afterward &amp;mdash; the guard has to come first.
+ */
+public final class SoftMax {
+
+  private static final String OPTION = &quot;SoftMaxHeapSize&quot;;
+
+  private final HotSpotDiagnosticMXBean diagnostics;
+
+<span class="fc" id="L32">  private SoftMax(HotSpotDiagnosticMXBean diagnostics) {</span>
+<span class="fc" id="L33">    this.diagnostics = diagnostics;</span>
+<span class="fc" id="L34">  }</span>
+
+  /**
+   * @throws UnsupportedCollectorException if the target's collector doesn't support a runtime
+   *     soft max (currently: anything but ZGC and Shenandoah)
+   * @throws IOException if the JMX connection to the target fails
+   */
+  public static SoftMax forTarget(AttachedJvm target) throws IOException {
+<span class="fc" id="L42">    List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
+<span class="fc" id="L43">        ManagementFactory.getPlatformMXBeans(target.mbeanConnection(), GarbageCollectorMXBean.class);</span>
+<span class="fc" id="L44">    GcCapabilities capabilities = GcDetector.detect(gcBeans);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">    if (!capabilities.supportsSoftMax()) {</span>
+<span class="fc" id="L46">      throw new UnsupportedCollectorException(OPTION, capabilities.collector());</span>
+    }
+
+<span class="fc" id="L49">    HotSpotDiagnosticMXBean diagnostics =</span>
+<span class="fc" id="L50">        ManagementFactory.getPlatformMXBean(target.mbeanConnection(), HotSpotDiagnosticMXBean.class);</span>
+<span class="fc" id="L51">    return new SoftMax(diagnostics);</span>
+  }
+
+  /** The current soft heap ceiling, in bytes. */
+  public long softMaxHeapSize() {
+<span class="fc" id="L56">    return Long.parseLong(diagnostics.getVMOption(OPTION).getValue());</span>
+  }
+
+  /** Sets the soft heap ceiling, in bytes. Takes effect immediately; no restart needed. */
+  public void setSoftMaxHeapSize(long bytes) {
+<span class="fc" id="L61">    diagnostics.setVMOption(OPTION, Long.toString(bytes));</span>
+<span class="fc" id="L62">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
