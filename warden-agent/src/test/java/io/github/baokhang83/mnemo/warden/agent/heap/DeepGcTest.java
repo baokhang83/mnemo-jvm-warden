@@ -41,6 +41,31 @@ class DeepGcTest {
   }
 
   @Test
+  void runsCleanlyAgainstARealG1TargetWithoutRequiringAnObservedDrop() throws Exception {
+    // Unlike ZGC/Shenandoah, G1 has no equivalent uncommit-delay tunable and already reclaims
+    // fairly eagerly by default — confirmed by spiking against a real target that committed heap
+    // can already be back at its floor within ~1-2s of garbage becoming unreachable, well before
+    // this test can attach and take a "before" reading. That means completed:true (an *observed*
+    // drop, per the honest algorithm from W-104 / constitution §7) isn't reliably reproducible in
+    // a fast test here — so this asserts only that the real GC.run + polling mechanism runs
+    // cleanly against a real G1 target, not a specific timing outcome G1's own speed makes
+    // non-deterministic to catch.
+    // Xmx1200m, not 512m: garbageChurner's 400MB is briefly all-live (referenced by its local
+    // array until the method returns) before it becomes collectible, and G1 needs materially
+    // more headroom than ZGC for that same transient peak — confirmed by hitting a real OOM at
+    // 512m and 768m before settling on this size.
+    try (SpawnedJvm target = SpawnedJvm.garbageChurner("-XX:+UseG1GC", "-Xmx1200m", "-Xms64m");
+        AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
+      target.awaitStdoutLine("allocated", Duration.ofSeconds(10));
+
+      DeepGc deepGc = DeepGc.forTarget(attached);
+      UncommitResult result = deepGc.runAndAwaitUncommit(Duration.ofSeconds(5));
+
+      assertTrue(result.bytesUncommitted() >= 0, "committed heap should never appear to grow");
+    }
+  }
+
+  @Test
   void rejectsCleanlyOnARealSerialGcTarget() throws Exception {
     try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseSerialGC", "-Xmx256m");
         AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {

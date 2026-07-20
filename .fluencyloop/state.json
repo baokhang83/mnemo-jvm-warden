@@ -1,8 +1,8 @@
 {
-  "feature": "w-106-shenandoah-driver-generalize-zgcsoftmax-to-softmax-via",
-  "branch": "feature/w-106-shenandoah-driver-generalize-zgcsoftmax-to-softmax-via",
+  "feature": "w-107-g1-driver-periodic-gc-interval-knob-real-g1-uncommit-v",
+  "branch": "feature/w-107-g1-driver-periodic-gc-interval-knob-real-g1-uncommit-v",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-106-shenandoah-driver-generalize-zgcsoftmax-to-softmax-via/sessions/slice-1-generalize-zgcsoftmax-to-softmax.md",
+  "last_session": "docs/fluencyloop/features/w-107-g1-driver-periodic-gc-interval-knob-real-g1-uncommit-v/sessions/slice-1-g1periodicgc-deepgc-g1-test.md",
   "base_ref": "main",
   "updated": "2026-07-20"
 }
