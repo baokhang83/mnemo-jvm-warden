@@ -1,8 +1,8 @@
 {
-  "feature": "w-104-deep-gc-uncommit-trigger-gc-run-and-wait-for-asynchron",
-  "branch": "feature/w-104-deep-gc-uncommit-trigger-gc-run-and-wait-for-asynchron",
+  "feature": "w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm",
+  "branch": "feature/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-104-deep-gc-uncommit-trigger-gc-run-and-wait-for-asynchron/sessions/slice-1-deepgc-uncommitresult.md",
+  "last_session": "docs/fluencyloop/features/w-105-rss-reader-cgroup-v2-memory-current-reconciled-with-nm/sessions/slice-2-fix-cross-container-cgroup-resolution-for-real-ci.md",
   "base_ref": "main",
   "updated": "2026-07-20"
 }

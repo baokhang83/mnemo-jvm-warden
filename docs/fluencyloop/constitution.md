@@ -70,6 +70,17 @@ instead of evidence, which is exactly what let W-104's first uncommit check repo
 even begin. *A decision violates this when* a stability/completion check can be satisfied by
 a value that never moved at all.
 
+### §8 — Verify against the real target environment, not a look-alike
+
+When a design depends on the specifics of a deployment environment &mdash; container runtime,
+cgroup namespace, kernel behavior, CI platform &mdash; verify against the actual target
+environment before trusting a similar-looking substitute. *Prevents* a design that looks
+verified but only proves out on a stand-in: W-105's cgroup access worked in kind (a private
+cgroup namespace) and in Docker Desktop's own Linux VM, but broke on the real CI runner (no
+container boundary at all) &mdash; two different environments, two different results. *A
+decision violates this when* "verified" cites an environment other than the one the code will
+actually run in, without checking whether the substitution changes the thing being tested.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by
