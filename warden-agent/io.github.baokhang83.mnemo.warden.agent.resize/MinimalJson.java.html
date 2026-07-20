@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MinimalJson.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.resize</a> &gt; <span class="el_source">MinimalJson.java</span></div><h1>MinimalJson.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.resize;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * A minimal JSON reader: enough to navigate the Kubernetes API's response shape ({@code
+ * status.containerStatuses[].resources}) and nothing more &amp;mdash; no writer, no streaming, no
+ * generic (de)serialization.
+ *
+ * &lt;p&gt;Exists in preference to a JSON library because {@link PodResizeClient} only ever needs to
+ * read a handful of string leaves out of a known response shape; a dependency-free ~150-line
+ * reader keeps that need in proportion, matching the agent's zero-runtime-dependency
+ * architecture (the same reasoning that ruled out Fabric8 for the HTTP layer itself).
+ *
+ * &lt;p&gt;Parses into plain JDK types: {@link Map}&amp;lt;String,Object&amp;gt; for objects, {@link
+ * List}&amp;lt;Object&amp;gt; for arrays, {@link String}, {@link Double}, {@link Boolean}, or {@code
+ * null} for scalars &amp;mdash; callers navigate with ordinary casts, exactly like consuming any
+ * other parsed-tree JSON API.
+ *
+ * &lt;p&gt;Every character read goes through {@link #peek()}/{@link #next()}, which check bounds and
+ * throw {@link IllegalArgumentException} on truncated input &amp;mdash; not raw {@code
+ * String.charAt}, which would let an unchecked {@code StringIndexOutOfBoundsException} escape
+ * instead (caught by a test feeding truncated JSON, e.g. {@code &quot;{\&quot;a\&quot;:1&quot;} with no closing
+ * brace).
+ */
+final class MinimalJson {
+
+  private final String source;
+  private int pos;
+
+<span class="fc" id="L34">  private MinimalJson(String source) {</span>
+<span class="fc" id="L35">    this.source = source;</span>
+<span class="fc" id="L36">  }</span>
+
+  static Object parse(String json) {
+<span class="fc" id="L39">    MinimalJson parser = new MinimalJson(json);</span>
+<span class="fc" id="L40">    parser.skipWhitespace();</span>
+<span class="fc" id="L41">    Object value = parser.parseValue();</span>
+<span class="fc" id="L42">    parser.skipWhitespace();</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">    if (parser.pos != json.length()) {</span>
+<span class="nc" id="L44">      throw new IllegalArgumentException(&quot;trailing content after JSON value at index &quot; + parser.pos);</span>
+    }
+<span class="fc" id="L46">    return value;</span>
+  }
+
+  private Object parseValue() {
+<span class="fc" id="L50">    char c = peek();</span>
+<span class="fc bfc" id="L51" title="All 6 branches covered.">    return switch (c) {</span>
+<span class="fc" id="L52">      case '{' -&gt; parseObject();</span>
+<span class="fc" id="L53">      case '[' -&gt; parseArray();</span>
+<span class="fc" id="L54">      case '&quot;' -&gt; parseString();</span>
+<span class="fc" id="L55">      case 't', 'f' -&gt; parseBoolean();</span>
+<span class="fc" id="L56">      case 'n' -&gt; parseNull();</span>
+<span class="fc" id="L57">      default -&gt; parseNumber();</span>
+    };
+  }
+
+  private Map&lt;String, Object&gt; parseObject() {
+<span class="fc" id="L62">    Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L63">    expect('{');</span>
+<span class="fc" id="L64">    skipWhitespace();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    if (peek() == '}') {</span>
+<span class="fc" id="L66">      pos++;</span>
+<span class="fc" id="L67">      return result;</span>
+    }
+    while (true) {
+<span class="fc" id="L70">      skipWhitespace();</span>
+<span class="fc" id="L71">      String key = parseString();</span>
+<span class="fc" id="L72">      skipWhitespace();</span>
+<span class="fc" id="L73">      expect(':');</span>
+<span class="fc" id="L74">      skipWhitespace();</span>
+<span class="fc" id="L75">      result.put(key, parseValue());</span>
+<span class="fc" id="L76">      skipWhitespace();</span>
+<span class="fc" id="L77">      char c = next();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">      if (c == '}') {</span>
+<span class="fc" id="L79">        return result;</span>
+      }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">      if (c != ',') {</span>
+<span class="nc" id="L82">        throw new IllegalArgumentException(&quot;expected ',' or '}' at index &quot; + (pos - 1));</span>
+      }
+<span class="fc" id="L84">    }</span>
+  }
+
+  private List&lt;Object&gt; parseArray() {
+<span class="fc" id="L88">    List&lt;Object&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L89">    expect('[');</span>
+<span class="fc" id="L90">    skipWhitespace();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">    if (peek() == ']') {</span>
+<span class="fc" id="L92">      pos++;</span>
+<span class="fc" id="L93">      return result;</span>
+    }
+    while (true) {
+<span class="fc" id="L96">      skipWhitespace();</span>
+<span class="fc" id="L97">      result.add(parseValue());</span>
+<span class="fc" id="L98">      skipWhitespace();</span>
+<span class="fc" id="L99">      char c = next();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">      if (c == ']') {</span>
+<span class="fc" id="L101">        return result;</span>
+      }
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">      if (c != ',') {</span>
+<span class="nc" id="L104">        throw new IllegalArgumentException(&quot;expected ',' or ']' at index &quot; + (pos - 1));</span>
+      }
+<span class="fc" id="L106">    }</span>
+  }
+
+  private String parseString() {
+<span class="fc" id="L110">    expect('&quot;');</span>
+<span class="fc" id="L111">    StringBuilder result = new StringBuilder();</span>
+    while (true) {
+<span class="fc" id="L113">      char c = next();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">      if (c == '&quot;') {</span>
+<span class="fc" id="L115">        return result.toString();</span>
+      }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">      if (c != '\\') {</span>
+<span class="fc" id="L118">        result.append(c);</span>
+<span class="fc" id="L119">        continue;</span>
+      }
+<span class="fc" id="L121">      char escaped = next();</span>
+<span class="pc bpc" id="L122" title="5 of 10 branches missed.">      switch (escaped) {</span>
+<span class="fc" id="L123">        case '&quot;' -&gt; result.append('&quot;');</span>
+<span class="fc" id="L124">        case '\\' -&gt; result.append('\\');</span>
+<span class="fc" id="L125">        case '/' -&gt; result.append('/');</span>
+<span class="nc" id="L126">        case 'b' -&gt; result.append('\b');</span>
+<span class="nc" id="L127">        case 'f' -&gt; result.append('\f');</span>
+<span class="fc" id="L128">        case 'n' -&gt; result.append('\n');</span>
+<span class="nc" id="L129">        case 'r' -&gt; result.append('\r');</span>
+<span class="nc" id="L130">        case 't' -&gt; result.append('\t');</span>
+        case 'u' -&gt; {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">          if (pos + 4 &gt; source.length()) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;truncated \\u escape at index &quot; + (pos - 2));</span>
+          }
+<span class="fc" id="L135">          result.append((char) Integer.parseInt(source.substring(pos, pos + 4), 16));</span>
+<span class="fc" id="L136">          pos += 4;</span>
+<span class="fc" id="L137">        }</span>
+<span class="nc" id="L138">        default -&gt; throw new IllegalArgumentException(&quot;invalid escape '\\&quot; + escaped + &quot;' at index &quot; + (pos - 2));</span>
+      }
+<span class="fc" id="L140">    }</span>
+  }
+
+  private Boolean parseBoolean() {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">    if (source.startsWith(&quot;true&quot;, pos)) {</span>
+<span class="fc" id="L145">      pos += 4;</span>
+<span class="fc" id="L146">      return Boolean.TRUE;</span>
+    }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">    if (source.startsWith(&quot;false&quot;, pos)) {</span>
+<span class="fc" id="L149">      pos += 5;</span>
+<span class="fc" id="L150">      return Boolean.FALSE;</span>
+    }
+<span class="nc" id="L152">    throw new IllegalArgumentException(&quot;invalid literal at index &quot; + pos);</span>
+  }
+
+  private Object parseNull() {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">    if (source.startsWith(&quot;null&quot;, pos)) {</span>
+<span class="fc" id="L157">      pos += 4;</span>
+<span class="fc" id="L158">      return null;</span>
+    }
+<span class="fc" id="L160">    throw new IllegalArgumentException(&quot;invalid literal at index &quot; + pos);</span>
+  }
+
+  private Double parseNumber() {
+<span class="fc" id="L164">    int start = pos;</span>
+<span class="fc bfc" id="L165" title="All 4 branches covered.">    while (pos &lt; source.length() &amp;&amp; &quot;-+.eE0123456789&quot;.indexOf(source.charAt(pos)) &gt;= 0) {</span>
+<span class="fc" id="L166">      pos++;</span>
+    }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">    if (pos == start) {</span>
+<span class="fc" id="L169">      throw new IllegalArgumentException(&quot;expected a value at index &quot; + pos);</span>
+    }
+<span class="fc" id="L171">    return Double.parseDouble(source.substring(start, pos));</span>
+  }
+
+  private char peek() {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">    if (pos &gt;= source.length()) {</span>
+<span class="fc" id="L176">      throw new IllegalArgumentException(&quot;unexpected end of input at index &quot; + pos);</span>
+    }
+<span class="fc" id="L178">    return source.charAt(pos);</span>
+  }
+
+  private char next() {
+<span class="fc" id="L182">    char c = peek();</span>
+<span class="fc" id="L183">    pos++;</span>
+<span class="fc" id="L184">    return c;</span>
+  }
+
+  private void expect(char c) {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">    if (peek() != c) {</span>
+<span class="nc" id="L189">      throw new IllegalArgumentException(&quot;expected '&quot; + c + &quot;' at index &quot; + pos);</span>
+    }
+<span class="fc" id="L191">    pos++;</span>
+<span class="fc" id="L192">  }</span>
+
+  private void skipWhitespace() {
+<span class="fc bfc" id="L195" title="All 4 branches covered.">    while (pos &lt; source.length() &amp;&amp; Character.isWhitespace(source.charAt(pos))) {</span>
+<span class="fc" id="L196">      pos++;</span>
+    }
+<span class="fc" id="L198">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

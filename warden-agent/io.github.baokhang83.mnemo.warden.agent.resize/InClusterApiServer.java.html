@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InClusterApiServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.resize</a> &gt; <span class="el_source">InClusterApiServer.java</span></div><h1>InClusterApiServer.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.resize;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.function.Function;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+
+/**
+ * Coordinates for reaching the Kubernetes API server from inside the pod, using the credentials
+ * every pod is given automatically &amp;mdash; no RBAC beyond what {@link PodResizeClient}'s own
+ * calls need, and no external HTTP client library.
+ *
+ * &lt;p&gt;Verified against a real pod: {@code KUBERNETES_SERVICE_HOST}/{@code
+ * KUBERNETES_SERVICE_PORT} are injected by the kubelet into every pod's environment, and the
+ * bound service-account token, its namespace, and the cluster CA certificate are projected at
+ * {@value #SERVICE_ACCOUNT_DIR} by the default {@code kube-api-access-*} volume &amp;mdash; no
+ * explicit {@code volumeMounts} needed in the pod spec.
+ *
+ * &lt;p&gt;{@link #bearerToken()} re-reads the token file on every call rather than caching it: bound
+ * service-account tokens are time-limited (an hour, by default &amp;mdash; confirmed via a real
+ * token's {@code expirationSeconds: 3607}) and the kubelet rotates the file in place before
+ * expiry, so a long-lived sidecar that cached the token at startup would eventually start sending
+ * an expired one. This rotation-survival behavior is standard, documented kubelet behavior, but
+ * wasn't independently observed over a full rotation window here.
+ */
+public final class InClusterApiServer {
+
+<span class="fc" id="L36">  private static final Path SERVICE_ACCOUNT_DIR = Path.of(&quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;);</span>
+  private static final String ENV_HOST = &quot;KUBERNETES_SERVICE_HOST&quot;;
+  private static final String ENV_PORT = &quot;KUBERNETES_SERVICE_PORT&quot;;
+
+  private final String host;
+  private final int port;
+  private final String namespace;
+  private final Path tokenFile;
+  private final SSLContext trust;
+
+<span class="fc" id="L46">  InClusterApiServer(String host, int port, String namespace, Path tokenFile, SSLContext trust) {</span>
+<span class="fc" id="L47">    this.host = host;</span>
+<span class="fc" id="L48">    this.port = port;</span>
+<span class="fc" id="L49">    this.namespace = namespace;</span>
+<span class="fc" id="L50">    this.tokenFile = tokenFile;</span>
+<span class="fc" id="L51">    this.trust = trust;</span>
+<span class="fc" id="L52">  }</span>
+
+  /** Reads the standard in-cluster environment and mounted service-account volume. */
+  public static InClusterApiServer discover() throws IOException, GeneralSecurityException {
+<span class="nc" id="L56">    return discover(System::getenv, SERVICE_ACCOUNT_DIR);</span>
+  }
+
+  /**
+   * Package-private seam so tests can supply a fake environment and a fake service-account
+   * directory (e.g. a {@code @TempDir} with a throwaway self-signed cert) instead of the real
+   * in-pod paths, which don't exist outside a real pod.
+   */
+  static InClusterApiServer discover(Function&lt;String, String&gt; env, Path serviceAccountDir)
+      throws IOException, GeneralSecurityException {
+<span class="fc" id="L66">    String host = requireEnv(env, ENV_HOST);</span>
+<span class="fc" id="L67">    int port = Integer.parseInt(requireEnv(env, ENV_PORT));</span>
+<span class="fc" id="L68">    String namespace = Files.readString(serviceAccountDir.resolve(&quot;namespace&quot;)).trim();</span>
+<span class="fc" id="L69">    Path tokenFile = serviceAccountDir.resolve(&quot;token&quot;);</span>
+<span class="fc" id="L70">    SSLContext trust = trustingClusterCa(serviceAccountDir.resolve(&quot;ca.crt&quot;));</span>
+<span class="fc" id="L71">    return new InClusterApiServer(host, port, namespace, tokenFile, trust);</span>
+  }
+
+  /** The namespace this pod runs in. */
+  public String namespace() {
+<span class="fc" id="L76">    return namespace;</span>
+  }
+
+  /** The API server's base URI, e.g. {@code https://10.96.0.1:443}. */
+  public URI baseUri() {
+<span class="fc" id="L81">    return URI.create(&quot;https://&quot; + host + &quot;:&quot; + port);</span>
+  }
+
+  /** The current bearer token, read fresh from disk (see class javadoc on why it isn't cached). */
+  public String bearerToken() throws IOException {
+<span class="fc" id="L86">    return Files.readString(tokenFile).trim();</span>
+  }
+
+  /** An {@link SSLContext} that trusts only the cluster's own CA, not the JDK's public trust store. */
+  public SSLContext sslContext() {
+<span class="fc" id="L91">    return trust;</span>
+  }
+
+  private static String requireEnv(Function&lt;String, String&gt; env, String name) {
+<span class="fc" id="L95">    String value = env.apply(name);</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">    if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L97">      throw new IllegalStateException(name + &quot; is not set; is this process running in a pod?&quot;);</span>
+    }
+<span class="fc" id="L99">    return value;</span>
+  }
+
+  private static SSLContext trustingClusterCa(Path caCertFile) throws IOException, GeneralSecurityException {
+<span class="fc" id="L103">    CertificateFactory certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+    X509Certificate caCert;
+<span class="fc" id="L105">    try (InputStream in = Files.newInputStream(caCertFile)) {</span>
+<span class="fc" id="L106">      caCert = (X509Certificate) certificateFactory.generateCertificate(in);</span>
+    }
+
+<span class="fc" id="L109">    KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="fc" id="L110">    trustStore.load(null, null);</span>
+<span class="fc" id="L111">    trustStore.setCertificateEntry(&quot;cluster-ca&quot;, caCert);</span>
+
+    TrustManagerFactory trustManagerFactory =
+<span class="fc" id="L114">        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());</span>
+<span class="fc" id="L115">    trustManagerFactory.init(trustStore);</span>
+
+<span class="fc" id="L117">    SSLContext sslContext = SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="fc" id="L118">    sslContext.init(null, trustManagerFactory.getTrustManagers(), null);</span>
+<span class="fc" id="L119">    return sslContext;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

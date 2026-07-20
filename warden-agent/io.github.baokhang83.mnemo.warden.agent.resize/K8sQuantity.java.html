@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>K8sQuantity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.resize</a> &gt; <span class="el_source">K8sQuantity.java</span></div><h1>K8sQuantity.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.resize;
+
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Parses a Kubernetes resource {@code Quantity} string into a byte count.
+ *
+ * &lt;p&gt;Exists because the API server normalizes memory quantities in {@code status}: a value
+ * {@link PodResizeClient} PATCHes as a plain byte count (e.g. {@code &quot;209715200&quot;}) comes back in
+ * {@code status.containerStatuses[].resources} as a different string for the same value (e.g.
+ * {@code &quot;200Mi&quot;}) &amp;mdash; verified against a real target. Confirming a resize therefore requires
+ * parsing both sides to bytes and comparing numerically; string equality would never match, even
+ * on success.
+ *
+ * &lt;p&gt;Covers the suffixes the API server actually emits for memory (binary: Ki/Mi/Gi/Ti/Pi/Ei;
+ * decimal: k/M/G/T/P/E; or a bare integer) &amp;mdash; not the full Quantity grammar (no exponential
+ * notation), since that's all {@link PodResizeClient} ever needs to read back.
+ */
+public final class K8sQuantity {
+
+<span class="fc" id="L24">  private static final Map&lt;String, BigDecimal&gt; BINARY_SUFFIXES =</span>
+<span class="fc" id="L25">      Map.of(</span>
+<span class="fc" id="L26">          &quot;Ki&quot;, BigDecimal.valueOf(1024L),</span>
+<span class="fc" id="L27">          &quot;Mi&quot;, BigDecimal.valueOf(1024L * 1024),</span>
+<span class="fc" id="L28">          &quot;Gi&quot;, BigDecimal.valueOf(1024L * 1024 * 1024),</span>
+<span class="fc" id="L29">          &quot;Ti&quot;, BigDecimal.valueOf(1024L * 1024 * 1024 * 1024),</span>
+<span class="fc" id="L30">          &quot;Pi&quot;, BigDecimal.valueOf(1024L * 1024 * 1024 * 1024 * 1024),</span>
+<span class="fc" id="L31">          &quot;Ei&quot;, BigDecimal.valueOf(1024L * 1024 * 1024 * 1024 * 1024 * 1024));</span>
+
+<span class="fc" id="L33">  private static final Map&lt;String, BigDecimal&gt; DECIMAL_SUFFIXES =</span>
+<span class="fc" id="L34">      Map.of(</span>
+<span class="fc" id="L35">          &quot;k&quot;, BigDecimal.valueOf(1_000L),</span>
+<span class="fc" id="L36">          &quot;M&quot;, BigDecimal.valueOf(1_000_000L),</span>
+<span class="fc" id="L37">          &quot;G&quot;, BigDecimal.valueOf(1_000_000_000L),</span>
+<span class="fc" id="L38">          &quot;T&quot;, BigDecimal.valueOf(1_000_000_000_000L),</span>
+<span class="fc" id="L39">          &quot;P&quot;, BigDecimal.valueOf(1_000_000_000_000_000L),</span>
+<span class="fc" id="L40">          &quot;E&quot;, BigDecimal.valueOf(1_000_000_000_000_000_000L));</span>
+
+<span class="fc" id="L42">  private static final Pattern QUANTITY = Pattern.compile(&quot;^(\\d+(?:\\.\\d+)?)([A-Za-z]*)$&quot;);</span>
+
+  private K8sQuantity() {}
+
+  /** Parses a Quantity string (e.g. {@code &quot;200Mi&quot;}, {@code &quot;1500000000&quot;}) into a byte count. */
+  public static long parseBytes(String quantity) {
+<span class="fc" id="L48">    Matcher matcher = QUANTITY.matcher(quantity.trim());</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">    if (!matcher.matches()) {</span>
+<span class="fc" id="L50">      throw new IllegalArgumentException(&quot;not a recognized Quantity: &quot; + quantity);</span>
+    }
+
+<span class="fc" id="L53">    BigDecimal number = new BigDecimal(matcher.group(1));</span>
+<span class="fc" id="L54">    String suffix = matcher.group(2);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">    if (suffix.isEmpty()) {</span>
+<span class="fc" id="L56">      return number.longValueExact();</span>
+    }
+
+<span class="fc" id="L59">    BigDecimal multiplier = BINARY_SUFFIXES.get(suffix);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    if (multiplier == null) {</span>
+<span class="fc" id="L61">      multiplier = DECIMAL_SUFFIXES.get(suffix);</span>
+    }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    if (multiplier == null) {</span>
+<span class="fc" id="L64">      throw new IllegalArgumentException(&quot;unsupported Quantity suffix: &quot; + suffix + &quot; in &quot; + quantity);</span>
+    }
+<span class="fc" id="L66">    return number.multiply(multiplier).longValueExact();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
