@@ -1,8 +1,8 @@
 {
-  "feature": "w-201-in-place-resize-client-via-raw-jdk-httpclient-against",
-  "branch": "feature/w-201-in-place-resize-client-via-raw-jdk-httpclient-against",
+  "feature": "w-202-native-sidecar-lifecycle-ordering-verified-via-causali",
+  "branch": "feature/w-202-native-sidecar-lifecycle-ordering-verified-via-causali",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-201-in-place-resize-client-via-raw-jdk-httpclient-against/sessions/slice-2-podresizeclient-deploy-manifest-rbac.md",
+  "last_session": "docs/fluencyloop/features/w-202-native-sidecar-lifecycle-ordering-verified-via-causali/sessions/slice-1-lifecycle-check-manifest-verify-lifecycle-ordering-s.md",
   "base_ref": "main",
   "updated": "2026-07-20"
 }

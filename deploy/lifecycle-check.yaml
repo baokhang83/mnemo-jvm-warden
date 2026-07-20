@@ -1,0 +1,50 @@
+# Verifies the native-sidecar ordering guarantee itself (W-202) — that an initContainer with
+# `restartPolicy: Always` genuinely starts before the main container and stops after it — using
+# minimal generic containers rather than the real Warden image, since this is a Kubernetes
+# platform guarantee, not Warden application logic, and isolating it keeps the proof independent
+# of anything else in the agent.
+#
+# Ordering is proven by causality, not wall-clock timestamps: each container touches a marker
+# file on a shared emptyDir when it starts and removes it right before it exits, then checks for
+# the OTHER container's marker at that same moment. Driven by deploy/verify-lifecycle-ordering.sh.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-check
+spec:
+  shareProcessNamespace: true
+  terminationGracePeriodSeconds: 15
+  volumes:
+    - name: shared
+      emptyDir: {}
+  initContainers:
+    - name: sidecar
+      image: busybox:1.36
+      restartPolicy: Always # <-- native sidecar
+      volumeMounts:
+        - name: shared
+          mountPath: /shared
+      command: ["sh", "-c"]
+      args:
+        - |
+          trap 'echo "STOP-ORDER: app-marker-present=$([ -f /shared/app-alive ] && echo yes || echo no)"; rm -f /shared/sidecar-alive; exit 0' TERM
+          touch /shared/sidecar-alive
+          echo "START-ORDER: app-marker-present=$([ -f /shared/app-alive ] && echo yes || echo no)"
+          while true; do sleep 1; done
+      readinessProbe:
+        exec:
+          command: ["true"]
+        periodSeconds: 1
+  containers:
+    - name: app
+      image: busybox:1.36
+      volumeMounts:
+        - name: shared
+          mountPath: /shared
+      command: ["sh", "-c"]
+      args:
+        - |
+          trap 'echo "app SIGTERM received"; rm -f /shared/app-alive; exit 0' TERM
+          echo "START-ORDER: sidecar-marker-present=$([ -f /shared/sidecar-alive ] && echo yes || echo no)"
+          touch /shared/app-alive
+          while true; do sleep 1; done
