@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DeepGc.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.heap</a> &gt; <span class="el_source">DeepGc.java</span></div><h1>DeepGc.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.heap;
+
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import java.io.IOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import javax.management.JMException;
+import javax.management.MBeanServerConnection;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+
+/**
+ * Forces a full collection on an attached target and waits for the collector's asynchronous
+ * uncommit to actually return pages to the OS.
+ *
+ * &lt;p&gt;Unlike W-103's {@code ZgcSoftMax}, this is not ZGC-specific: {@link #forTarget(AttachedJvm)}
+ * checks {@link GcCapabilities#supported()} (uncommit support), which is also true for G1 (via
+ * periodic GC) &amp;mdash; only {@link Collector#OTHER} gets rejected.
+ *
+ * &lt;p&gt;{@code GC.run} is invoked over JMX as the zero-arg {@code gcRun} operation on the
+ * {@code com.sun.management:type=DiagnosticCommand} MBean &amp;mdash; the remote equivalent of
+ * {@code jcmd &lt;pid&gt; GC.run}; {@code System.gc()} cannot be called on a remote process at all.
+ * Uncommit itself has no completion signal to wait on, so {@link #runAndAwaitUncommit} polls
+ * {@link MemoryMXBean#getHeapMemoryUsage()}'s committed size until it stabilizes or the caller's
+ * timeout elapses. Note for callers: ZGC's default {@code ZUncommitDelay} is 300 seconds, so a
+ * short timeout here can validly come back {@code completed: false} in production.
+ */
+public final class DeepGc {
+
+  private static final String OPERATION = &quot;deep GC + uncommit&quot;;
+<span class="fc" id="L35">  private static final ObjectName DIAGNOSTIC_COMMAND = objectName(&quot;com.sun.management:type=DiagnosticCommand&quot;);</span>
+<span class="fc" id="L36">  private static final Duration POLL_INTERVAL = Duration.ofMillis(250);</span>
+  private static final int STABLE_SAMPLES = 3;
+
+  private final MBeanServerConnection connection;
+  private final MemoryMXBean memory;
+
+<span class="fc" id="L42">  private DeepGc(MBeanServerConnection connection, MemoryMXBean memory) {</span>
+<span class="fc" id="L43">    this.connection = connection;</span>
+<span class="fc" id="L44">    this.memory = memory;</span>
+<span class="fc" id="L45">  }</span>
+
+  /**
+   * @throws UnsupportedCollectorException if the target's collector doesn't support uncommit
+   * @throws IOException if the JMX connection to the target fails
+   */
+  public static DeepGc forTarget(AttachedJvm target) throws IOException {
+<span class="fc" id="L52">    List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
+<span class="fc" id="L53">        ManagementFactory.getPlatformMXBeans(target.mbeanConnection(), GarbageCollectorMXBean.class);</span>
+<span class="fc" id="L54">    GcCapabilities capabilities = GcDetector.detect(gcBeans);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">    if (!capabilities.supported()) {</span>
+<span class="fc" id="L56">      throw new UnsupportedCollectorException(OPERATION, capabilities.collector());</span>
+    }
+
+<span class="fc" id="L59">    MemoryMXBean memory = ManagementFactory.getPlatformMXBean(target.mbeanConnection(), MemoryMXBean.class);</span>
+<span class="fc" id="L60">    return new DeepGc(target.mbeanConnection(), memory);</span>
+  }
+
+  /**
+   * Forces {@code GC.run}, then polls until the committed heap has visibly dropped and then held
+   * steady for {@link #STABLE_SAMPLES} consecutive samples, or {@code timeout} elapses.
+   *
+   * &lt;p&gt;&quot;Unchanged&quot; is only trusted as &quot;settled&quot; once at least one drop has actually been
+   * observed &amp;mdash; an unchanged reading from the very first sample is indistinguishable from
+   * &quot;the {@code ZUncommitDelay} window just hasn't elapsed yet&quot; from &quot;there was nothing to free,&quot;
+   * so it does not by itself count as completion. A target with genuinely nothing to uncommit
+   * therefore consumes the full timeout before returning {@code completed: false} &amp;mdash; slower,
+   * but honest: there is no signal that lets this method tell the two cases apart any earlier.
+   */
+  public UncommitResult runAndAwaitUncommit(Duration timeout) throws IOException, InterruptedException {
+<span class="fc" id="L75">    long before = committed();</span>
+<span class="fc" id="L76">    triggerGcRun();</span>
+
+<span class="fc" id="L78">    Instant deadline = Instant.now().plus(timeout);</span>
+<span class="fc" id="L79">    long lastSeen = before;</span>
+<span class="fc" id="L80">    boolean everDropped = false;</span>
+<span class="fc" id="L81">    int stableSamples = 0;</span>
+
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">    while (Instant.now().isBefore(deadline)) {</span>
+<span class="fc" id="L84">      Thread.sleep(POLL_INTERVAL.toMillis());</span>
+<span class="fc" id="L85">      long sample = committed();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">      if (sample &lt; lastSeen) {</span>
+<span class="fc" id="L87">        everDropped = true;</span>
+<span class="fc" id="L88">        stableSamples = 0;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">      } else if (sample == lastSeen) {</span>
+<span class="fc" id="L90">        stableSamples++;</span>
+      } else {
+<span class="nc" id="L92">        stableSamples = 0;</span>
+      }
+<span class="fc" id="L94">      lastSeen = sample;</span>
+
+<span class="fc bfc" id="L96" title="All 4 branches covered.">      if (everDropped &amp;&amp; stableSamples &gt;= STABLE_SAMPLES) {</span>
+<span class="fc" id="L97">        break;</span>
+      }
+<span class="fc" id="L99">    }</span>
+
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">    boolean completed = everDropped &amp;&amp; stableSamples &gt;= STABLE_SAMPLES;</span>
+<span class="fc" id="L102">    return new UncommitResult(before - lastSeen, completed);</span>
+  }
+
+  private long committed() {
+<span class="fc" id="L106">    return memory.getHeapMemoryUsage().getCommitted();</span>
+  }
+
+  private void triggerGcRun() throws IOException {
+    try {
+<span class="fc" id="L111">      connection.invoke(DIAGNOSTIC_COMMAND, &quot;gcRun&quot;, new Object[0], new String[0]);</span>
+<span class="nc" id="L112">    } catch (JMException e) {</span>
+<span class="nc" id="L113">      throw new IOException(&quot;failed to invoke GC.run on target&quot;, e);</span>
+<span class="fc" id="L114">    }</span>
+<span class="fc" id="L115">  }</span>
+
+  private static ObjectName objectName(String name) {
+    try {
+<span class="fc" id="L119">      return new ObjectName(name);</span>
+<span class="nc" id="L120">    } catch (MalformedObjectNameException e) {</span>
+<span class="nc" id="L121">      throw new AssertionError(&quot;hardcoded ObjectName is invalid: &quot; + name, e);</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
