@@ -1,7 +1,6 @@
 package io.github.baokhang83.mnemo.warden.agent.testsupport;
 
 import com.sun.tools.attach.VirtualMachine;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.IOException;
@@ -11,17 +10,28 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import javax.management.remote.JMXConnector;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXServiceURL;
 
 /**
  * Spawns a throwaway JVM (JEP 330 single-file source launch) as a real attach target for tests
- * &mdash; the Attach API / JMX bootstrap, and now collector-specific VM options, are exactly the
- * kind of platform plumbing a mock would hide breakage in.
+ * &mdash; the JMX bootstrap, and collector-specific VM options, are exactly the kind of platform
+ * plumbing a mock would hide breakage in.
+ *
+ * <p>Every spawned target opens the loopback-only JMX port {@link TargetAttacher} connects
+ * through (see its javadoc for why: the Attach API cannot cross a real UID mismatch, verified on
+ * a real cluster). Tests run sequentially (no parallel execution configured), and each {@link
+ * SpawnedJvm} is closed before the next spawns, so a single fixed port is safe here &mdash; no
+ * two targets are ever listening on it at once.
  */
 public final class SpawnedJvm implements Closeable {
+
+  /** Matches {@link TargetAttacher#DEFAULT_JMX_PORT}. */
+  private static final int JMX_PORT = 9999;
 
   private final Process process;
   private final BlockingQueue<String> stdoutLines = new LinkedBlockingQueue<>();
@@ -82,6 +92,12 @@ public final class SpawnedJvm implements Closeable {
 
     List<String> command = new ArrayList<>();
     command.add(System.getProperty("java.home") + "/bin/java");
+    command.add("-Dcom.sun.management.jmxremote.port=" + JMX_PORT);
+    command.add("-Dcom.sun.management.jmxremote.rmi.port=" + JMX_PORT);
+    command.add("-Dcom.sun.management.jmxremote.host=127.0.0.1");
+    command.add("-Dcom.sun.management.jmxremote.authenticate=false");
+    command.add("-Dcom.sun.management.jmxremote.ssl=false");
+    command.add("-Djava.rmi.server.hostname=127.0.0.1");
     command.addAll(List.of(jvmArgs));
     command.add(source.toString());
     ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
@@ -96,18 +112,49 @@ public final class SpawnedJvm implements Closeable {
     return process;
   }
 
-  /** Waits for the target's attach socket to appear, then returns its descriptor. */
-  public VirtualMachineDescriptor awaitDescriptor() throws InterruptedException {
+  /**
+   * Waits for the target's process to appear in {@link VirtualMachine#list()}, <em>and</em> for
+   * its JMX RMI registry to actually complete a connect-and-close round trip.
+   *
+   * <p>The second wait matters, and a raw TCP connect is not enough to prove it: a TCP {@code
+   * SYN}/{@code ACK} succeeds the instant the OS accepts the connection, well before the RMI
+   * registry has finished exporting its object table &mdash; observed directly as a flaky
+   * "connection refused" (registry not up yet) and, once tests reused the same fixed port back to
+   * back, a flakier {@code NoSuchObjectException: no such object in table} (a stale registry
+   * reference from the just-replaced previous target's JVM). A full {@code
+   * JMXConnectorFactory.connect()} + close is the only check that actually proves the *new*
+   * registry is live. {@code AttachSupervisor}'s own retry loop absorbs this timing in
+   * production; tests that call {@code TargetAttacher.attach(target.pid())} directly, once, need
+   * this method to have already absorbed it instead.
+   */
+  public void awaitReady() throws InterruptedException {
     String pidString = Long.toString(pid());
+    boolean visible = false;
     for (int i = 0; i < 100; i++) {
-      Optional<VirtualMachineDescriptor> found =
-          VirtualMachine.list().stream().filter(d -> d.id().equals(pidString)).findFirst();
-      if (found.isPresent()) {
-        return found.get();
+      if (VirtualMachine.list().stream().anyMatch(d -> d.id().equals(pidString))) {
+        visible = true;
+        break;
       }
       Thread.sleep(100);
     }
-    throw new AssertionError("spawned JVM (pid " + pid() + ") never appeared in VirtualMachine.list()");
+    if (!visible) {
+      throw new AssertionError("spawned JVM (pid " + pid() + ") never appeared in VirtualMachine.list()");
+    }
+
+    JMXServiceURL url;
+    try {
+      url = new JMXServiceURL("service:jmx:rmi:///jndi/rmi://127.0.0.1:" + JMX_PORT + "/jmxrmi");
+    } catch (java.net.MalformedURLException e) {
+      throw new AssertionError("hardcoded JMX service URL is invalid", e);
+    }
+    for (int i = 0; i < 100; i++) {
+      try (JMXConnector connector = JMXConnectorFactory.connect(url)) {
+        return;
+      } catch (IOException e) {
+        Thread.sleep(100);
+      }
+    }
+    throw new AssertionError("spawned JVM (pid " + pid() + ") never opened its JMX port (" + JMX_PORT + ")");
   }
 
   /**

@@ -20,7 +20,8 @@ class TargetAttacherTest {
   @Test
   void attachesAndReadsTheTargetsGcBeans() throws Exception {
     try (SpawnedJvm target = SpawnedJvm.sleeper()) {
-      try (AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
+      target.awaitReady();
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
         assertEquals(target.pid(), attached.pid());
         assertTrue(attached.isAlive());
 
@@ -34,7 +35,8 @@ class TargetAttacherTest {
   @Test
   void isAliveGoesFalseAfterTheTargetExits() throws Exception {
     try (SpawnedJvm target = SpawnedJvm.sleeper()) {
-      AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor());
+      target.awaitReady();
+      AttachedJvm attached = TargetAttacher.attach(target.pid());
       try {
         target.close();
         target.process().waitFor();

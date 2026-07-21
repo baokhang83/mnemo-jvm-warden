@@ -1,14 +1,13 @@
 package io.github.baokhang83.mnemo.warden.agent.attach;
 
-import com.sun.tools.attach.VirtualMachine;
 import java.io.Closeable;
 import java.io.IOException;
 import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
 
 /**
- * A live connection to the target JVM: its PID, the {@link VirtualMachine} handle used to attach,
- * and the JMX connection opened over that attachment.
+ * A live connection to the target JVM: its PID and the JMX connection opened over its
+ * loopback-bound JMX port (see {@link TargetAttacher} for why not the Attach API).
  *
  * <p>{@link #mbeanConnection()} is what lets W-101's {@code GcDetector} and later heap drivers
  * read/act on the target's MXBeans exactly as they would locally &mdash;
@@ -18,14 +17,11 @@ import javax.management.remote.JMXConnector;
 public final class AttachedJvm implements Closeable {
 
   private final long pid;
-  private final VirtualMachine virtualMachine;
   private final JMXConnector connector;
   private final MBeanServerConnection mbeanServerConnection;
 
-  AttachedJvm(
-      long pid, VirtualMachine virtualMachine, JMXConnector connector, MBeanServerConnection mbeanServerConnection) {
+  AttachedJvm(long pid, JMXConnector connector, MBeanServerConnection mbeanServerConnection) {
     this.pid = pid;
-    this.virtualMachine = virtualMachine;
     this.connector = connector;
     this.mbeanServerConnection = mbeanServerConnection;
   }
@@ -46,10 +42,9 @@ public final class AttachedJvm implements Closeable {
   }
 
   /**
-   * Closes the JMX connector and detaches from the target. Safe to call once the target has
-   * already exited &mdash; that is precisely the case this exists for (cleanup after a dead
-   * target, before {@code AttachSupervisor} retries), so a severed connection is not a failure
-   * here, just expected.
+   * Closes the JMX connector. Safe to call once the target has already exited &mdash; that is
+   * precisely the case this exists for (cleanup after a dead target, before {@code
+   * AttachSupervisor} retries), so a severed connection is not a failure here, just expected.
    */
   @Override
   public void close() {
@@ -57,11 +52,6 @@ public final class AttachedJvm implements Closeable {
       connector.close();
     } catch (IOException e) {
       // The target's RMI connection is already gone; nothing left to close.
-    }
-    try {
-      virtualMachine.detach();
-    } catch (IOException e) {
-      // Same reasoning: the target may already be gone.
     }
   }
 }

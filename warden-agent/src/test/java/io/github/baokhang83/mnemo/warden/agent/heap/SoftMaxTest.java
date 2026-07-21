@@ -22,14 +22,16 @@ class SoftMaxTest {
 
   @Test
   void readsAndSetsTheSoftCeilingOnARealZgcTarget() throws Exception {
-    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseZGC", "-Xmx512m", "-Xms64m", "-XX:SoftMaxHeapSize=400m");
-        AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
-      SoftMax softMax = SoftMax.forTarget(attached);
+    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseZGC", "-Xmx512m", "-Xms64m", "-XX:SoftMaxHeapSize=400m")) {
+      target.awaitReady();
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
+        SoftMax softMax = SoftMax.forTarget(attached);
 
-      assertEquals(400L * 1024 * 1024, softMax.softMaxHeapSize());
+        assertEquals(400L * 1024 * 1024, softMax.softMaxHeapSize());
 
-      softMax.setSoftMaxHeapSize(300L * 1024 * 1024);
-      assertEquals(300L * 1024 * 1024, softMax.softMaxHeapSize());
+        softMax.setSoftMaxHeapSize(300L * 1024 * 1024);
+        assertEquals(300L * 1024 * 1024, softMax.softMaxHeapSize());
+      }
     }
   }
 
@@ -44,8 +46,9 @@ class SoftMaxTest {
             "-XX:SoftMaxHeapSize=400m")) {
       Thread.sleep(800); // a JDK without Shenandoah built in fails startup almost immediately
       Assumptions.assumeTrue(target.process().isAlive(), "Shenandoah is not available on this JDK");
+      target.awaitReady();
 
-      try (AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
         SoftMax softMax = SoftMax.forTarget(attached);
 
         assertEquals(400L * 1024 * 1024, softMax.softMaxHeapSize());
@@ -58,12 +61,14 @@ class SoftMaxTest {
 
   @Test
   void rejectsCleanlyOnARealG1Target() throws Exception {
-    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseG1GC", "-Xmx512m");
-        AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
-      UnsupportedCollectorException thrown =
-          assertThrows(UnsupportedCollectorException.class, () -> SoftMax.forTarget(attached));
+    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseG1GC", "-Xmx512m")) {
+      target.awaitReady();
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
+        UnsupportedCollectorException thrown =
+            assertThrows(UnsupportedCollectorException.class, () -> SoftMax.forTarget(attached));
 
-      assertEquals(Collector.G1, thrown.actual());
+        assertEquals(Collector.G1, thrown.actual());
+      }
     }
   }
 }

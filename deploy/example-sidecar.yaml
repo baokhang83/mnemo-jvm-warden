@@ -12,6 +12,9 @@
 # Requires Kubernetes 1.35+ (in-place pod resize is GA there; verified against a real 1.36
 # kind cluster) or an earlier version with the `InPlacePodVerticalScaling` feature gate on.
 #
+# The `app` container's JMX flags are required, not optional — see the comment on that
+# container below, and TargetAttacher's javadoc, for why (bug #55).
+#
 # Apply to a kind cluster (see deploy/README.md); both containers should reach Ready.
 apiVersion: v1
 kind: ServiceAccount
@@ -53,8 +56,9 @@ metadata:
 spec:
   serviceAccountName: warden-example
 
-  # Lets the Warden sidecar see the target JVM's PID — the prerequisite for the Attach API
-  # (W-102). The agent attaches to whichever JVM this reveals that isn't itself.
+  # Lets the Warden sidecar see the target JVM's PID via /proc (W-102's TargetLocator). The
+  # actual connection goes over the app's JMX port below, not this — shareProcessNamespace only
+  # needs to answer "is there exactly one other JVM, and is it still alive."
   shareProcessNamespace: true
 
   initContainers:
@@ -86,8 +90,33 @@ spec:
     - name: app
       # The target JVM Warden manages. A real long-running JVM — the JDK's Simple Web Server —
       # using the default collector (G1), which the agent's GcDetector recognises.
+      #
+      # Launched via `java -m jdk.httpserver/...` (what the `jwebserver` launcher wraps), not the
+      # `jwebserver` binary itself: verified that binary does not honor JDK_JAVA_OPTIONS the way
+      # a plain `java` launch does, so it can't pick up the JMX flags below.
+      #
+      # The JMX flags are load-bearing, not optional (see TargetAttacher's javadoc for why): the
+      # Attach API this used before required the agent to run as real root to reach a target
+      # under a different UID — which this container, defaulting to root while the agent hardens
+      # to a non-root user, is. `jmxremote.host=127.0.0.1` is itself load-bearing too — verified
+      # on a real cluster that without it, this port is reachable from any other pod, not just
+      # this one; with it, a separate pod's connection is refused while the sidecar's (same pod,
+      # same loopback) still succeeds. `authenticate=false` is only safe because of that binding.
       image: eclipse-temurin:21-jdk
-      command: ["jwebserver", "-b", "0.0.0.0", "-p", "8000"]
+      command:
+        - java
+        - -Dcom.sun.management.jmxremote.port=9999
+        - -Dcom.sun.management.jmxremote.rmi.port=9999
+        - -Dcom.sun.management.jmxremote.host=127.0.0.1
+        - -Dcom.sun.management.jmxremote.authenticate=false
+        - -Dcom.sun.management.jmxremote.ssl=false
+        - -Djava.rmi.server.hostname=127.0.0.1
+        - -m
+        - jdk.httpserver/sun.net.httpserver.simpleserver.JWebServer
+        - -b
+        - "0.0.0.0"
+        - -p
+        - "8000"
       ports:
         - name: http
           containerPort: 8000

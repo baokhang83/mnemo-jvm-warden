@@ -38,10 +38,32 @@ kind delete cluster --name warden-demo
 The `warden` container serves `/healthz` (liveness) and `/readyz` (readiness) on port 8080; the
 `app` container is the JDK's Simple Web Server on port 8000, standing in for a real workload.
 
-> **Known issue:** the agent currently cannot attach to a target running as a different UID (the
-> default here, since the agent hardens to a non-root user and most app images run as root) — see
-> [#55](https://github.com/baokhang83/mnemo-jvm-warden/issues/55). `/readyz` will stay `503` until
-> that's resolved or the pod's containers are given matching UIDs.
+### The `app` container's JMX flags are required
+
+The agent connects to the target over a JMX port the target opens at launch, not the JDK Attach
+API — see `TargetAttacher`'s javadoc for why (bug
+[#55](https://github.com/baokhang83/mnemo-jvm-warden/issues/55): the Attach API turned out to
+require the agent to run as real root to reach a target under a different UID, which is the
+common case). Any target JVM Warden manages needs, at minimum:
+
+```
+-Dcom.sun.management.jmxremote.port=9999
+-Dcom.sun.management.jmxremote.rmi.port=9999
+-Dcom.sun.management.jmxremote.host=127.0.0.1
+-Dcom.sun.management.jmxremote.authenticate=false
+-Dcom.sun.management.jmxremote.ssl=false
+-Djava.rmi.server.hostname=127.0.0.1
+```
+
+`jmxremote.host=127.0.0.1` is not optional: without it, this port is reachable from **any pod in
+the cluster**, not just this one — verified directly with a real second pod completing a TCP
+connect to the target's pod IP. Combined with `authenticate=false`, that would be unauthenticated,
+cluster-reachable MBean access. With the loopback binding, `authenticate=false` is safe because the
+port is provably unreachable outside this pod's own network namespace (re-verified on the same
+live deployment).
+
+The port number just has to match `WARDEN_TARGET_JMX_PORT` on the `warden` container (default
+`9999`, so unset is fine if you use the default here too).
 
 ## `lifecycle-check.yaml` — native-sidecar start/stop ordering (W-202)
 

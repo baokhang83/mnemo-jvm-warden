@@ -1,7 +1,5 @@
 package io.github.baokhang83.mnemo.warden.agent.attach;
 
-import com.sun.tools.attach.AttachNotSupportedException;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 import io.github.baokhang83.mnemo.warden.agent.AgentLog;
 import io.github.baokhang83.mnemo.warden.agent.HealthState;
 import java.io.IOException;
@@ -30,7 +28,7 @@ public final class AttachSupervisor {
   static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
 
   private final HealthState health;
-  private final Supplier<Optional<VirtualMachineDescriptor>> locateTarget;
+  private final Supplier<Optional<Long>> locateTarget;
   private final AtomicReference<AttachedJvm> current = new AtomicReference<>();
   private final Thread thread;
   private volatile boolean running;
@@ -44,7 +42,7 @@ public final class AttachSupervisor {
    * on {@link TargetLocator}'s single-other-JVM assumption &mdash; which does not hold on a dev
    * machine running unrelated JVMs, only inside the pod it is designed for.
    */
-  AttachSupervisor(HealthState health, Supplier<Optional<VirtualMachineDescriptor>> locateTarget) {
+  AttachSupervisor(HealthState health, Supplier<Optional<Long>> locateTarget) {
     this.health = health;
     this.locateTarget = locateTarget;
     this.thread = new Thread(this::run, "warden-attach-supervisor");
@@ -77,16 +75,16 @@ public final class AttachSupervisor {
 
   private void run() {
     while (running) {
-      Optional<VirtualMachineDescriptor> descriptor = locateTarget.get();
-      if (descriptor.isEmpty()) {
+      Optional<Long> pid = locateTarget.get();
+      if (pid.isEmpty()) {
         sleep();
         continue;
       }
 
       AttachedJvm attached;
       try {
-        attached = TargetAttacher.attach(descriptor.get());
-      } catch (AttachNotSupportedException | IOException e) {
+        attached = TargetAttacher.attach(pid.get());
+      } catch (IOException e) {
         AgentLog.info("attach failed, retrying: " + e.getMessage());
         sleep();
         continue;

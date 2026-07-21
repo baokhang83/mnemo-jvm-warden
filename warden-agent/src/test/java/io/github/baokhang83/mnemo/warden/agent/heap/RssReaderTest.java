@@ -30,19 +30,21 @@ class RssReaderTest {
   @Test
   @EnabledOnOs(OS.LINUX)
   void readsWorkingSetAndReconcilesNmtOnARealLinuxTarget() throws Exception {
-    try (SpawnedJvm target = SpawnedJvm.garbageChurner("-XX:NativeMemoryTracking=summary");
-        AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
-      target.awaitStdoutLine("allocated", java.time.Duration.ofSeconds(10));
+    try (SpawnedJvm target = SpawnedJvm.garbageChurner("-XX:NativeMemoryTracking=summary")) {
+      target.awaitReady();
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
+        target.awaitStdoutLine("allocated", java.time.Duration.ofSeconds(10));
 
-      RssReader rssReader = RssReader.forTarget(attached);
-      RssReading reading = rssReader.currentRss();
+        RssReader rssReader = RssReader.forTarget(attached);
+        RssReading reading = rssReader.currentRss();
 
-      assertTrue(reading.cgroupMemoryCurrent() > 0, "a live target must show some committed memory");
-      assertTrue(
-          reading.workingSetBytes() <= reading.cgroupMemoryCurrent(),
-          "working set is memory.current minus reclaimable cache, so it cannot exceed it");
-      assertTrue(reading.nmtCommittedBytes().isPresent(), "NMT was enabled on this target");
-      assertTrue(reading.nmtCommittedBytes().getAsLong() > 0);
+        assertTrue(reading.cgroupMemoryCurrent() > 0, "a live target must show some committed memory");
+        assertTrue(
+            reading.workingSetBytes() <= reading.cgroupMemoryCurrent(),
+            "working set is memory.current minus reclaimable cache, so it cannot exceed it");
+        assertTrue(reading.nmtCommittedBytes().isPresent(), "NMT was enabled on this target");
+        assertTrue(reading.nmtCommittedBytes().getAsLong() > 0);
+      }
     }
   }
 }
