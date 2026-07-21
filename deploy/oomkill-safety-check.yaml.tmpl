@@ -1,0 +1,118 @@
+# W-206 test fixture, templated with envsubst by deploy/verify-oomkill-safety.sh (never applied
+# directly) — the same pod shape as example-sidecar.yaml, but the `app` container runs the real
+# agent image's own harness.LoadTarget class (a controllable live-memory fixture) instead of a
+# demo web server, so the safety check can pose two deterministic scenarios: adversarial load
+# that must abort safely, and idle load that must shrink safely — see deploy/README.md.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${POD_NAME}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${POD_NAME}-resize
+rules:
+  - apiGroups: [""]
+    resources: ["pods/resize"]
+    resourceNames: ["${POD_NAME}"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["${POD_NAME}"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${POD_NAME}-resize
+subjects:
+  - kind: ServiceAccount
+    name: ${POD_NAME}
+roleRef:
+  kind: Role
+  name: ${POD_NAME}-resize
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${POD_NAME}
+  labels:
+    app.kubernetes.io/name: ${POD_NAME}
+spec:
+  serviceAccountName: ${POD_NAME}
+  shareProcessNamespace: true
+  volumes:
+    - name: host-cgroup
+      hostPath:
+        path: /sys/fs/cgroup
+        type: Directory
+
+  initContainers:
+    - name: warden
+      image: ${WARDEN_IMAGE}
+      imagePullPolicy: IfNotPresent
+      restartPolicy: Always # native sidecar
+      ports:
+        - name: health
+          containerPort: 8080
+      volumeMounts:
+        - name: host-cgroup
+          mountPath: /host-cgroup
+          readOnly: true
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: health
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: health
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+
+  containers:
+    - name: app
+      # Same image as the warden container, invoked with a different main class: the
+      # W-206 harness.LoadTarget fixture instead of a real workload, so this needs no
+      # separate image build. -XX:+UseG1GC is explicit for the same reason it is in
+      # example-sidecar.yaml (see deploy/README.md): default collector ergonomics pick
+      # Serial GC at this heap size, which AttachedHeapController correctly refuses to manage.
+      # -Xmx350m is explicit too: without it, default heap ergonomics sized the max heap too
+      # small to retain the 220Mi adversarial-load scenario. Verified empirically (not guessed)
+      # that G1 needs real headroom above the live set it retains, not just enough for the raw
+      # bytes: 250m and 270m both threw OutOfMemoryError retaining 220Mi, 290m did not.
+      image: ${WARDEN_IMAGE}
+      imagePullPolicy: IfNotPresent
+      command:
+        - java
+        - -XX:+UseG1GC
+        - -Xmx350m
+        - -Dcom.sun.management.jmxremote.port=9999
+        - -Dcom.sun.management.jmxremote.rmi.port=9999
+        - -Dcom.sun.management.jmxremote.host=127.0.0.1
+        - -Dcom.sun.management.jmxremote.authenticate=false
+        - -Dcom.sun.management.jmxremote.ssl=false
+        - -Djava.rmi.server.hostname=127.0.0.1
+        - -cp
+        - /app/warden-agent.jar
+        - io.github.baokhang83.mnemo.warden.agent.harness.LoadTarget
+      env:
+        - name: WARDEN_LOAD_TARGET_RETAIN_MB
+          value: "${RETAIN_MB}"
+      resources:
+        requests:
+          cpu: 100m
+          memory: ${APP_REQUEST}
+        limits:
+          memory: ${APP_LIMIT}
+      resizePolicy:
+        - resourceName: memory
+          restartPolicy: NotRequired

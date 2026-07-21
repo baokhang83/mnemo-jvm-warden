@@ -1,8 +1,8 @@
 {
-  "feature": "w-205-abort-path-formalize-the-already-shipped-abort-on-fail",
-  "branch": "feature/w-205-abort-path-formalize-the-already-shipped-abort-on-fail",
+  "feature": "w-206-oomkill-safety-test-harness-kind-based-real-cluster-pr",
+  "branch": "feature/w-206-oomkill-safety-test-harness-kind-based-real-cluster-pr",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-205-abort-path-formalize-the-already-shipped-abort-on-fail/sessions/formalize-the-abort-path-no-op-confirmed-softmax-restore-rej.md",
+  "last_session": "docs/fluencyloop/features/w-206-oomkill-safety-test-harness-kind-based-real-cluster-pr/sessions/build-and-verify-the-oomkill-safety-harness-against-a-real-k.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
