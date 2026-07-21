@@ -268,10 +268,43 @@ catches it, well within the schedule's own minute-level grain, without a per-pol
 secondary-resource watch (which would need each policy's target selector known statically at
 controller startup; it isn't).
 
-**A real, explicit RBAC tradeoff, not a free generalization:** every `Pod`-targeting example
-scopes its `Role` to one static, pre-known pod name via `resourceNames` — but a
+**A real, explicit RBAC tradeoff, narrowed where it actually can be:** every `Pod`-targeting
+example scopes its `Role` to one static, pre-known pod name via `resourceNames` — but a
 `Deployment`/`StatefulSet`'s replica names are generated dynamically, so that pattern can't be
-provisioned ahead of time. `wardenpolicy-demo-deployment.yaml.tmpl`'s `Role` grants `get`/`patch`
-on **every pod in the namespace** instead — real, working, and a genuine widening from
-least-privilege. Designing something narrower is tracked separately
-([#71](https://github.com/baokhang83/mnemo-jvm-warden/issues/71)).
+provisioned ahead of time. `wardenpolicy-demo-deployment.yaml.tmpl`'s `ClusterRole` (bound via a
+namespace-scoped `RoleBinding` — identical effective scope to a `Role`, just reusable across
+namespaces) grants `get`/`patch` on **every pod in the namespace** instead. See
+`warden-resize-admission-policy.yaml` below for why the read (`get`) side genuinely can't be
+narrowed any further natively, and how the write (`patch`) side — the actually dangerous
+action — is narrowed anyway.
+
+## `warden-resize-admission-policy.yaml` + `verify-cross-pod-resize-denied.sh` — one replica's token can never resize another (#71)
+
+Kubernetes admission control (`ValidatingAdmissionPolicy`, and webhooks) never intercepts
+`GET`/`LIST`/`WATCH` — only writes — so there is **no native mechanism** that lets a
+Deployment/StatefulSet's shared-ServiceAccount replicas read only their own pod object; the
+`ClusterRole` above is as narrow as the read side gets. But `pods/resize` PATCH *is* a write, and
+every pod's default projected service-account token is already bound to that specific pod
+(carries its own name as an `authentication.kubernetes.io/pod-name` claim, readable in a policy's
+CEL expression as `request.userInfo.extra`) — even when many replicas share one ServiceAccount.
+`warden-resize-admission-policy.yaml` requires that claim to match the pod actually being
+resized, GA since Kubernetes 1.30 (no new version floor — this project already requires 1.35+
+for in-place resize itself).
+
+```bash
+deploy/verify-cross-pod-resize-denied.sh              # spins up + tears down its own kind cluster
+deploy/verify-cross-pod-resize-denied.sh --keep        # leaves the cluster + pods up for inspection
+deploy/verify-cross-pod-resize-denied.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Two checks against the same 2-replica Deployment demo, using the new `harness.CrossPodResizeAttempt`
+test driver (reuses `PodResizeClient` exactly as production code does):
+
+- **Negative control** — replica A attempts to resize replica B, using replica A's own token.
+  Denied with HTTP 422, citing the policy by name.
+- **Positive control** — replica A resizes itself. Still succeeds — the policy doesn't block
+  legitimate use, only a different pod's identity acting on this one.
+
+Independent of the schedule/intent machinery `verify-wardenpolicy-intent.sh` covers — this is a
+pure RBAC/admission-control check, with no `WardenPolicy` or controller involved at all. Manual-run
+only for now, matching every other check in this directory.

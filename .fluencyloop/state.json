@@ -1,8 +1,8 @@
 {
-  "feature": "resolve-targetref-for-deployment-statefulset-69-intentemitte",
-  "branch": "feature/resolve-targetref-for-deployment-statefulset-69-intentemitte",
+  "feature": "71-rbac-for-deployment-statefulset-managed-agents-layer-a-na",
+  "branch": "feature/71-rbac-for-deployment-statefulset-managed-agents-layer-a-na",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/resolve-targetref-for-deployment-statefulset-69-intentemitte/sessions/resolve-deployment-statefulset-targetref-and-verify-all-repl.md",
+  "last_session": "docs/fluencyloop/features/71-rbac-for-deployment-statefulset-managed-agents-layer-a-na/sessions/build-and-verify-the-validatingadmissionpolicy-closing-the-w.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }

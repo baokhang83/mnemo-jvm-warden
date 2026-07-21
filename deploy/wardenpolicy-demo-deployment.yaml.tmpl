@@ -6,16 +6,24 @@
 #
 # RBAC here is deliberately NOT resourceNames-scoped, unlike every Pod-based example in this
 # directory — replica pod names are generated dynamically, so a Role naming one specific pod
-# can't be provisioned ahead of time. This grants get/patch on every pod in the namespace instead,
-# a real, broader-than-elsewhere tradeoff the design doc for #69 flags explicitly (and a
-# dedicated follow-up issue tracks designing something narrower).
+# can't be provisioned ahead of time. This grants get/patch on every pod in the namespace instead
+# — a real, broader-than-elsewhere tradeoff (see #71's design doc for the full reasoning and why
+# the read (get) side genuinely can't be narrowed natively). The write side (pods/resize PATCH,
+# the actually dangerous action) IS narrowed, by warden-resize-admission-policy.yaml — applied
+# alongside this manifest, not part of it, since it's a cluster-scoped policy independent of any
+# one workload.
+#
+# ClusterRole + a namespace-scoped RoleBinding, not a Role defined directly here: identical
+# effective scope (both are namespace-wide once bound), but the ClusterRole can be reused by a
+# RoleBinding in any other namespace without redefining the rule (relevant once a Helm chart, M6,
+# installs this into more than one).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: warden-demo-e2e-deploy
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: warden-demo-e2e-deploy-resize
 rules:
@@ -34,7 +42,7 @@ subjects:
   - kind: ServiceAccount
     name: warden-demo-e2e-deploy
 roleRef:
-  kind: Role
+  kind: ClusterRole
   name: warden-demo-e2e-deploy-resize
   apiGroup: rbac.authorization.k8s.io
 ---
