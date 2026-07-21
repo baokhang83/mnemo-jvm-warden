@@ -81,6 +81,20 @@ container boundary at all) &mdash; two different environments, two different res
 decision violates this when* "verified" cites an environment other than the one the code will
 actually run in, without checking whether the substitution changes the thing being tested.
 
+### §9 — When fixing a bug, verify the whole path, not just the piece you changed
+
+A piece of the design reasoned to be "unaffected" by a bug is still only an assumption until
+it is exercised end-to-end &mdash; sound reasoning about an untested piece is not the same as
+verification. *Prevents* fixing one broken step while a second, earlier step in the same path
+stays silently broken for the identical underlying reason: bug #55's own design claimed
+`TargetLocator` was unaffected by the UID-mismatch problem (correct reasoning about
+`/proc/PID/comm` not crossing namespaces), but `TargetLocator` used `VirtualMachine.list()`
+under the hood, which reads each candidate's `hsperfdata` file &mdash; the same
+cross-container-filesystem restriction that broke the Attach API, one step earlier in the
+pipeline. Only found by deploying the "fixed" code end-to-end and seeing the pod still not
+reach Ready. *A decision violates this when* a design says a piece "isn't affected" without a
+citation of having actually run that piece under the real failure condition.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by

@@ -14,25 +14,29 @@ class G1PeriodicGcTest {
 
   @Test
   void readsAndSetsThePeriodicIntervalOnARealG1Target() throws Exception {
-    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseG1GC", "-Xmx256m");
-        AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
-      G1PeriodicGc periodicGc = G1PeriodicGc.forTarget(attached);
+    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseG1GC", "-Xmx256m")) {
+      target.awaitReady();
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
+        G1PeriodicGc periodicGc = G1PeriodicGc.forTarget(attached);
 
-      assertEquals(Duration.ZERO, periodicGc.periodicGcInterval(), "disabled by default");
+        assertEquals(Duration.ZERO, periodicGc.periodicGcInterval(), "disabled by default");
 
-      periodicGc.setPeriodicGcInterval(Duration.ofSeconds(30));
-      assertEquals(Duration.ofSeconds(30), periodicGc.periodicGcInterval());
+        periodicGc.setPeriodicGcInterval(Duration.ofSeconds(30));
+        assertEquals(Duration.ofSeconds(30), periodicGc.periodicGcInterval());
+      }
     }
   }
 
   @Test
   void rejectsCleanlyOnARealZgcTarget() throws Exception {
-    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseZGC", "-Xmx256m");
-        AttachedJvm attached = TargetAttacher.attach(target.awaitDescriptor())) {
-      UnsupportedCollectorException thrown =
-          assertThrows(UnsupportedCollectorException.class, () -> G1PeriodicGc.forTarget(attached));
+    try (SpawnedJvm target = SpawnedJvm.sleeper("-XX:+UseZGC", "-Xmx256m")) {
+      target.awaitReady();
+      try (AttachedJvm attached = TargetAttacher.attach(target.pid())) {
+        UnsupportedCollectorException thrown =
+            assertThrows(UnsupportedCollectorException.class, () -> G1PeriodicGc.forTarget(attached));
 
-      assertEquals(Collector.ZGC, thrown.actual());
+        assertEquals(Collector.ZGC, thrown.actual());
+      }
     }
   }
 }

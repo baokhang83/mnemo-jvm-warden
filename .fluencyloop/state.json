@@ -1,8 +1,8 @@
 {
-  "feature": "w-202-native-sidecar-lifecycle-ordering-verified-via-causali",
-  "branch": "feature/w-202-native-sidecar-lifecycle-ordering-verified-via-causali",
+  "feature": "bug-55-replace-attach-api-with-a-target-opened-jmx-port-loop",
+  "branch": "feature/bug-55-replace-attach-api-with-a-target-opened-jmx-port-loop",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-202-native-sidecar-lifecycle-ordering-verified-via-causali/sessions/slice-1-lifecycle-check-manifest-verify-lifecycle-ordering-s.md",
+  "last_session": "docs/fluencyloop/features/bug-55-replace-attach-api-with-a-target-opened-jmx-port-loop/sessions/slice-3-targetlocator-proc-rewrite-deploy-manifest-real-clus.md",
   "base_ref": "main",
-  "updated": "2026-07-20"
+  "updated": "2026-07-21"
 }

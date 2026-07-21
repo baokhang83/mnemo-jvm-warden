@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.sun.tools.attach.VirtualMachine;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 import io.github.baokhang83.mnemo.warden.agent.HealthState;
 import io.github.baokhang83.mnemo.warden.agent.testsupport.SpawnedJvm;
 import java.time.Duration;
@@ -20,7 +18,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Runs {@link AttachSupervisor} end-to-end against real spawned child JVMs (not mocks) &mdash;
- * this loop is the one piece of W-102 that only a real attach/detach cycle can prove out.
+ * this loop is the one piece of W-102 that only a real attach/detach cycle can prove out,
+ * including its resilience to the target's JMX port not being open yet the moment it's located
+ * (absorbed by the same retry loop that locates it).
  *
  * <p>Uses the package-private locator seam rather than {@link TargetLocator#findTarget()}: this
  * dev machine routinely has other, unrelated JVMs running, so the "exactly one other JVM"
@@ -65,12 +65,12 @@ class AttachSupervisorTest {
   }
 
   /** Finds whichever PID the test currently cares about, ignoring every other visible JVM. */
-  private Optional<VirtualMachineDescriptor> locateExpectedPid() {
+  private Optional<Long> locateExpectedPid() {
     Long pid = expectedPid.get();
     if (pid == null) {
       return Optional.empty();
     }
-    return VirtualMachine.list().stream().filter(d -> d.id().equals(Long.toString(pid))).findFirst();
+    return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).map(ProcessHandle::pid);
   }
 
   private SpawnedJvm spawn() throws Exception {
