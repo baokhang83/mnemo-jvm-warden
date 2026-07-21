@@ -1,4 +1,13 @@
 GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,TargetRef,24,0,0,0,10,0,7,0,7,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,Guardrail,24,0,0,0,10,0,7,0,7,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicySpec,52,0,0,0,22,0,15,0,15,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicy,3,0,0,0,1,0,1,0,1,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicyStatus,10,0,0,0,4,0,3,0,3,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,BlackoutWindow,17,0,0,0,7,0,5,0,5,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,ScheduleWindow,17,0,0,0,7,0,5,0,5,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,LeadTime,17,0,0,0,7,0,5,0,5,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,ResourceProfile,17,0,0,0,7,0,5,0,5,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,UnsupportedCollectorException,0,13,0,0,0,4,0,2,0,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,Collector,0,27,0,0,0,5,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,GcDetector,0,65,0,9,0,15,0,9,0,4
