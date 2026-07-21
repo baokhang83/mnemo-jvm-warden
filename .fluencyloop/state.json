@@ -1,8 +1,8 @@
 {
-  "feature": "w-204-grow-sequence-cgroup-up-first-via-resizeport-then-rais",
-  "branch": "feature/w-204-grow-sequence-cgroup-up-first-via-resizeport-then-rais",
+  "feature": "w-205-abort-path-formalize-the-already-shipped-abort-on-fail",
+  "branch": "feature/w-205-abort-path-formalize-the-already-shipped-abort-on-fail",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-204-grow-sequence-cgroup-up-first-via-resizeport-then-rais/sessions/grow-sequence-cgroup-up-first-then-raise-softmax.md",
+  "last_session": "docs/fluencyloop/features/w-205-abort-path-formalize-the-already-shipped-abort-on-fail/sessions/formalize-the-abort-path-no-op-confirmed-softmax-restore-rej.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
