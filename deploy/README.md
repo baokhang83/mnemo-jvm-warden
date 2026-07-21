@@ -178,3 +178,23 @@ deploy/verify-wardenpolicy-schema.sh --cluster N   # reuse an existing kind clus
 Rebuilds `warden-crd-model` itself before applying the CRD, so the check always exercises a
 freshly generated schema, not a stale one. Manual-run only for now, matching the other checks
 above. Prints `PASS`/`FAIL` for each policy and exits non-zero on any failure.
+
+## `verify-wardenpolicy-reconciler.sh` — the reconciler actually watches and patches status (W-302)
+
+Verifies, against a real cluster, that `WardenPolicyReconciler` (`warden-controller`) watches
+`WardenPolicy` objects and patches `status.currentProfile` back for real — not just that the
+selection logic is correct in isolation (that's `WardenPolicyReconcilerTest`). Runs the real
+`WardenController` process out-of-cluster, pointed at kind's own kubeconfig context (production
+runs in-pod instead, where Fabric8 finds the in-cluster service-account config automatically —
+`WardenController` itself is unchanged either way).
+
+```bash
+deploy/verify-wardenpolicy-reconciler.sh              # spins up + tears down its own kind cluster
+deploy/verify-wardenpolicy-reconciler.sh --keep        # leaves the cluster up for inspection
+deploy/verify-wardenpolicy-reconciler.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Applies the same `wardenpolicy-sample-valid.yaml` used above (`profiles: off-peak, peak`) and
+confirms `status.currentProfile` gets patched to `off-peak` — the alphabetically-first key, this
+slice's deliberate placeholder for W-303's real schedule evaluation. Manual-run only for now,
+matching the other checks above.
