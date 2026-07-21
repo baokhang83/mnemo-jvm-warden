@@ -109,7 +109,14 @@ public final class ScheduleEvaluator {
     return soonest;
   }
 
-  private static Long limitBytes(WardenPolicySpec spec, String profileName) {
+  /**
+   * {@code spec.profiles.get(profileName)}'s {@code limit}, parsed to bytes, or {@code null} if
+   * the profile or its limit is unresolved. {@code public}: {@code
+   * io.github.baokhang83.mnemo.warden.controller.guardrail.ShrinkVetoEvaluator} (W-402) reuses
+   * this exact lookup to classify a schedule candidate as a shrink, rather than a second copy of
+   * the same profile-name-to-bytes resolution.
+   */
+  public static Long limitBytes(WardenPolicySpec spec, String profileName) {
     if (spec.getProfiles() == null) {
       return null;
     }

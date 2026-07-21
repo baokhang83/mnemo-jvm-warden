@@ -1,5 +1,6 @@
 package io.github.baokhang83.mnemo.warden.controller;
 
+import io.github.baokhang83.mnemo.warden.controller.guardrail.ShrinkVetoEvaluator;
 import io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter;
 import io.github.baokhang83.mnemo.warden.controller.metrics.PrometheusMetricSource;
 import io.github.baokhang83.mnemo.warden.controller.schedule.BlackoutEvaluator;
@@ -14,6 +15,7 @@ import io.javaoperatorsdk.operator.api.reconciler.Reconciler;
 import io.javaoperatorsdk.operator.api.reconciler.UpdateControl;
 import java.net.http.HttpClient;
 import java.time.Instant;
+import java.util.OptionalDouble;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,16 +23,19 @@ import org.slf4j.LoggerFactory;
 /**
  * Watches {@code WardenPolicy} objects, patches {@code status.currentProfile} back
  * (W-302/W-303/W-304), PATCHes the target pod's own annotations with the resolved profile
- * (W-306) so {@code warden-agent}'s {@code IntentWatcher} can drive a real resize, and evaluates
+ * (W-306) so {@code warden-agent}'s {@code IntentWatcher} can drive a real resize, evaluates
  * {@code spec.guardrail.metric} against Prometheus into {@code status.currentMetricValue}
- * (W-401, purely observational this slice — nothing acts on it yet).
+ * (W-401), and vetoes a schedule-resolved shrink candidate when that metric isn't verified quiet
+ * (W-402, via {@link ShrinkVetoEvaluator}).
  *
- * <p>{@link BlackoutEvaluator} (W-305) gates the schedule-driven writes: while blacked out,
- * neither {@code status.currentProfile} nor the target pod's intent annotations change, a hard
- * "do not touch" override. This is also where a future guardrail/metric *veto* (W-402/W-403)
- * would plug in &mdash; the same gate, not a second override to keep in sync. Metric
- * *observation* itself is unconditional: it's passive telemetry, not a shrink/grow action, so
- * blackout doesn't apply to it.
+ * <p>{@link BlackoutEvaluator} (W-305) gates the schedule-driven writes entirely: while blacked
+ * out, neither {@code status.currentProfile} nor the target pod's intent annotations change, a
+ * hard "do not touch" override, and no candidate is even resolved to check against the guardrail.
+ * {@link ShrinkVetoEvaluator} is a second, narrower gate *inside* that block: it only fires once a
+ * candidate is known, so it can tell a shrink from a grow. Metric *observation* itself stays
+ * unconditional — it's passive telemetry, not a shrink/grow action, so blackout doesn't apply to
+ * it, and it now runs first each reconcile so the veto can use this reconcile's own fresh reading
+ * (see the W-402 design doc; W-404 documents the full three-way precedence).
  *
  * <p>Intent emission and metric evaluation are each isolated in their own {@code try}/{@code
  * catch} (constitution §12): a target pod that doesn't exist, or a Prometheus query failure, must
@@ -59,17 +64,29 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
   @Override
   public UpdateControl<WardenPolicy> reconcile(WardenPolicy policy, Context<WardenPolicy> context) {
     Instant now = Instant.now();
+    Double metricValue = evaluateMetric(policy);
     if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {
       ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)
-          .ifPresent(
-              currentProfile -> {
-                ensureStatus(policy);
-                policy.getStatus().setCurrentProfile(currentProfile);
-                emitIntent(policy, context, currentProfile);
-              });
+          .ifPresent(candidateProfile -> applyScheduleDecision(policy, context, candidateProfile, metricValue));
     }
-    evaluateMetric(policy);
     return UpdateControl.patchStatus(policy);
+  }
+
+  private void applyScheduleDecision(
+      WardenPolicy policy, Context<WardenPolicy> context, String candidateProfile, Double metricValue) {
+    ensureStatus(policy);
+    String previousProfile = policy.getStatus().getCurrentProfile();
+    if (ShrinkVetoEvaluator.vetoesShrink(policy.getSpec(), previousProfile, candidateProfile, metricValue)) {
+      log.info(
+          "guardrail vetoed shrink for WardenPolicy {}/{}: metric={} not verified below shrinkBelow, staying on {}",
+          policy.getMetadata().getNamespace(),
+          policy.getMetadata().getName(),
+          metricValue,
+          previousProfile);
+      return;
+    }
+    policy.getStatus().setCurrentProfile(candidateProfile);
+    emitIntent(policy, context, candidateProfile);
   }
 
   private void emitIntent(WardenPolicy policy, Context<WardenPolicy> context, String currentProfile) {
@@ -86,27 +103,35 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
     }
   }
 
-  private void evaluateMetric(WardenPolicy policy) {
+  /**
+   * Returns this reconcile's freshly evaluated metric value (also recorded to {@code
+   * status.currentMetricValue}), or {@code null} if no guardrail is configured, the query is
+   * blank, or evaluation fails — {@link ShrinkVetoEvaluator} reads {@code null} as "not verified
+   * quiet," not "no reading needed."
+   */
+  private Double evaluateMetric(WardenPolicy policy) {
     if (config.prometheusUri().isEmpty()) {
-      return;
+      return null;
     }
     String promQl = policy.getSpec().getGuardrail() == null ? null : policy.getSpec().getGuardrail().getMetric();
     if (promQl == null || promQl.isBlank()) {
-      return;
+      return null;
     }
     try {
-      PrometheusMetricSource.query(httpClient, config.prometheusUri().get(), promQl)
-          .ifPresent(
-              value -> {
-                ensureStatus(policy);
-                policy.getStatus().setCurrentMetricValue(value);
-              });
+      OptionalDouble result = PrometheusMetricSource.query(httpClient, config.prometheusUri().get(), promQl);
+      if (result.isEmpty()) {
+        return null;
+      }
+      ensureStatus(policy);
+      policy.getStatus().setCurrentMetricValue(result.getAsDouble());
+      return result.getAsDouble();
     } catch (Exception e) {
       log.warn(
           "failed to evaluate guardrail metric for WardenPolicy {}/{} (status.currentProfile still updated): {}",
           policy.getMetadata().getNamespace(),
           policy.getMetadata().getName(),
           e.getMessage());
+      return null;
     }
   }
 
