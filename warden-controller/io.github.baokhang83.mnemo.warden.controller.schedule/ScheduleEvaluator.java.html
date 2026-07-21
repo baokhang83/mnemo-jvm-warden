@@ -109,24 +109,31 @@ public final class ScheduleEvaluator {
 <span class="fc" id="L109">    return soonest;</span>
   }
 
-  private static Long limitBytes(WardenPolicySpec spec, String profileName) {
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">    if (spec.getProfiles() == null) {</span>
-<span class="nc" id="L114">      return null;</span>
+  /**
+   * {@code spec.profiles.get(profileName)}'s {@code limit}, parsed to bytes, or {@code null} if
+   * the profile or its limit is unresolved. {@code public}: {@code
+   * io.github.baokhang83.mnemo.warden.controller.guardrail.ShrinkVetoEvaluator} (W-402) reuses
+   * this exact lookup to classify a schedule candidate as a shrink, rather than a second copy of
+   * the same profile-name-to-bytes resolution.
+   */
+  public static Long limitBytes(WardenPolicySpec spec, String profileName) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">    if (spec.getProfiles() == null) {</span>
+<span class="nc" id="L121">      return null;</span>
     }
-<span class="fc" id="L116">    ResourceProfile profile = spec.getProfiles().get(profileName);</span>
-<span class="pc bpc" id="L117" title="2 of 4 branches missed.">    if (profile == null || profile.getLimit() == null) {</span>
-<span class="nc" id="L118">      return null;</span>
+<span class="fc" id="L123">    ResourceProfile profile = spec.getProfiles().get(profileName);</span>
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">    if (profile == null || profile.getLimit() == null) {</span>
+<span class="nc" id="L125">      return null;</span>
     }
-<span class="fc" id="L120">    return ResourceQuantity.parseBytes(profile.getLimit());</span>
+<span class="fc" id="L127">    return ResourceQuantity.parseBytes(profile.getLimit());</span>
   }
 
   /** @param movingToSmaller true if the transition's target profile has a smaller limit (a shrink) */
   private static Duration leadTimeFor(LeadTime leadTime, boolean movingToSmaller) {
-<span class="fc bfc" id="L125" title="All 2 branches covered.">    if (leadTime == null) {</span>
-<span class="fc" id="L126">      return null;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">    if (leadTime == null) {</span>
+<span class="fc" id="L133">      return null;</span>
     }
-<span class="fc bfc" id="L128" title="All 2 branches covered.">    String raw = movingToSmaller ? leadTime.getShrink() : leadTime.getWarm();</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">    return raw == null ? null : ShorthandDuration.parse(raw);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">    String raw = movingToSmaller ? leadTime.getShrink() : leadTime.getWarm();</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">    return raw == null ? null : ShorthandDuration.parse(raw);</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

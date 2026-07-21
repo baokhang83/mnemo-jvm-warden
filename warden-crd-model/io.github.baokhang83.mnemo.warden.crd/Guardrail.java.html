@@ -5,7 +5,7 @@
  * {@code emergencyGrowAbove} forces an off-schedule grow (W-403), both evaluated against {@code
  * metric} &amp;mdash; a PromQL query (W-401 reads it on an interval; not evaluated here, §1).
  */
-<span class="nc" id="L8">public class Guardrail {</span>
+<span class="fc" id="L8">public class Guardrail {</span>
 
   private String metric;
   private String shrinkBelow;
@@ -16,16 +16,16 @@
   }
 
   public void setMetric(String metric) {
-<span class="nc" id="L19">    this.metric = metric;</span>
-<span class="nc" id="L20">  }</span>
+<span class="fc" id="L19">    this.metric = metric;</span>
+<span class="fc" id="L20">  }</span>
 
   public String getShrinkBelow() {
-<span class="nc" id="L23">    return shrinkBelow;</span>
+<span class="fc" id="L23">    return shrinkBelow;</span>
   }
 
   public void setShrinkBelow(String shrinkBelow) {
-<span class="nc" id="L27">    this.shrinkBelow = shrinkBelow;</span>
-<span class="nc" id="L28">  }</span>
+<span class="fc" id="L27">    this.shrinkBelow = shrinkBelow;</span>
+<span class="fc" id="L28">  }</span>
 
   public String getEmergencyGrowAbove() {
 <span class="nc" id="L31">    return emergencyGrowAbove;</span>
