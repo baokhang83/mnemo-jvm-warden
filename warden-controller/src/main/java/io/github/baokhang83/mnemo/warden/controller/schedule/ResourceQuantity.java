@@ -14,8 +14,13 @@ import java.util.regex.Pattern;
  * pom.xml} says so), and the agent's copy is tied to a different problem (confirming a PATCHed
  * value against the API server's normalized echo) than this one (comparing two static spec
  * values) — see W-304's design doc.
+ *
+ * <p>Public, not package-private: {@code
+ * io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter} (W-306) also needs to parse
+ * a {@code ResourceProfile}'s {@code request}/{@code limit} to bytes, and reuses this rather than
+ * a third copy in the same module.
  */
-final class ResourceQuantity {
+public final class ResourceQuantity {
 
   private static final Map<String, BigDecimal> BINARY_SUFFIXES =
       Map.of(
@@ -35,7 +40,7 @@ final class ResourceQuantity {
 
   private ResourceQuantity() {}
 
-  static long parseBytes(String quantity) {
+  public static long parseBytes(String quantity) {
     Matcher matcher = QUANTITY.matcher(quantity.trim());
     if (!matcher.matches()) {
       throw new IllegalArgumentException("not a recognized Quantity: " + quantity);
