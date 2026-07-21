@@ -1,38 +1,75 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TargetAttacher.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.attach</a> &gt; <span class="el_source">TargetAttacher.java</span></div><h1>TargetAttacher.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.attach;
 
-import com.sun.tools.attach.AttachNotSupportedException;
-import com.sun.tools.attach.VirtualMachine;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 import java.io.IOException;
+import java.util.function.Function;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 
 /**
- * Opens a live connection to a target JVM found by {@link TargetLocator}.
+ * Opens a live connection to a target JVM found by {@link TargetLocator}, via a JMX port the
+ * target itself opens at launch &amp;mdash; not the JDK Attach API.
  *
- * &lt;p&gt;Uses {@link VirtualMachine#startLocalManagementAgent()} (JDK 9+) rather than requiring the
- * target to launch with {@code -Dcom.sun.management.jmxremote}: it starts (or reuses) a JMX
- * connector on an already-running target and hands back its address, so attaching needs nothing
- * from the app's own launch configuration.
+ * &lt;p&gt;The Attach API (the original W-102 mechanism) turned out to fundamentally require the agent
+ * to run as real root (UID 0) to reach a target running under a different UID, since it connects
+ * by crossing into the target's own mount namespace via {@code /proc/&lt;pid&gt;/root} to find its
+ * {@code .java_pid&lt;pid&gt;} socket. Exhaustively verified on a real cluster that no capability grant
+ * fixes this &amp;mdash; not {@code CAP_SYS_PTRACE}, not {@code CAP_DAC_OVERRIDE}/{@code
+ * CAP_DAC_READ_SEARCH}, not {@code CAP_SYS_ADMIN}, not unconfined seccomp/AppArmor, and not even
+ * exactly matching non-root UID and GID. Only real root works, which most deployments won't (and
+ * shouldn't) grant the agent.
+ *
+ * &lt;p&gt;A JMX port is a network socket over the pod's &lt;em&gt;shared&lt;/em&gt; network namespace, not a
+ * filesystem crossing, so it needs no special UID or capability at all &amp;mdash; verified against a
+ * real cluster with genuinely mismatched UIDs. The target must launch with:
+ *
+ * &lt;pre&gt;{@code
+ * -Dcom.sun.management.jmxremote.port=&lt;PORT&gt;
+ * -Dcom.sun.management.jmxremote.rmi.port=&lt;PORT&gt;
+ * -Dcom.sun.management.jmxremote.host=127.0.0.1
+ * -Dcom.sun.management.jmxremote.authenticate=false
+ * -Dcom.sun.management.jmxremote.ssl=false
+ * -Djava.rmi.server.hostname=127.0.0.1
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;&lt;b&gt;{@code jmxremote.host=127.0.0.1} is not optional.&lt;/b&gt; Without it, the JMX listener binds
+ * to every interface, not just loopback &amp;mdash; verified on a real cluster that the port is then
+ * reachable from a completely separate pod's IP, not just from within the target's own pod.
+ * Combined with {@code authenticate=false}, that is an unauthenticated, cluster-reachable MBean
+ * server: effectively remote code execution. With {@code jmxremote.host=127.0.0.1}, verified on
+ * the same live deployment that a separate pod's connection attempt is refused while the
+ * sidecar's (same pod, same loopback) still succeeds &amp;mdash; {@code authenticate=false} is only
+ * safe because the listener is provably unreachable outside the pod's own trust boundary.
  */
 public final class TargetAttacher {
 
+  /** Overrides the target's JMX port; must match the target's {@code jmxremote.port}. */
+  public static final String ENV_TARGET_JMX_PORT = &quot;WARDEN_TARGET_JMX_PORT&quot;;
+
+  /** Default JMX port, used when {@link #ENV_TARGET_JMX_PORT} is unset. */
+  public static final int DEFAULT_JMX_PORT = 9999;
+
   private TargetAttacher() {}
 
-  /** Attaches to the described JVM and opens its JMX connection. */
-  public static AttachedJvm attach(VirtualMachineDescriptor descriptor)
-      throws AttachNotSupportedException, IOException {
-<span class="fc" id="L26">    long pid = Long.parseLong(descriptor.id());</span>
-<span class="fc" id="L27">    VirtualMachine vm = VirtualMachine.attach(descriptor);</span>
-    try {
-<span class="fc" id="L29">      String connectorAddress = vm.startLocalManagementAgent();</span>
-<span class="fc" id="L30">      JMXConnector connector = JMXConnectorFactory.connect(new JMXServiceURL(connectorAddress));</span>
-<span class="fc" id="L31">      return new AttachedJvm(pid, vm, connector, connector.getMBeanServerConnection());</span>
-<span class="nc" id="L32">    } catch (IOException e) {</span>
-<span class="nc" id="L33">      vm.detach();</span>
-<span class="nc" id="L34">      throw e;</span>
+  /** Attaches to the target PID using the configured (or default) JMX port. */
+  public static AttachedJvm attach(long pid) throws IOException {
+<span class="fc" id="L56">    return attach(pid, System::getenv);</span>
+  }
+
+  /** Package-private seam so tests can supply a fake environment. */
+  static AttachedJvm attach(long pid, Function&lt;String, String&gt; env) throws IOException {
+<span class="fc" id="L61">    int port = jmxPort(env);</span>
+<span class="fc" id="L62">    JMXServiceURL url = new JMXServiceURL(&quot;service:jmx:rmi:///jndi/rmi://127.0.0.1:&quot; + port + &quot;/jmxrmi&quot;);</span>
+<span class="fc" id="L63">    JMXConnector connector = JMXConnectorFactory.connect(url);</span>
+<span class="fc" id="L64">    return new AttachedJvm(pid, connector, connector.getMBeanServerConnection());</span>
+  }
+
+  private static int jmxPort(Function&lt;String, String&gt; env) {
+<span class="fc" id="L68">    String raw = env.apply(ENV_TARGET_JMX_PORT);</span>
+<span class="pc bpc" id="L69" title="3 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L70">      return DEFAULT_JMX_PORT;</span>
     }
+<span class="nc" id="L72">    return Integer.parseInt(raw.trim());</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AttachSupervisor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.attach</a> &gt; <span class="el_source">AttachSupervisor.java</span></div><h1>AttachSupervisor.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.attach;
 
-import com.sun.tools.attach.AttachNotSupportedException;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 import io.github.baokhang83.mnemo.warden.agent.AgentLog;
 import io.github.baokhang83.mnemo.warden.agent.HealthState;
 import java.io.IOException;
@@ -27,100 +25,100 @@ public final class AttachSupervisor {
   /** Backoff between attach attempts, and the liveness-poll period once attached. A single
    *  interval keeps this class to one dial instead of two, and stays well clear of a busy-wait
    *  (constitution §4). */
-<span class="fc" id="L30">  static final Duration POLL_INTERVAL = Duration.ofSeconds(2);</span>
+<span class="fc" id="L28">  static final Duration POLL_INTERVAL = Duration.ofSeconds(2);</span>
 
   private final HealthState health;
-  private final Supplier&lt;Optional&lt;VirtualMachineDescriptor&gt;&gt; locateTarget;
-<span class="fc" id="L34">  private final AtomicReference&lt;AttachedJvm&gt; current = new AtomicReference&lt;&gt;();</span>
+  private final Supplier&lt;Optional&lt;Long&gt;&gt; locateTarget;
+<span class="fc" id="L32">  private final AtomicReference&lt;AttachedJvm&gt; current = new AtomicReference&lt;&gt;();</span>
   private final Thread thread;
   private volatile boolean running;
 
   public AttachSupervisor(HealthState health) {
-<span class="nc" id="L39">    this(health, TargetLocator::findTarget);</span>
-<span class="nc" id="L40">  }</span>
+<span class="nc" id="L37">    this(health, TargetLocator::findTarget);</span>
+<span class="nc" id="L38">  }</span>
 
   /**
    * Package-private seam so tests can point the supervisor at one known target without depending
    * on {@link TargetLocator}'s single-other-JVM assumption &amp;mdash; which does not hold on a dev
    * machine running unrelated JVMs, only inside the pod it is designed for.
    */
-<span class="fc" id="L47">  AttachSupervisor(HealthState health, Supplier&lt;Optional&lt;VirtualMachineDescriptor&gt;&gt; locateTarget) {</span>
-<span class="fc" id="L48">    this.health = health;</span>
-<span class="fc" id="L49">    this.locateTarget = locateTarget;</span>
-<span class="fc" id="L50">    this.thread = new Thread(this::run, &quot;warden-attach-supervisor&quot;);</span>
-<span class="fc" id="L51">    this.thread.setDaemon(true);</span>
-<span class="fc" id="L52">  }</span>
+<span class="fc" id="L45">  AttachSupervisor(HealthState health, Supplier&lt;Optional&lt;Long&gt;&gt; locateTarget) {</span>
+<span class="fc" id="L46">    this.health = health;</span>
+<span class="fc" id="L47">    this.locateTarget = locateTarget;</span>
+<span class="fc" id="L48">    this.thread = new Thread(this::run, &quot;warden-attach-supervisor&quot;);</span>
+<span class="fc" id="L49">    this.thread.setDaemon(true);</span>
+<span class="fc" id="L50">  }</span>
 
   /** Starts the supervising loop on a background daemon thread. */
   public void start() {
-<span class="fc" id="L56">    running = true;</span>
-<span class="fc" id="L57">    thread.start();</span>
-<span class="fc" id="L58">  }</span>
+<span class="fc" id="L54">    running = true;</span>
+<span class="fc" id="L55">    thread.start();</span>
+<span class="fc" id="L56">  }</span>
 
   /** Stops the loop, marks the agent not ready, and closes any live attachment. */
   public void stop() {
-<span class="fc" id="L62">    running = false;</span>
-<span class="fc" id="L63">    thread.interrupt();</span>
+<span class="fc" id="L60">    running = false;</span>
+<span class="fc" id="L61">    thread.interrupt();</span>
     try {
-<span class="fc" id="L65">      thread.join(POLL_INTERVAL.multipliedBy(2).toMillis());</span>
-<span class="nc" id="L66">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L67">      Thread.currentThread().interrupt();</span>
-<span class="fc" id="L68">    }</span>
-<span class="fc" id="L69">    health.markNotReady();</span>
-<span class="fc" id="L70">    closeCurrent();</span>
-<span class="fc" id="L71">  }</span>
+<span class="fc" id="L63">      thread.join(POLL_INTERVAL.multipliedBy(2).toMillis());</span>
+<span class="nc" id="L64">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L65">      Thread.currentThread().interrupt();</span>
+<span class="fc" id="L66">    }</span>
+<span class="fc" id="L67">    health.markNotReady();</span>
+<span class="fc" id="L68">    closeCurrent();</span>
+<span class="fc" id="L69">  }</span>
 
   /** The currently attached target, if any. */
   public Optional&lt;AttachedJvm&gt; currentTarget() {
-<span class="fc" id="L75">    return Optional.ofNullable(current.get());</span>
+<span class="fc" id="L73">    return Optional.ofNullable(current.get());</span>
   }
 
   private void run() {
-<span class="fc bfc" id="L79" title="All 2 branches covered.">    while (running) {</span>
-<span class="fc" id="L80">      Optional&lt;VirtualMachineDescriptor&gt; descriptor = locateTarget.get();</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">      if (descriptor.isEmpty()) {</span>
-<span class="fc" id="L82">        sleep();</span>
-<span class="fc" id="L83">        continue;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">    while (running) {</span>
+<span class="fc" id="L78">      Optional&lt;Long&gt; pid = locateTarget.get();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">      if (pid.isEmpty()) {</span>
+<span class="fc" id="L80">        sleep();</span>
+<span class="fc" id="L81">        continue;</span>
       }
 
       AttachedJvm attached;
       try {
-<span class="fc" id="L88">        attached = TargetAttacher.attach(descriptor.get());</span>
-<span class="nc" id="L89">      } catch (AttachNotSupportedException | IOException e) {</span>
-<span class="nc" id="L90">        AgentLog.info(&quot;attach failed, retrying: &quot; + e.getMessage());</span>
-<span class="nc" id="L91">        sleep();</span>
-<span class="nc" id="L92">        continue;</span>
-<span class="fc" id="L93">      }</span>
+<span class="fc" id="L86">        attached = TargetAttacher.attach(pid.get());</span>
+<span class="nc" id="L87">      } catch (IOException e) {</span>
+<span class="nc" id="L88">        AgentLog.info(&quot;attach failed, retrying: &quot; + e.getMessage());</span>
+<span class="nc" id="L89">        sleep();</span>
+<span class="nc" id="L90">        continue;</span>
+<span class="fc" id="L91">      }</span>
 
-<span class="fc" id="L95">      current.set(attached);</span>
-<span class="fc" id="L96">      health.markReady();</span>
-<span class="fc" id="L97">      AgentLog.info(&quot;attached to target pid &quot; + attached.pid());</span>
+<span class="fc" id="L93">      current.set(attached);</span>
+<span class="fc" id="L94">      health.markReady();</span>
+<span class="fc" id="L95">      AgentLog.info(&quot;attached to target pid &quot; + attached.pid());</span>
 
-<span class="fc bfc" id="L99" title="All 4 branches covered.">      while (running &amp;&amp; attached.isAlive()) {</span>
-<span class="fc" id="L100">        sleep();</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">      while (running &amp;&amp; attached.isAlive()) {</span>
+<span class="fc" id="L98">        sleep();</span>
       }
 
-<span class="fc" id="L103">      health.markNotReady();</span>
-<span class="fc" id="L104">      closeCurrent();</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">      if (running) {</span>
-<span class="fc" id="L106">        AgentLog.info(&quot;target detached; retrying&quot;);</span>
+<span class="fc" id="L101">      health.markNotReady();</span>
+<span class="fc" id="L102">      closeCurrent();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">      if (running) {</span>
+<span class="fc" id="L104">        AgentLog.info(&quot;target detached; retrying&quot;);</span>
       }
-<span class="fc" id="L108">    }</span>
-<span class="fc" id="L109">  }</span>
+<span class="fc" id="L106">    }</span>
+<span class="fc" id="L107">  }</span>
 
   private void closeCurrent() {
-<span class="fc" id="L112">    AttachedJvm attached = current.getAndSet(null);</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">    if (attached != null) {</span>
-<span class="fc" id="L114">      attached.close();</span>
+<span class="fc" id="L110">    AttachedJvm attached = current.getAndSet(null);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">    if (attached != null) {</span>
+<span class="fc" id="L112">      attached.close();</span>
     }
-<span class="fc" id="L116">  }</span>
+<span class="fc" id="L114">  }</span>
 
   private void sleep() {
     try {
-<span class="fc" id="L120">      Thread.sleep(POLL_INTERVAL.toMillis());</span>
-<span class="fc" id="L121">    } catch (InterruptedException e) {</span>
-<span class="fc" id="L122">      Thread.currentThread().interrupt();</span>
-<span class="fc" id="L123">    }</span>
-<span class="fc" id="L124">  }</span>
+<span class="fc" id="L118">      Thread.sleep(POLL_INTERVAL.toMillis());</span>
+<span class="fc" id="L119">    } catch (InterruptedException e) {</span>
+<span class="fc" id="L120">      Thread.currentThread().interrupt();</span>
+<span class="fc" id="L121">    }</span>
+<span class="fc" id="L122">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

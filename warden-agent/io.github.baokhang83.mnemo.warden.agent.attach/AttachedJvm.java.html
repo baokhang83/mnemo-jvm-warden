@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AttachedJvm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.attach</a> &gt; <span class="el_source">AttachedJvm.java</span></div><h1>AttachedJvm.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.attach;
 
-import com.sun.tools.attach.VirtualMachine;
 import java.io.Closeable;
 import java.io.IOException;
 import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
 
 /**
- * A live connection to the target JVM: its PID, the {@link VirtualMachine} handle used to attach,
- * and the JMX connection opened over that attachment.
+ * A live connection to the target JVM: its PID and the JMX connection opened over its
+ * loopback-bound JMX port (see {@link TargetAttacher} for why not the Attach API).
  *
  * &lt;p&gt;{@link #mbeanConnection()} is what lets W-101's {@code GcDetector} and later heap drivers
  * read/act on the target's MXBeans exactly as they would locally &amp;mdash;
@@ -18,51 +17,42 @@ import javax.management.remote.JMXConnector;
 public final class AttachedJvm implements Closeable {
 
   private final long pid;
-  private final VirtualMachine virtualMachine;
   private final JMXConnector connector;
   private final MBeanServerConnection mbeanServerConnection;
 
-  AttachedJvm(
-<span class="fc" id="L26">      long pid, VirtualMachine virtualMachine, JMXConnector connector, MBeanServerConnection mbeanServerConnection) {</span>
-<span class="fc" id="L27">    this.pid = pid;</span>
-<span class="fc" id="L28">    this.virtualMachine = virtualMachine;</span>
-<span class="fc" id="L29">    this.connector = connector;</span>
-<span class="fc" id="L30">    this.mbeanServerConnection = mbeanServerConnection;</span>
-<span class="fc" id="L31">  }</span>
+<span class="fc" id="L23">  AttachedJvm(long pid, JMXConnector connector, MBeanServerConnection mbeanServerConnection) {</span>
+<span class="fc" id="L24">    this.pid = pid;</span>
+<span class="fc" id="L25">    this.connector = connector;</span>
+<span class="fc" id="L26">    this.mbeanServerConnection = mbeanServerConnection;</span>
+<span class="fc" id="L27">  }</span>
 
   /** The target's PID. */
   public long pid() {
-<span class="fc" id="L35">    return pid;</span>
+<span class="fc" id="L31">    return pid;</span>
   }
 
   /** The JMX connection to the target, for reading/acting on its MXBeans. */
   public MBeanServerConnection mbeanConnection() {
-<span class="fc" id="L40">    return mbeanServerConnection;</span>
+<span class="fc" id="L36">    return mbeanServerConnection;</span>
   }
 
   /** Whether the target process is still running. */
   public boolean isAlive() {
-<span class="fc" id="L45">    return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);</span>
+<span class="fc" id="L41">    return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);</span>
   }
 
   /**
-   * Closes the JMX connector and detaches from the target. Safe to call once the target has
-   * already exited &amp;mdash; that is precisely the case this exists for (cleanup after a dead
-   * target, before {@code AttachSupervisor} retries), so a severed connection is not a failure
-   * here, just expected.
+   * Closes the JMX connector. Safe to call once the target has already exited &amp;mdash; that is
+   * precisely the case this exists for (cleanup after a dead target, before {@code
+   * AttachSupervisor} retries), so a severed connection is not a failure here, just expected.
    */
   @Override
   public void close() {
     try {
-<span class="fc" id="L57">      connector.close();</span>
-<span class="fc" id="L58">    } catch (IOException e) {</span>
+<span class="fc" id="L52">      connector.close();</span>
+<span class="fc" id="L53">    } catch (IOException e) {</span>
       // The target's RMI connection is already gone; nothing left to close.
-<span class="fc" id="L60">    }</span>
-    try {
-<span class="fc" id="L62">      virtualMachine.detach();</span>
-<span class="nc" id="L63">    } catch (IOException e) {</span>
-      // Same reasoning: the target may already be gone.
-<span class="fc" id="L65">    }</span>
-<span class="fc" id="L66">  }</span>
+<span class="fc" id="L55">    }</span>
+<span class="fc" id="L56">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
