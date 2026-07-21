@@ -12,8 +12,10 @@ public sealed interface ShrinkOutcome {
 
   /**
    * The RSS gate failed: {@code observedRssBytes} was not below {@code targetBytes} after the
-   * deep GC + uncommit step. The cgroup was never touched.
+   * deep GC + uncommit step. The cgroup was never touched &amp;mdash; this is W-205's &quot;safe no-op&quot;
+   * abort path. {@code SoftMax} is deliberately left at {@code targetBytes}, not restored; see
+   * {@code docs/fluencyloop/features/w-205-abort-path-formalize-the-already-shipped-abort-on-fail/design.md}.
    */
-<span class="fc" id="L17">  record AbortedVerificationFailed(long observedRssBytes, long targetBytes) implements ShrinkOutcome {}</span>
+<span class="fc" id="L19">  record AbortedVerificationFailed(long observedRssBytes, long targetBytes) implements ShrinkOutcome {}</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
