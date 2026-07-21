@@ -62,6 +62,19 @@ class RssReaderParsingTest {
   }
 
   @Test
+  void extractsScopeNameFromASiblingContainerPath() {
+    assertEquals(
+        "cri-containerd-7771495e3a0363588a20dd8c3fd02a5679de692a7b2d9cf94b94247488ac9c6e.scope",
+        RssReader.lastPathSegment(RssReader.parseCgroupPath(REAL_CGROUP_SIBLING_CONTAINER)));
+  }
+
+  @Test
+  void extractsScopeNameFromAPathWithNoContainerBoundary() {
+    assertEquals(
+        "hosted-compute-agent.service", RssReader.lastPathSegment(RssReader.parseCgroupPath(REAL_CGROUP_NO_CONTAINER_BOUNDARY)));
+  }
+
+  @Test
   void parsesInactiveFileFromRealMemoryStat() {
     assertEquals(83_902_464L, RssReader.parseInactiveFile(REAL_MEMORY_STAT));
   }

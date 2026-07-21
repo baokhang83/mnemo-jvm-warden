@@ -15,6 +15,10 @@
 # The `app` container's JMX flags are required, not optional — see the comment on that
 # container below, and TargetAttacher's javadoc, for why (bug #55).
 #
+# The `warden` container's hostPath mount of /sys/fs/cgroup is also required, not optional — see
+# the comment on that volume below, and RssReader's javadoc, for why (bug #57). It is a real,
+# explicit privilege cost (full-node cgroup visibility for the sidecar); see deploy/README.md.
+#
 # Apply to a kind cluster (see deploy/README.md); both containers should reach Ready.
 apiVersion: v1
 kind: ServiceAccount
@@ -61,6 +65,18 @@ spec:
   # needs to answer "is there exactly one other JVM, and is it still alive."
   shareProcessNamespace: true
 
+  # Gives the warden container a read-only view of every cgroup on the node, so RssReader
+  # (bug #57) can find the app container's own cgroup directory despite cgroup namespacing
+  # hiding its real absolute path. There's no Kubernetes-native way to scope a hostPath mount to
+  # just one pod's cgroup subtree — that path is assigned by the container runtime after
+  # scheduling — so this is a real, explicit cost: the sidecar can see every other pod's cgroup
+  # on the node too, not just this one's. Weighed and accepted; see deploy/README.md.
+  volumes:
+    - name: host-cgroup
+      hostPath:
+        path: /sys/fs/cgroup
+        type: Directory
+
   initContainers:
     - name: warden
       image: ghcr.io/baokhang83/mnemo-jvm-warden:latest
@@ -69,6 +85,10 @@ spec:
       ports:
         - name: health
           containerPort: 8080
+      volumeMounts:
+        - name: host-cgroup
+          mountPath: /host-cgroup # must match RssReader.HOST_CGROUP_ROOT
+          readOnly: true
       livenessProbe:
         httpGet:
           path: /healthz

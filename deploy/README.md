@@ -65,6 +65,52 @@ live deployment).
 The port number just has to match `WARDEN_TARGET_JMX_PORT` on the `warden` container (default
 `9999`, so unset is fine if you use the default here too).
 
+### The `warden` container's cgroup hostPath mount is required, and costs real privilege
+
+`RssReader` (what M2's shrink-verify step reads to confirm a resize actually freed memory) needs
+the target's cgroup files — `memory.current` and `memory.stat` — but the agent and target are
+separate containers, so the agent's own `/sys/fs/cgroup` is the wrong cgroup. Reaching the
+target's cgroup by crossing into its mount namespace via `/proc/<pid>/root` hit the same
+UID-gated restriction that broke the Attach API (bug
+[#55](https://github.com/baokhang83/mnemo-jvm-warden/issues/55)) — confirmed `Permission denied`
+under a genuine UID mismatch, with no capability grant able to fix it (bug
+[#57](https://github.com/baokhang83/mnemo-jvm-warden/issues/57)). Unlike #55, there is no
+network-based escape hatch here: the JMX metrics that would have avoided a new mount
+(`OperatingSystemMXBean.getTotalMemorySize()`/`getFreeMemorySize()`) track raw `memory.current`,
+not the working-set-minus-reclaimable-cache number this class exists to compute — adopting them
+would have silently regressed that safety property, so they were rejected.
+
+The verified fix instead mounts `/sys/fs/cgroup` from the node into the `warden` container,
+read-only, at `/host-cgroup`:
+
+```yaml
+volumes:
+  - name: host-cgroup
+    hostPath:
+      path: /sys/fs/cgroup
+      type: Directory
+containers: # (on the warden initContainer)
+  - volumeMounts:
+      - name: host-cgroup
+        mountPath: /host-cgroup
+        readOnly: true
+```
+
+**This is a real, explicit cost, not a free fix.** Cgroup namespacing hides a container's real
+absolute path from its own namespaced view, so there is no Kubernetes-native way to scope a
+`hostPath` mount to just this one pod's cgroup subtree — that path isn't known until the
+container runtime assigns it, after scheduling. The mount therefore gives the sidecar read
+visibility into **every cgroup on the node**, not just this pod's. No narrower alternative was
+found; this tradeoff was weighed explicitly and accepted rather than left implicit. `RssReader`
+finds the target's specific directory by a bounded-depth search under the mount for one named
+after the container-runtime scope name reported in `/proc/<pid>/cgroup` (verified real depth on
+kind/containerd: 5 levels — the search doesn't assume that exact shape, since the cgroup driver
+and naming vary by cluster).
+
+If your platform's PodSecurity Standards restrict `hostPath` volumes (the `restricted` and
+`baseline` profiles both forbid them), this deployment needs an exemption for the `warden`
+container — there is currently no verified way around that requirement.
+
 ## `lifecycle-check.yaml` — native-sidecar start/stop ordering (W-202)
 
 Verifies, against a real cluster, that an `initContainer` with `restartPolicy: Always` actually
