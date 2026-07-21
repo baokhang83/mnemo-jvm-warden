@@ -1,8 +1,8 @@
 {
-  "feature": "w-206-oomkill-safety-test-harness-kind-based-real-cluster-pr",
-  "branch": "feature/w-206-oomkill-safety-test-harness-kind-based-real-cluster-pr",
+  "feature": "w-301-wardenpolicy-crd-model-validation-fabric8-generated-cu",
+  "branch": "feature/w-301-wardenpolicy-crd-model-validation-fabric8-generated-cu",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-206-oomkill-safety-test-harness-kind-based-real-cluster-pr/sessions/build-and-verify-the-oomkill-safety-harness-against-a-real-k.md",
+  "last_session": "docs/fluencyloop/features/w-301-wardenpolicy-crd-model-validation-fabric8-generated-cu/sessions/build-the-wardenpolicy-crd-model-and-verify-timezone-validat.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }

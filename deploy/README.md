@@ -160,3 +160,21 @@ cluster itself (no registry needed). Manual-run only for now, matching the lifec
 — CI wiring (building the image and running kind inside GitHub Actions) is a deliberate
 fast-follow, not part of this slice. Prints `PASS`/`FAIL` for each scenario and exits non-zero on
 any failure.
+
+## `wardenpolicy-sample-*.yaml` — the CRD schema is enforced by the API server (W-301)
+
+Verifies, against a real cluster, that the `WardenPolicy` CRD generated from
+`warden-crd-model` (via `crd-generator-maven-plugin`, at `warden-crd-model/target/classes/
+META-INF/fabric8/`) actually gets its `timezone` requirement enforced by the Kubernetes API
+server itself — not just checked by some Java-side validator a different client could bypass.
+`wardenpolicy-sample-valid.yaml` has a `timezone`; `wardenpolicy-sample-invalid.yaml` doesn't.
+
+```bash
+deploy/verify-wardenpolicy-schema.sh              # spins up + tears down its own kind cluster
+deploy/verify-wardenpolicy-schema.sh --keep        # leaves the cluster up for inspection
+deploy/verify-wardenpolicy-schema.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Rebuilds `warden-crd-model` itself before applying the CRD, so the check always exercises a
+freshly generated schema, not a stale one. Manual-run only for now, matching the other checks
+above. Prints `PASS`/`FAIL` for each policy and exits non-zero on any failure.
