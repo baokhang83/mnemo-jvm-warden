@@ -1,8 +1,8 @@
 {
-  "feature": "71-rbac-for-deployment-statefulset-managed-agents-layer-a-na",
-  "branch": "feature/71-rbac-for-deployment-statefulset-managed-agents-layer-a-na",
+  "feature": "w-401-prometheus-metric-source-prometheusmetricsource-evalua",
+  "branch": "feature/w-401-prometheus-metric-source-prometheusmetricsource-evalua",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/71-rbac-for-deployment-statefulset-managed-agents-layer-a-na/sessions/build-and-verify-the-validatingadmissionpolicy-closing-the-w.md",
+  "last_session": "docs/fluencyloop/features/w-401-prometheus-metric-source-prometheusmetricsource-evalua/sessions/build-the-prometheus-metric-source-and-verify-it-against-a-r.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }

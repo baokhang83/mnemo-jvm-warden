@@ -14,8 +14,9 @@ public final class WardenController {
   private WardenController() {}
 
   public static void main(String[] args) throws InterruptedException {
+    ControllerConfig config = ControllerConfig.fromEnv();
     Operator operator = new Operator();
-    operator.register(new WardenPolicyReconciler());
+    operator.register(new WardenPolicyReconciler(config));
     operator.start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(operator::stop, "warden-controller-shutdown"));
