@@ -37,6 +37,10 @@
          release as of W-301, and crd-generator-maven-plugin/generator-annotations ship on the
          same release train. -->
     <fabric8.version>7.3.1</fabric8.version>
+    <!-- Verified against Maven Central and java-operator-sdk's own pom.xml (not guessed):
+         5.1.1 is latest, and it pins fabric8-client.version 7.3.1 — the exact version above,
+         so no client-version conflict between warden-crd-model and warden-controller. -->
+    <java-operator-sdk.version>5.1.1</java-operator-sdk.version>
   </properties>
 
   <dependencyManagement>
@@ -63,6 +67,11 @@
         <groupId>io.fabric8</groupId>
         <artifactId>generator-annotations</artifactId>
         <version>${fabric8.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.javaoperatorsdk</groupId>
+        <artifactId>operator-framework</artifactId>
+        <version>${java-operator-sdk.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

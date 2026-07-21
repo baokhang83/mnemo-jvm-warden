@@ -1,8 +1,8 @@
 {
-  "feature": "w-301-wardenpolicy-crd-model-validation-fabric8-generated-cu",
-  "branch": "feature/w-301-wardenpolicy-crd-model-validation-fabric8-generated-cu",
+  "feature": "w-302-reconciler-skeleton-java-operator-sdk-reconciler-warde",
+  "branch": "feature/w-302-reconciler-skeleton-java-operator-sdk-reconciler-warde",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-301-wardenpolicy-crd-model-validation-fabric8-generated-cu/sessions/build-the-wardenpolicy-crd-model-and-verify-timezone-validat.md",
+  "last_session": "docs/fluencyloop/features/w-302-reconciler-skeleton-java-operator-sdk-reconciler-warde/sessions/build-the-reconciler-skeleton-and-verify-the-watch-patch-loo.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
