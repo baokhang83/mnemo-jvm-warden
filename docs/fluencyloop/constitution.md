@@ -120,6 +120,18 @@ the assumed transition date") instead of a cited, verifiable historical instant 
 distinction that made W-303's DST test pin the real March 9→10, 2024 `America/New_York`
 spring-forward rather than compute a date from a rule description.
 
+### §12 — Independent concerns in a reconcile must have isolated failure blast radius
+
+When a reconcile loop performs two or more logically independent writes (e.g. updating a
+resource's own status, and emitting a side effect to another resource), a failure in one must
+not silently prevent the other from completing. *Prevents* an unrelated, possibly transient
+failure (a missing target, a momentary API error) from masking the primary result a caller
+actually depends on. *A decision violates this when* one write's exception is allowed to
+propagate out of the same call chain as another, unrelated write — exactly the gap that let
+`IntentEmitter.emit()` throwing (a target pod absent from a test cluster) silently stop
+`WardenPolicyReconciler` from ever patching `status.currentProfile`, caught only by W-306's own
+real-cluster verification.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by

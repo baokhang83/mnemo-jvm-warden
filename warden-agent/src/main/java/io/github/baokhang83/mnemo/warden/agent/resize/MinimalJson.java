@@ -25,8 +25,12 @@ import java.util.Map;
  * String.charAt}, which would let an unchecked {@code StringIndexOutOfBoundsException} escape
  * instead (caught by a test feeding truncated JSON, e.g. {@code "{\"a\":1"} with no closing
  * brace).
+ *
+ * <p>Public, not package-private: {@code io.github.baokhang83.mnemo.warden.agent.intent}
+ * (W-306) reads the same API server response shape (a pod's annotations and container status)
+ * and reuses this rather than duplicating a second minimal JSON reader in the same module.
  */
-final class MinimalJson {
+public final class MinimalJson {
 
   private final String source;
   private int pos;
@@ -35,7 +39,7 @@ final class MinimalJson {
     this.source = source;
   }
 
-  static Object parse(String json) {
+  public static Object parse(String json) {
     MinimalJson parser = new MinimalJson(json);
     parser.skipWhitespace();
     Object value = parser.parseValue();

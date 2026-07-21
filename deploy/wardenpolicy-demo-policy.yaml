@@ -1,0 +1,21 @@
+# The WardenPolicy driving W-306's end-to-end demo: targets warden-demo-e2e (see
+# wardenpolicy-demo-pod.yaml.tmpl) with a single always-firing window ("* * * * *", deterministic
+# regardless of wall-clock time — same trick as wardenpolicy-sample-schedule.yaml) that resolves
+# to demo-target: request 100Mi / limit 150Mi, well below the demo pod's initial 400Mi/450Mi.
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-demo-e2e-policy
+spec:
+  targetRef:
+    apiVersion: v1
+    kind: Pod
+    name: warden-demo-e2e
+  timezone: UTC
+  profiles:
+    demo-target:
+      request: 100Mi
+      limit: 150Mi
+  schedule:
+    - cron: "* * * * *"
+      profile: demo-target

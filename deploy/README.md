@@ -212,3 +212,44 @@ Applies two policies:
   all**, even though the schedule alone would resolve to `always-on` on every reconcile.
 
 Manual-run only for now, matching the other checks above.
+
+## `verify-wardenpolicy-intent.sh` — a scheduled window actually resizes a real workload, end to end (W-306)
+
+The capstone check tying M2 to M3: a `WardenPolicy`'s schedule decision reaches the **real**
+agent image (the actual init-container sidecar, not a `kubectl exec`'d test driver like W-206's)
+via a pod-annotation intent handoff, and drives a real `ShrinkSequence` call — a genuine in-place
+resize confirmed on the live pod.
+
+```bash
+deploy/verify-wardenpolicy-intent.sh              # spins up + tears down its own kind cluster
+deploy/verify-wardenpolicy-intent.sh --keep        # leaves the cluster + pod up for inspection
+deploy/verify-wardenpolicy-intent.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Deploys `warden-demo-e2e` (`wardenpolicy-demo-pod.yaml.tmpl`) — sized and configured identically
+to W-206's proven-working idle-load scenario (`-Xmx350m`, `RETAIN_MB=10`, initial
+400Mi/450Mi request/limit) so this doesn't re-debug G1 heap sizing already solved there — then
+applies `wardenpolicy-demo-policy.yaml`, whose always-firing schedule (`* * * * *`) resolves to a
+`demo-target` profile of `100Mi`/`150Mi`. Confirms the app container's actual memory limit
+changes from `450Mi` to `150Mi`, `status.currentProfile` reaches `demo-target`, and the container
+never restarts (no OOMKill).
+
+Runs the real `WardenController` out-of-cluster (same as the reconciler check above) alongside
+the real agent image running *in* the demo pod — both sides of the intent handoff, for real.
+Manual-run only for now, matching every other check in this directory.
+
+### How the fields wire up
+
+`IntentEmitter` (controller) resolves `demo-target`'s `request`/`limit` to bytes and PATCHes
+`warden-demo-e2e`'s own annotations (`warden.mnemo.io/target-request-bytes`,
+`warden.mnemo.io/target-limit-bytes`). `PodIntentReader`/`IntentWatcher` (agent) poll that same
+pod every `WARDEN_INTENT_POLL_INTERVAL_SECONDS` (2s here, 5s default), compare the intent's
+`limitBytes` to the container's *actual current* limit, and call `ShrinkSequence`/`GrowSequence`
+accordingly — smaller shrinks, larger grows, equal is a no-op. Two new **required** agent env
+vars make this possible: `WARDEN_POD_NAME` (Downward API `fieldRef: metadata.name`) and
+`WARDEN_TARGET_CONTAINER_NAME` — both now present on `example-sidecar.yaml` and
+`oomkill-safety-check.yaml.tmpl` too, since the agent fails fast without them.
+
+Scoped to `targetRef.kind: Pod` only, direct by name, for this slice — resolving a
+`Deployment`/`StatefulSet` targetRef to its live pod(s) is tracked separately
+([#69](https://github.com/baokhang83/mnemo-jvm-warden/issues/69)).

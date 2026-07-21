@@ -1,8 +1,8 @@
 {
-  "feature": "w-305-blackout-windows-when-now-falls-within-any-spec-blacko",
-  "branch": "feature/w-305-blackout-windows-when-now-falls-within-any-spec-blacko",
+  "feature": "w-306-intent-to-agent-handoff-controller-patches-the-target",
+  "branch": "feature/w-306-intent-to-agent-handoff-controller-patches-the-target",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-305-blackout-windows-when-now-falls-within-any-spec-blacko/sessions/build-blackout-override-and-verify-it-freezes-status-against.md",
+  "last_session": "docs/fluencyloop/features/w-306-intent-to-agent-handoff-controller-patches-the-target/sessions/build-the-intent-handoff-and-verify-a-scheduled-window-resiz.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }

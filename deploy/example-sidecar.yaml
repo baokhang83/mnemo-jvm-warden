@@ -85,6 +85,16 @@ spec:
       ports:
         - name: health
           containerPort: 8080
+      env:
+        # Required (W-306): lets the agent read back its own pod's intent annotations and know
+        # which sibling container to resize. No default — guessing wrong here means silently
+        # resizing nothing, or resizing the wrong container.
+        - name: WARDEN_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: WARDEN_TARGET_CONTAINER_NAME
+          value: app
       volumeMounts:
         - name: host-cgroup
           mountPath: /host-cgroup # must match RssReader.HOST_CGROUP_ROOT
