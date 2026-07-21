@@ -1,0 +1,30 @@
+# Used by verify-wardenpolicy-reconciler.sh to prove W-305's "do not touch" override for real:
+# the blackout window (2000-01-01 to 2100-01-01) covers "now" for the entire foreseeable
+# lifetime of this check, so status.currentProfile must NEVER get set, even though the schedule
+# below (same always-on/yearly pattern as wardenpolicy-sample-schedule.yaml) would otherwise
+# resolve to "always-on" on every single reconcile.
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-policy-sample-blackout
+spec:
+  targetRef:
+    apiVersion: v1
+    kind: Pod
+    name: warden-example
+  timezone: UTC
+  profiles:
+    always-on:
+      request: 128Mi
+      limit: 256Mi
+    yearly:
+      request: 384Mi
+      limit: 512Mi
+  schedule:
+    - cron: "* * * * *"
+      profile: always-on
+    - cron: "0 0 1 1 *"
+      profile: yearly
+  blackout:
+    - start: "2000-01-01T00:00:00Z"
+      end: "2100-01-01T00:00:00Z"

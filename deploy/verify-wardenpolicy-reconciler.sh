@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Verifies W-302/W-303/W-304's acceptance criteria for real: java-operator-sdk's watch ->
-# reconcile -> status-patch loop actually works against a real cluster, and
-# status.currentProfile reflects real, lead-time-aware cron schedule evaluation
-# (ScheduleEvaluator.currentProfileWithLeadTime), not just a unit test of the pure evaluator
-# logic (constitution §8). Runs the real WardenController process (out-of-cluster, against
-# kind's own kubeconfig context — production runs in-cluster and needs no such override).
+# Verifies W-302/W-303/W-304/W-305's acceptance criteria for real: java-operator-sdk's watch ->
+# reconcile -> status-patch loop actually works against a real cluster, status.currentProfile
+# reflects real, lead-time-aware cron schedule evaluation (ScheduleEvaluator.
+# currentProfileWithLeadTime), and a blackout window really does suppress that entirely — not
+# just unit tests of the pure evaluator logic (constitution §8). Runs the real WardenController
+# process (out-of-cluster, against kind's own kubeconfig context — production runs in-cluster
+# and needs no such override).
 #
 # Uses wardenpolicy-sample-schedule.yaml, not wardenpolicy-sample-valid.yaml: its schedule is
 # deterministic regardless of wall-clock time ("* * * * *" always fired within the last minute
@@ -12,6 +13,10 @@
 # here), so this check never depends on what time of day it happens to run. The exact lead-time
 # early-fire boundary is proven by ScheduleEvaluatorTest's fixed-instant tests instead — a more
 # reliable tool for exact timing than a live wall-clock-dependent cluster run.
+#
+# wardenpolicy-sample-blackout.yaml carries the same always-on/yearly schedule but with a
+# blackout window spanning 2000-2100 — permanently covering "now" for this check's entire
+# foreseeable lifetime, so status.currentProfile must NEVER get set, deterministically.
 #
 # Manual-run only, matching W-202/W-206/W-301's precedent.
 #
@@ -46,7 +51,8 @@ cleanup() {
   fi
   rm -f "$CLASSPATH_FILE" "$CONTROLLER_LOG"
   if [[ "$KEEP_CLUSTER" == false ]]; then
-    kubectl --context "kind-$CLUSTER_NAME" delete wardenpolicy warden-policy-sample-schedule \
+    kubectl --context "kind-$CLUSTER_NAME" delete wardenpolicy \
+      warden-policy-sample-schedule warden-policy-sample-blackout \
       --ignore-not-found --wait=false >/dev/null 2>&1 || true
     if [[ "$OWN_CLUSTER" == true ]]; then
       kind delete cluster --name "$CLUSTER_NAME" >/dev/null 2>&1 || true
@@ -79,6 +85,7 @@ kubectl --context "kind-$CLUSTER_NAME" apply -f "$GENERATED_CRD" >/dev/null
 kubectl --context "kind-$CLUSTER_NAME" wait --for=condition=Established \
   crd/wardenpolicies.warden.mnemo.io --timeout=30s >/dev/null
 kubectl --context "kind-$CLUSTER_NAME" apply -f "$SCRIPT_DIR/wardenpolicy-sample-schedule.yaml" >/dev/null
+kubectl --context "kind-$CLUSTER_NAME" apply -f "$SCRIPT_DIR/wardenpolicy-sample-blackout.yaml" >/dev/null
 
 echo "==> starting the real WardenController (out-of-cluster, kind's own kubeconfig context)"
 # The controller has no in-cluster config here — it picks up the current kubeconfig context,
@@ -108,8 +115,24 @@ else
   fail=true
 fi
 
+echo "==> confirming the blacked-out policy's status.currentProfile is never set (W-305)"
+# Positive proof of non-occurrence needs a fixed wait, not a poll-until: several reconcile
+# cycles must actually have had the chance to run and correctly do nothing.
+sleep 5
+blackout_profile="$(kubectl --context "kind-$CLUSTER_NAME" get wardenpolicy warden-policy-sample-blackout \
+  -o jsonpath='{.status.currentProfile}' 2>/dev/null || true)"
+
+if [[ -z "$blackout_profile" ]]; then
+  echo "PASS: status.currentProfile stayed unset — the blackout window suppressed every reconcile's write"
+else
+  echo "FAIL: expected status.currentProfile to stay unset under a permanent blackout, got \"$blackout_profile\""
+  echo "--- controller log ---"
+  cat "$CONTROLLER_LOG"
+  fail=true
+fi
+
 if [[ "$fail" == true ]]; then
   echo "==> RESULT: FAIL"
   exit 1
 fi
-echo "==> RESULT: PASS — real cron schedule evaluation drives status.currentProfile"
+echo "==> RESULT: PASS — real cron schedule evaluation drives status.currentProfile, and blackout suppresses it entirely"
