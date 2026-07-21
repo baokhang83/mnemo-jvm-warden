@@ -1,8 +1,8 @@
 {
-  "feature": "w-302-reconciler-skeleton-java-operator-sdk-reconciler-warde",
-  "branch": "feature/w-302-reconciler-skeleton-java-operator-sdk-reconciler-warde",
+  "feature": "w-303-cron-schedule-evaluation-evaluate-wardenpolicy-schedul",
+  "branch": "feature/w-303-cron-schedule-evaluation-evaluate-wardenpolicy-schedul",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-302-reconciler-skeleton-java-operator-sdk-reconciler-warde/sessions/build-the-reconciler-skeleton-and-verify-the-watch-patch-loo.md",
+  "last_session": "docs/fluencyloop/features/w-303-cron-schedule-evaluation-evaluate-wardenpolicy-schedul/sessions/build-the-cron-schedule-evaluator-and-verify-dst-safety-plus.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }

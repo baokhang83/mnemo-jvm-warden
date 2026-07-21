@@ -108,6 +108,18 @@ top-level catch-all directing unexpected failures to their own code — exactly 
 `ShrinkTrialDriver`'s original `EXIT_ABORTED = 1` collide with an uncaught JMX exception during
 W-206's real-cluster verification, producing a false PASS in `verify-oomkill-safety.sh`.
 
+### §11 — Test date/time logic against a real historical transition, not a synthetic one
+
+When a test needs to prove behavior across a calendar edge case (a DST shift, a leap day, a
+month/year boundary), pin an actual date on which that transition really happened in the
+relevant zone's real tzdata, not a hypothetical or future-postulated one. *Prevents* a test that
+only proves the code agrees with the test author's own assumption about how the transition
+works, rather than proving it against the JDK's real, authoritative time-zone data. *A decision
+violates this when* a time/date test constructs its edge case from arithmetic ("add one day to
+the assumed transition date") instead of a cited, verifiable historical instant — the same
+distinction that made W-303's DST test pin the real March 9→10, 2024 `America/New_York`
+spring-forward rather than compute a date from a rule description.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by

@@ -1,0 +1,27 @@
+# Used by verify-wardenpolicy-reconciler.sh to prove real schedule evaluation (W-303)
+# deterministically, regardless of what wall-clock time the check happens to run at:
+# "* * * * *" has fired within the last minute no matter when this is applied, and "0 0 1 1 *"
+# (once a year, Jan 1st) is guaranteed to have last fired further in the past — so "always-on"
+# must always win under ScheduleEvaluator's most-recently-fired-wins rule.
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-policy-sample-schedule
+spec:
+  targetRef:
+    apiVersion: v1
+    kind: Pod
+    name: warden-example
+  timezone: UTC
+  profiles:
+    always-on:
+      request: 128Mi
+      limit: 256Mi
+    yearly:
+      request: 384Mi
+      limit: 512Mi
+  schedule:
+    - cron: "* * * * *"
+      profile: always-on
+    - cron: "0 0 1 1 *"
+      profile: yearly

@@ -41,6 +41,10 @@
          5.1.1 is latest, and it pins fabric8-client.version 7.3.1 — the exact version above,
          so no client-version conflict between warden-crd-model and warden-controller. -->
     <java-operator-sdk.version>5.1.1</java-operator-sdk.version>
+    <!-- Verified against Maven Central (not guessed): 9.2.1 is latest. DST-safe cron
+         last/next-execution math via java.time.ZonedDateTime — see W-303's design doc for why
+         this is a library, not hand-rolled arithmetic. -->
+    <cron-utils.version>9.2.1</cron-utils.version>
   </properties>
 
   <dependencyManagement>
@@ -72,6 +76,11 @@
         <groupId>io.javaoperatorsdk</groupId>
         <artifactId>operator-framework</artifactId>
         <version>${java-operator-sdk.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.cronutils</groupId>
+        <artifactId>cron-utils</artifactId>
+        <version>${cron-utils.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
