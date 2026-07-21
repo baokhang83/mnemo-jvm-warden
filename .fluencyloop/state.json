@@ -1,8 +1,8 @@
 {
-  "feature": "w-402-shrinkbelow-veto-a-scheduled-shrink-is-blocked-when-li",
-  "branch": "feature/w-402-shrinkbelow-veto-a-scheduled-shrink-is-blocked-when-li",
+  "feature": "w-403-emergencygrowabove-reactive-grow-an-off-schedule-traff",
+  "branch": "feature/w-403-emergencygrowabove-reactive-grow-an-off-schedule-traff",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-402-shrinkbelow-veto-a-scheduled-shrink-is-blocked-when-li/sessions/build-the-shrinkbelow-veto-shrinkvetoevaluator-reconciler-wi.md",
+  "last_session": "docs/fluencyloop/features/w-403-emergencygrowabove-reactive-grow-an-off-schedule-traff/sessions/build-the-emergencygrowabove-reactive-grow-emergencygroweval.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
