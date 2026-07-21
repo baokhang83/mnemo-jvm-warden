@@ -11,17 +11,18 @@ import java.time.Instant;
 
 /**
  * Watches {@code WardenPolicy} objects and patches {@code status.currentProfile} back, evaluated
- * by {@link ScheduleEvaluator} (W-303) &mdash; replacing W-302's placeholder (the
- * alphabetically-first profile key) with the real, cron-schedule-driven selection. Nothing else
- * about the reconcile/patch wiring changed shape from W-302: same {@link
- * UpdateControl#patchStatus} call site, a real value instead of a placeholder.
+ * by {@link ScheduleEvaluator#currentProfileWithLeadTime} (W-303/W-304) &mdash; replacing
+ * W-302's placeholder (the alphabetically-first profile key) with the real, cron-schedule-driven
+ * selection, fired {@code leadTime} early where applicable. Nothing else about the reconcile/patch
+ * wiring changed shape from W-302: same {@link UpdateControl#patchStatus} call site, a real value
+ * instead of a placeholder.
  */
 @ControllerConfiguration
 public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
 
   @Override
   public UpdateControl<WardenPolicy> reconcile(WardenPolicy policy, Context<WardenPolicy> context) {
-    ScheduleEvaluator.currentProfile(policy.getSpec(), Instant.now())
+    ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), Instant.now())
         .ifPresent(
             currentProfile -> {
               if (policy.getStatus() == null) {

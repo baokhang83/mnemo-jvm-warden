@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Verifies W-302/W-303's acceptance criteria for real: java-operator-sdk's watch -> reconcile ->
-# status-patch loop actually works against a real cluster, and status.currentProfile reflects
-# real cron schedule evaluation (W-303), not just a unit test of the pure evaluator logic
-# (constitution §8). Runs the real WardenController process (out-of-cluster, against kind's own
-# kubeconfig context — production runs in-cluster and needs no such override).
+# Verifies W-302/W-303/W-304's acceptance criteria for real: java-operator-sdk's watch ->
+# reconcile -> status-patch loop actually works against a real cluster, and
+# status.currentProfile reflects real, lead-time-aware cron schedule evaluation
+# (ScheduleEvaluator.currentProfileWithLeadTime), not just a unit test of the pure evaluator
+# logic (constitution §8). Runs the real WardenController process (out-of-cluster, against
+# kind's own kubeconfig context — production runs in-cluster and needs no such override).
 #
 # Uses wardenpolicy-sample-schedule.yaml, not wardenpolicy-sample-valid.yaml: its schedule is
-# deterministic regardless of wall-clock time ("* * * * *" always fired within the last minute),
-# so this check never depends on what time of day it happens to run.
+# deterministic regardless of wall-clock time ("* * * * *" always fired within the last minute
+# and is always its own soonest upcoming transition too, so leadTime never changes the outcome
+# here), so this check never depends on what time of day it happens to run. The exact lead-time
+# early-fire boundary is proven by ScheduleEvaluatorTest's fixed-instant tests instead — a more
+# reliable tool for exact timing than a live wall-clock-dependent cluster run.
 #
 # Manual-run only, matching W-202/W-206/W-301's precedent.
 #

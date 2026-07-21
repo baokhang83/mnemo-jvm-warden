@@ -25,3 +25,11 @@ spec:
       profile: always-on
     - cron: "0 0 1 1 *"
       profile: yearly
+  # Present so this fixture also proves leadTime deserializes and flows through
+  # ScheduleEvaluator.currentProfileWithLeadTime (W-304) without error against a real API
+  # server. It has no effect on which profile wins here: "always-on"'s own next occurrence
+  # (within the next minute) is always sooner than "yearly"'s (up to ~a year away), so
+  # findNextTransition always resolves to "always-on" itself, same as the unadjusted base.
+  leadTime:
+    shrink: 5m
+    warm: 10m
