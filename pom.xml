@@ -45,6 +45,11 @@
          last/next-execution math via java.time.ZonedDateTime — see W-303's design doc for why
          this is a library, not hand-rolled arithmetic. -->
     <cron-utils.version>9.2.1</cron-utils.version>
+    <!-- Pinned to the exact version Fabric8's own client already pulls in transitively
+         (confirmed via `mvn dependency:tree`, not guessed) — declared explicitly so
+         warden-controller doesn't rely on an undeclared transitive dependency for its own
+         Prometheus response parsing (W-401). -->
+    <jackson.version>2.19.0</jackson.version>
   </properties>
 
   <dependencyManagement>
@@ -81,6 +86,11 @@
         <groupId>com.cronutils</groupId>
         <artifactId>cron-utils</artifactId>
         <version>${cron-utils.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

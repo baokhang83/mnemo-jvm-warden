@@ -1,0 +1,13 @@
+# Used by verify-prometheus-metric-source.sh. Only `timezone` is required by the CRD schema
+# (W-301) — targetRef/profiles/schedule are all omitted since this check only cares about
+# status.currentMetricValue, not a resize. guardrail.metric is `vector(1)`, a PromQL literal
+# expression needing no scraped data at all, so any running Prometheus answers it identically —
+# deterministic, no scrape-target setup required.
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-demo-metric-policy
+spec:
+  timezone: UTC
+  guardrail:
+    metric: "vector(1)"

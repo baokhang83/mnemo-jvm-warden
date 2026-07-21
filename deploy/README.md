@@ -308,3 +308,25 @@ test driver (reuses `PodResizeClient` exactly as production code does):
 Independent of the schedule/intent machinery `verify-wardenpolicy-intent.sh` covers — this is a
 pure RBAC/admission-control check, with no `WardenPolicy` or controller involved at all. Manual-run
 only for now, matching every other check in this directory.
+
+## `prometheus-demo.yaml` + `verify-prometheus-metric-source.sh` — a real PromQL query reaches status (W-401)
+
+The first M4 check: `PrometheusMetricSource` evaluates `spec.guardrail.metric` against a real
+Prometheus, on the reconciler's own cadence, into `status.currentMetricValue` — purely
+observational this slice; nothing acts on the value yet (W-402, W-403).
+
+```bash
+deploy/verify-prometheus-metric-source.sh              # spins up + tears down its own kind cluster
+deploy/verify-prometheus-metric-source.sh --keep        # leaves the cluster up for inspection
+deploy/verify-prometheus-metric-source.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Deploys a real `prom/prometheus` instance (`prometheus-demo.yaml`, default config, no scrape
+targets needed) and a guardrail-only `WardenPolicy` (`wardenpolicy-demo-metric-policy.yaml`,
+`guardrail.metric: "vector(1)"` — a PromQL literal expression needing no scraped data at all, so
+any running Prometheus answers it identically, deterministic by construction). Since the
+controller runs out-of-cluster (same as every other check here) and can't resolve in-cluster DNS
+or reach a `ClusterIP` directly, this port-forwards Prometheus's `Service` to `localhost` first —
+the same way any out-of-cluster tool would reach it — then points `WARDEN_PROMETHEUS_URL` at the
+forwarded port. Confirms `status.currentMetricValue` reaches `1.0`. Manual-run only for now,
+matching every other check in this directory.
