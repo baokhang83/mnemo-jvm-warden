@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BlackoutEvaluator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.schedule</a> &gt; <span class="el_source">BlackoutEvaluator.java</span></div><h1>BlackoutEvaluator.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.schedule;
+
+import io.github.baokhang83.mnemo.warden.crd.BlackoutWindow;
+import io.github.baokhang83.mnemo.warden.crd.WardenPolicySpec;
+import java.time.Instant;
+
+/**
+ * Whether {@code now} falls inside any of {@code spec.blackout}'s windows &amp;mdash; W-305's hard
+ * &quot;do not touch&quot; override. {@code start}/{@code end} are absolute ISO-8601 instants (every
+ * example uses an explicit {@code Z} offset), not local wall-clock crons, so this compares
+ * {@link Instant}s directly: a launch freeze or holiday blackout is &quot;this exact moment in time,&quot;
+ * not a recurring local time, so unlike {@link ScheduleEvaluator} there's no DST question here
+ * to get right (see the design doc).
+ *
+ * &lt;p&gt;{@link WardenPolicyReconciler} gates on this once, before calling {@link ScheduleEvaluator}
+ * at all: when blacked out, {@code status.currentProfile} is left untouched for this reconcile
+ * rather than routed to some blackout-specific profile &amp;mdash; {@link BlackoutWindow} has no
+ * such field, and &quot;do not touch&quot; means leave whatever is currently active alone.
+ */
+public final class BlackoutEvaluator {
+
+  private BlackoutEvaluator() {}
+
+  public static boolean isBlackedOut(WardenPolicySpec spec, Instant now) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">    if (spec.getBlackout() == null) {</span>
+<span class="fc" id="L26">      return false;</span>
+    }
+<span class="fc bfc" id="L28" title="All 2 branches covered.">    for (BlackoutWindow window : spec.getBlackout()) {</span>
+<span class="fc" id="L29">      Instant start = Instant.parse(window.getStart());</span>
+<span class="fc" id="L30">      Instant end = Instant.parse(window.getEnd());</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">      if (!now.isBefore(start) &amp;&amp; !now.isAfter(end)) {</span>
+<span class="fc" id="L32">        return true;</span>
+      }
+<span class="fc" id="L34">    }</span>
+<span class="fc" id="L35">    return false;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

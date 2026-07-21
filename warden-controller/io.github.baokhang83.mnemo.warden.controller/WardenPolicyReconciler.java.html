@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WardenPolicyReconciler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller</a> &gt; <span class="el_source">WardenPolicyReconciler.java</span></div><h1>WardenPolicyReconciler.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller;
 
+import io.github.baokhang83.mnemo.warden.controller.schedule.BlackoutEvaluator;
 import io.github.baokhang83.mnemo.warden.controller.schedule.ScheduleEvaluator;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicy;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicyStatus;
@@ -13,24 +14,30 @@ import java.time.Instant;
  * Watches {@code WardenPolicy} objects and patches {@code status.currentProfile} back, evaluated
  * by {@link ScheduleEvaluator#currentProfileWithLeadTime} (W-303/W-304) &amp;mdash; replacing
  * W-302's placeholder (the alphabetically-first profile key) with the real, cron-schedule-driven
- * selection, fired {@code leadTime} early where applicable. Nothing else about the reconcile/patch
- * wiring changed shape from W-302: same {@link UpdateControl#patchStatus} call site, a real value
- * instead of a placeholder.
+ * selection, fired {@code leadTime} early where applicable.
+ *
+ * &lt;p&gt;{@link BlackoutEvaluator} (W-305) gates the write: while blacked out, {@code
+ * status.currentProfile} is left exactly as it was this reconcile, a hard &quot;do not touch&quot; override
+ * that beats the schedule. This is also where a future guardrail/metric veto (M4) would plug in
+ * &amp;mdash; the same gate, not a second override to keep in sync.
  */
 @ControllerConfiguration
-<span class="nc" id="L21">public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {</span>
+<span class="nc" id="L25">public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {</span>
 
   @Override
   public UpdateControl&lt;WardenPolicy&gt; reconcile(WardenPolicy policy, Context&lt;WardenPolicy&gt; context) {
-<span class="nc" id="L25">    ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), Instant.now())</span>
-<span class="nc" id="L26">        .ifPresent(</span>
-            currentProfile -&gt; {
-<span class="nc bnc" id="L28" title="All 2 branches missed.">              if (policy.getStatus() == null) {</span>
-<span class="nc" id="L29">                policy.setStatus(new WardenPolicyStatus());</span>
-              }
-<span class="nc" id="L31">              policy.getStatus().setCurrentProfile(currentProfile);</span>
-<span class="nc" id="L32">            });</span>
-<span class="nc" id="L33">    return UpdateControl.patchStatus(policy);</span>
+<span class="nc" id="L29">    Instant now = Instant.now();</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">    if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {</span>
+<span class="nc" id="L31">      ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)</span>
+<span class="nc" id="L32">          .ifPresent(</span>
+              currentProfile -&gt; {
+<span class="nc bnc" id="L34" title="All 2 branches missed.">                if (policy.getStatus() == null) {</span>
+<span class="nc" id="L35">                  policy.setStatus(new WardenPolicyStatus());</span>
+                }
+<span class="nc" id="L37">                policy.getStatus().setCurrentProfile(currentProfile);</span>
+<span class="nc" id="L38">              });</span>
+    }
+<span class="nc" id="L40">    return UpdateControl.patchStatus(policy);</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
