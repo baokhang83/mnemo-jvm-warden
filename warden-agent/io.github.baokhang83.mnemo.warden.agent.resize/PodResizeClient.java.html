@@ -33,7 +33,7 @@ import java.util.Map;
  * normalizes the representation (confirmed: a byte count PATCHed as {@code &quot;209715200&quot;} comes
  * back in status as {@code &quot;200Mi&quot;} &amp;mdash; a different string for the same value).
  */
-public final class PodResizeClient {
+public final class PodResizeClient implements ResizePort {
 
 <span class="fc" id="L38">  private static final Duration POLL_INTERVAL = Duration.ofMillis(250);</span>
 
@@ -58,26 +58,27 @@ public final class PodResizeClient {
    *
    * @throws ResizeTimeoutException if the kubelet hadn't applied it by the deadline
    */
+  @Override
   public void resizeMemory(String podName, String containerName, long requestBytes, long limitBytes, Duration timeout)
       throws IOException, InterruptedException {
-<span class="nc" id="L63">    patch(podName, containerName, requestBytes, limitBytes);</span>
-<span class="nc" id="L64">    awaitConfirmation(podName, containerName, requestBytes, limitBytes, timeout);</span>
-<span class="nc" id="L65">  }</span>
+<span class="nc" id="L64">    patch(podName, containerName, requestBytes, limitBytes);</span>
+<span class="nc" id="L65">    awaitConfirmation(podName, containerName, requestBytes, limitBytes, timeout);</span>
+<span class="nc" id="L66">  }</span>
 
   private void patch(String podName, String containerName, long requestBytes, long limitBytes)
       throws IOException, InterruptedException {
-<span class="nc" id="L69">    HttpRequest request =</span>
-<span class="nc" id="L70">        authorizedRequestBuilder(resizeUri(podName))</span>
-<span class="nc" id="L71">            .header(&quot;Content-Type&quot;, &quot;application/strategic-merge-patch+json&quot;)</span>
-<span class="nc" id="L72">            .method(&quot;PATCH&quot;, HttpRequest.BodyPublishers.ofString(patchBody(containerName, requestBytes, limitBytes)))</span>
-<span class="nc" id="L73">            .build();</span>
+<span class="nc" id="L70">    HttpRequest request =</span>
+<span class="nc" id="L71">        authorizedRequestBuilder(resizeUri(podName))</span>
+<span class="nc" id="L72">            .header(&quot;Content-Type&quot;, &quot;application/strategic-merge-patch+json&quot;)</span>
+<span class="nc" id="L73">            .method(&quot;PATCH&quot;, HttpRequest.BodyPublishers.ofString(patchBody(containerName, requestBytes, limitBytes)))</span>
+<span class="nc" id="L74">            .build();</span>
 
-<span class="nc" id="L75">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
-<span class="nc bnc" id="L76" title="All 2 branches missed.">    if (response.statusCode() != 200) {</span>
-<span class="nc" id="L77">      throw new IOException(&quot;resize PATCH for &quot; + podName + &quot;/&quot; + containerName + &quot; failed: HTTP &quot;</span>
-<span class="nc" id="L78">          + response.statusCode() + &quot; &quot; + response.body());</span>
+<span class="nc" id="L76">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L78">      throw new IOException(&quot;resize PATCH for &quot; + podName + &quot;/&quot; + containerName + &quot; failed: HTTP &quot;</span>
+<span class="nc" id="L79">          + response.statusCode() + &quot; &quot; + response.body());</span>
     }
-<span class="nc" id="L80">  }</span>
+<span class="nc" id="L81">  }</span>
 
   /**
    * K8s container names are validated by the API server against RFC 1123 label rules (lowercase
@@ -86,7 +87,7 @@ public final class PodResizeClient {
    * accepted with no unit suffix), so callers of {@link PodResizeClient} never format a quantity.
    */
   static String patchBody(String containerName, long requestBytes, long limitBytes) {
-<span class="fc" id="L89">    return &quot;{\&quot;spec\&quot;:{\&quot;containers\&quot;:[{\&quot;name\&quot;:\&quot;&quot; + containerName + &quot;\&quot;,\&quot;resources\&quot;:{&quot;</span>
+<span class="fc" id="L90">    return &quot;{\&quot;spec\&quot;:{\&quot;containers\&quot;:[{\&quot;name\&quot;:\&quot;&quot; + containerName + &quot;\&quot;,\&quot;resources\&quot;:{&quot;</span>
         + &quot;\&quot;requests\&quot;:{\&quot;memory\&quot;:\&quot;&quot; + requestBytes + &quot;\&quot;},&quot;
         + &quot;\&quot;limits\&quot;:{\&quot;memory\&quot;:\&quot;&quot; + limitBytes + &quot;\&quot;}}}]}}&quot;;
   }
@@ -94,23 +95,23 @@ public final class PodResizeClient {
   private void awaitConfirmation(
       String podName, String containerName, long requestBytes, long limitBytes, Duration timeout)
       throws IOException, InterruptedException {
-<span class="nc" id="L97">    Instant deadline = Instant.now().plus(timeout);</span>
-<span class="nc bnc" id="L98" title="All 2 branches missed.">    while (Instant.now().isBefore(deadline)) {</span>
-<span class="nc bnc" id="L99" title="All 2 branches missed.">      if (matchesDesired(podName, containerName, requestBytes, limitBytes)) {</span>
-<span class="nc" id="L100">        return;</span>
+<span class="nc" id="L98">    Instant deadline = Instant.now().plus(timeout);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">    while (Instant.now().isBefore(deadline)) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">      if (matchesDesired(podName, containerName, requestBytes, limitBytes)) {</span>
+<span class="nc" id="L101">        return;</span>
       }
-<span class="nc" id="L102">      Thread.sleep(POLL_INTERVAL.toMillis());</span>
+<span class="nc" id="L103">      Thread.sleep(POLL_INTERVAL.toMillis());</span>
     }
-<span class="nc bnc" id="L104" title="All 2 branches missed.">    if (!matchesDesired(podName, containerName, requestBytes, limitBytes)) {</span>
-<span class="nc" id="L105">      throw new ResizeTimeoutException(podName, containerName);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">    if (!matchesDesired(podName, containerName, requestBytes, limitBytes)) {</span>
+<span class="nc" id="L106">      throw new ResizeTimeoutException(podName, containerName);</span>
     }
-<span class="nc" id="L107">  }</span>
+<span class="nc" id="L108">  }</span>
 
   private boolean matchesDesired(String podName, String containerName, long requestBytes, long limitBytes)
       throws IOException, InterruptedException {
-<span class="nc" id="L111">    String body = getPod(podName);</span>
-<span class="nc" id="L112">    long[] observed = extractConfirmedMemory(body, containerName);</span>
-<span class="nc bnc" id="L113" title="All 6 branches missed.">    return observed != null &amp;&amp; observed[0] == requestBytes &amp;&amp; observed[1] == limitBytes;</span>
+<span class="nc" id="L112">    String body = getPod(podName);</span>
+<span class="nc" id="L113">    long[] observed = extractConfirmedMemory(body, containerName);</span>
+<span class="nc bnc" id="L114" title="All 6 branches missed.">    return observed != null &amp;&amp; observed[0] == requestBytes &amp;&amp; observed[1] == limitBytes;</span>
   }
 
   /**
@@ -120,56 +121,56 @@ public final class PodResizeClient {
    */
   @SuppressWarnings(&quot;unchecked&quot;)
   static long[] extractConfirmedMemory(String getPodResponseJson, String containerName) {
-<span class="fc" id="L123">    Map&lt;String, Object&gt; pod = (Map&lt;String, Object&gt;) MinimalJson.parse(getPodResponseJson);</span>
-<span class="fc" id="L124">    Map&lt;String, Object&gt; status = (Map&lt;String, Object&gt;) pod.get(&quot;status&quot;);</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">    if (status == null) {</span>
-<span class="fc" id="L126">      return null;</span>
+<span class="fc" id="L124">    Map&lt;String, Object&gt; pod = (Map&lt;String, Object&gt;) MinimalJson.parse(getPodResponseJson);</span>
+<span class="fc" id="L125">    Map&lt;String, Object&gt; status = (Map&lt;String, Object&gt;) pod.get(&quot;status&quot;);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">    if (status == null) {</span>
+<span class="fc" id="L127">      return null;</span>
     }
-<span class="fc" id="L128">    List&lt;Object&gt; containerStatuses = (List&lt;Object&gt;) status.get(&quot;containerStatuses&quot;);</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">    if (containerStatuses == null) {</span>
-<span class="nc" id="L130">      return null;</span>
+<span class="fc" id="L129">    List&lt;Object&gt; containerStatuses = (List&lt;Object&gt;) status.get(&quot;containerStatuses&quot;);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">    if (containerStatuses == null) {</span>
+<span class="nc" id="L131">      return null;</span>
     }
 
-<span class="fc bfc" id="L133" title="All 2 branches covered.">    for (Object entry : containerStatuses) {</span>
-<span class="fc" id="L134">      Map&lt;String, Object&gt; containerStatus = (Map&lt;String, Object&gt;) entry;</span>
-<span class="fc bfc" id="L135" title="All 2 branches covered.">      if (!containerName.equals(containerStatus.get(&quot;name&quot;))) {</span>
-<span class="fc" id="L136">        continue;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">    for (Object entry : containerStatuses) {</span>
+<span class="fc" id="L135">      Map&lt;String, Object&gt; containerStatus = (Map&lt;String, Object&gt;) entry;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">      if (!containerName.equals(containerStatus.get(&quot;name&quot;))) {</span>
+<span class="fc" id="L137">        continue;</span>
       }
-<span class="fc" id="L138">      Map&lt;String, Object&gt; resources = (Map&lt;String, Object&gt;) containerStatus.get(&quot;resources&quot;);</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">      if (resources == null) {</span>
-<span class="nc" id="L140">        return null;</span>
+<span class="fc" id="L139">      Map&lt;String, Object&gt; resources = (Map&lt;String, Object&gt;) containerStatus.get(&quot;resources&quot;);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">      if (resources == null) {</span>
+<span class="nc" id="L141">        return null;</span>
       }
-<span class="fc" id="L142">      Map&lt;String, Object&gt; requests = (Map&lt;String, Object&gt;) resources.get(&quot;requests&quot;);</span>
-<span class="fc" id="L143">      Map&lt;String, Object&gt; limits = (Map&lt;String, Object&gt;) resources.get(&quot;limits&quot;);</span>
-<span class="pc bpc" id="L144" title="4 of 8 branches missed.">      if (requests == null || limits == null || requests.get(&quot;memory&quot;) == null || limits.get(&quot;memory&quot;) == null) {</span>
-<span class="nc" id="L145">        return null;</span>
+<span class="fc" id="L143">      Map&lt;String, Object&gt; requests = (Map&lt;String, Object&gt;) resources.get(&quot;requests&quot;);</span>
+<span class="fc" id="L144">      Map&lt;String, Object&gt; limits = (Map&lt;String, Object&gt;) resources.get(&quot;limits&quot;);</span>
+<span class="pc bpc" id="L145" title="4 of 8 branches missed.">      if (requests == null || limits == null || requests.get(&quot;memory&quot;) == null || limits.get(&quot;memory&quot;) == null) {</span>
+<span class="nc" id="L146">        return null;</span>
       }
-<span class="fc" id="L147">      return new long[] {</span>
-<span class="fc" id="L148">        K8sQuantity.parseBytes((String) requests.get(&quot;memory&quot;)), K8sQuantity.parseBytes((String) limits.get(&quot;memory&quot;))</span>
+<span class="fc" id="L148">      return new long[] {</span>
+<span class="fc" id="L149">        K8sQuantity.parseBytes((String) requests.get(&quot;memory&quot;)), K8sQuantity.parseBytes((String) limits.get(&quot;memory&quot;))</span>
       };
     }
-<span class="fc" id="L151">    return null;</span>
+<span class="fc" id="L152">    return null;</span>
   }
 
   private String getPod(String podName) throws IOException, InterruptedException {
-<span class="nc" id="L155">    HttpRequest request = authorizedRequestBuilder(podUri(podName)).GET().build();</span>
-<span class="nc" id="L156">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
-<span class="nc bnc" id="L157" title="All 2 branches missed.">    if (response.statusCode() != 200) {</span>
-<span class="nc" id="L158">      throw new IOException(&quot;GET pod &quot; + podName + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+<span class="nc" id="L156">    HttpRequest request = authorizedRequestBuilder(podUri(podName)).GET().build();</span>
+<span class="nc" id="L157">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L159">      throw new IOException(&quot;GET pod &quot; + podName + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
     }
-<span class="nc" id="L160">    return response.body();</span>
+<span class="nc" id="L161">    return response.body();</span>
   }
 
   private HttpRequest.Builder authorizedRequestBuilder(URI uri) throws IOException {
-<span class="nc" id="L164">    return HttpRequest.newBuilder(uri).header(&quot;Authorization&quot;, &quot;Bearer &quot; + apiServer.bearerToken());</span>
+<span class="nc" id="L165">    return HttpRequest.newBuilder(uri).header(&quot;Authorization&quot;, &quot;Bearer &quot; + apiServer.bearerToken());</span>
   }
 
   private URI podUri(String podName) {
-<span class="nc" id="L168">    return apiServer.baseUri().resolve(&quot;/api/v1/namespaces/&quot; + apiServer.namespace() + &quot;/pods/&quot; + podName);</span>
+<span class="nc" id="L169">    return apiServer.baseUri().resolve(&quot;/api/v1/namespaces/&quot; + apiServer.namespace() + &quot;/pods/&quot; + podName);</span>
   }
 
   private URI resizeUri(String podName) {
-<span class="nc" id="L172">    return apiServer.baseUri().resolve(&quot;/api/v1/namespaces/&quot; + apiServer.namespace() + &quot;/pods/&quot; + podName + &quot;/resize&quot;);</span>
+<span class="nc" id="L173">    return apiServer.baseUri().resolve(&quot;/api/v1/namespaces/&quot; + apiServer.namespace() + &quot;/pods/&quot; + podName + &quot;/resize&quot;);</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
