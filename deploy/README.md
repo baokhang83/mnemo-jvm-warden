@@ -179,15 +179,16 @@ Rebuilds `warden-crd-model` itself before applying the CRD, so the check always 
 freshly generated schema, not a stale one. Manual-run only for now, matching the other checks
 above. Prints `PASS`/`FAIL` for each policy and exits non-zero on any failure.
 
-## `verify-wardenpolicy-reconciler.sh` — the reconciler watches, evaluates the schedule (with lead time), and patches status (W-302/W-303/W-304)
+## `verify-wardenpolicy-reconciler.sh` — the reconciler watches, evaluates the schedule (with lead time), respects blackout, and patches status (W-302/W-303/W-304/W-305)
 
 Verifies, against a real cluster, that `WardenPolicyReconciler` (`warden-controller`) watches
 `WardenPolicy` objects and patches `status.currentProfile` back with a real, cron-schedule-driven
-value (`ScheduleEvaluator.currentProfileWithLeadTime`, W-303/W-304) — not just that the selection
-logic is correct in isolation (that's `ScheduleEvaluatorTest`, which also proves DST-safety
-against a real historical transition and the exact lead-time boundary behavior with fixed
-instants — a more reliable tool for that than a live, wall-clock-dependent cluster run). Runs the
-real `WardenController` process out-of-cluster, pointed at kind's own kubeconfig context
+value (`ScheduleEvaluator.currentProfileWithLeadTime`, W-303/W-304), and that a blackout window
+really suppresses that entirely (`BlackoutEvaluator`, W-305) — not just that the selection logic
+is correct in isolation (that's `ScheduleEvaluatorTest`/`BlackoutEvaluatorTest`, which also prove
+DST-safety against a real historical transition and the exact lead-time boundary behavior with
+fixed instants — more reliable tools for that than a live, wall-clock-dependent cluster run).
+Runs the real `WardenController` process out-of-cluster, pointed at kind's own kubeconfig context
 (production runs in-pod instead, where Fabric8 finds the in-cluster service-account config
 automatically — `WardenController` itself is unchanged either way).
 
@@ -197,11 +198,17 @@ deploy/verify-wardenpolicy-reconciler.sh --keep        # leaves the cluster up f
 deploy/verify-wardenpolicy-reconciler.sh --cluster N   # reuse an existing kind cluster named N
 ```
 
-Applies `wardenpolicy-sample-schedule.yaml` (`* * * * *` → `always-on`, `0 0 1 1 *` → `yearly`,
-plus a `leadTime` block) and confirms `status.currentProfile` gets patched to `always-on` —
-deterministic regardless of what wall-clock time the check happens to run at, since `* * * * *`
-always fired within the last minute and is always its own soonest upcoming transition too (so
-`leadTime` never changes the outcome here — it's present to prove the field deserializes and
-flows through the real code path against a real API server, not to exercise the exact early-fire
-boundary, which the fixed-instant unit tests already cover more reliably). Manual-run only for
-now, matching the other checks above.
+Applies two policies:
+
+- `wardenpolicy-sample-schedule.yaml` (`* * * * *` → `always-on`, `0 0 1 1 *` → `yearly`, plus a
+  `leadTime` block) — confirms `status.currentProfile` gets patched to `always-on`, deterministic
+  regardless of what wall-clock time the check happens to run at, since `* * * * *` always fired
+  within the last minute and is always its own soonest upcoming transition too (so `leadTime`
+  never changes the outcome here — it's present to prove the field deserializes and flows through
+  the real code path, not to exercise the exact early-fire boundary, which the fixed-instant unit
+  tests already cover more reliably).
+- `wardenpolicy-sample-blackout.yaml` — the same schedule, but with a blackout window spanning
+  2000–2100 that permanently covers "now" — confirms `status.currentProfile` **never gets set at
+  all**, even though the schedule alone would resolve to `always-on` on every reconcile.
+
+Manual-run only for now, matching the other checks above.

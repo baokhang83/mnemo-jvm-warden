@@ -1,8 +1,8 @@
 {
-  "feature": "w-304-lead-time-transition-triggering-fire-a-schedule-transi",
-  "branch": "feature/w-304-lead-time-transition-triggering-fire-a-schedule-transi",
+  "feature": "w-305-blackout-windows-when-now-falls-within-any-spec-blacko",
+  "branch": "feature/w-305-blackout-windows-when-now-falls-within-any-spec-blacko",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-304-lead-time-transition-triggering-fire-a-schedule-transi/sessions/build-lead-time-aware-schedule-evaluation-and-verify-it-agai.md",
+  "last_session": "docs/fluencyloop/features/w-305-blackout-windows-when-now-falls-within-any-spec-blacko/sessions/build-blackout-override-and-verify-it-freezes-status-against.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
