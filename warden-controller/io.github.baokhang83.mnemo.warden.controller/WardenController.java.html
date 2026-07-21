@@ -14,15 +14,16 @@ public final class WardenController {
   private WardenController() {}
 
   public static void main(String[] args) throws InterruptedException {
-<span class="nc" id="L17">    Operator operator = new Operator();</span>
-<span class="nc" id="L18">    operator.register(new WardenPolicyReconciler());</span>
-<span class="nc" id="L19">    operator.start();</span>
+<span class="nc" id="L17">    ControllerConfig config = ControllerConfig.fromEnv();</span>
+<span class="nc" id="L18">    Operator operator = new Operator();</span>
+<span class="nc" id="L19">    operator.register(new WardenPolicyReconciler(config));</span>
+<span class="nc" id="L20">    operator.start();</span>
 
-<span class="nc" id="L21">    Runtime.getRuntime().addShutdownHook(new Thread(operator::stop, &quot;warden-controller-shutdown&quot;));</span>
+<span class="nc" id="L22">    Runtime.getRuntime().addShutdownHook(new Thread(operator::stop, &quot;warden-controller-shutdown&quot;));</span>
 
     // Park the main thread until the JVM is terminated (SIGTERM runs the hook above) — same
     // pattern WardenAgent.main uses.
-<span class="nc" id="L25">    new CountDownLatch(1).await();</span>
-<span class="nc" id="L26">  }</span>
+<span class="nc" id="L26">    new CountDownLatch(1).await();</span>
+<span class="nc" id="L27">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -3,17 +3,29 @@
 /**
  * What the controller last observed, per W-302's own acceptance criteria (&quot;status reflects
  * current profile&quot;). Populated by the reconciler, not this slice.
+ *
+ * &lt;p&gt;{@code currentMetricValue} (W-401) is the latest {@code spec.guardrail.metric} PromQL
+ * evaluation, purely observational in this slice &amp;mdash; nothing acts on it yet (W-402, W-403).
  */
-<span class="nc" id="L7">public class WardenPolicyStatus {</span>
+<span class="nc" id="L10">public class WardenPolicyStatus {</span>
 
   private String currentProfile;
+  private Double currentMetricValue;
 
   public String getCurrentProfile() {
-<span class="nc" id="L12">    return currentProfile;</span>
+<span class="nc" id="L16">    return currentProfile;</span>
   }
 
   public void setCurrentProfile(String currentProfile) {
-<span class="nc" id="L16">    this.currentProfile = currentProfile;</span>
-<span class="nc" id="L17">  }</span>
+<span class="nc" id="L20">    this.currentProfile = currentProfile;</span>
+<span class="nc" id="L21">  }</span>
+
+  public Double getCurrentMetricValue() {
+<span class="nc" id="L24">    return currentMetricValue;</span>
+  }
+
+  public void setCurrentMetricValue(Double currentMetricValue) {
+<span class="nc" id="L28">    this.currentMetricValue = currentMetricValue;</span>
+<span class="nc" id="L29">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

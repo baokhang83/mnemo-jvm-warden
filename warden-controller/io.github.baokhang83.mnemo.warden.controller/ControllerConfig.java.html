@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ControllerConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller</a> &gt; <span class="el_source">ControllerConfig.java</span></div><h1>ControllerConfig.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller;
+
+import java.net.URI;
+import java.util.Optional;
+import java.util.function.Function;
+
+/**
+ * Controller-wide configuration, read from the environment. Mirrors {@code warden-agent}'s
+ * {@code AgentConfig.fromEnv} pattern.
+ *
+ * @param prometheusUri where Prometheus lives (W-401), or empty if guardrail metric evaluation
+ *     isn't configured &amp;mdash; optional and safely absent, the same posture the roadmap already
+ *     states for {@code CacheHook} (W-501): not every policy needs a guardrail.
+ */
+<span class="fc" id="L15">public record ControllerConfig(Optional&lt;URI&gt; prometheusUri) {</span>
+
+  public static final String ENV_PROMETHEUS_URL = &quot;WARDEN_PROMETHEUS_URL&quot;;
+
+  public static ControllerConfig fromEnv() {
+<span class="nc" id="L20">    return fromEnv(System::getenv);</span>
+  }
+
+  /**
+   * Package-private seam so tests can supply a fake environment without mutating the real
+   * process environment.
+   */
+  static ControllerConfig fromEnv(Function&lt;String, String&gt; env) {
+<span class="fc" id="L28">    String raw = env.apply(ENV_PROMETHEUS_URL);</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L30">      return new ControllerConfig(Optional.empty());</span>
+    }
+<span class="fc" id="L32">    return new ControllerConfig(Optional.of(URI.create(raw.trim())));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

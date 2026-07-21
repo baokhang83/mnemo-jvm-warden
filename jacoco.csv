@@ -3,7 +3,7 @@ coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,TargetRef,10,14,
 coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,Guardrail,24,0,0,0,10,0,7,0,7,0
 coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicySpec,14,38,0,0,6,16,4,11,4,11
 coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicy,3,0,0,0,1,0,1,0,1,0
-coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicyStatus,10,0,0,0,4,0,3,0,3,0
+coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,WardenPolicyStatus,17,0,0,0,7,0,5,0,5,0
 coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,BlackoutWindow,0,17,0,0,0,7,0,5,0,5
 coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,ScheduleWindow,0,17,0,0,0,7,0,5,0,5
 coverage/warden-crd-model,io.github.baokhang83.mnemo.warden.crd,LeadTime,0,17,0,0,0,7,0,5,0,5
@@ -13,8 +13,10 @@ coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.schedule
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.schedule,ScheduleEvaluator.NextTransition,0,9,0,0,0,1,0,1,0,1
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.schedule,BlackoutEvaluator,0,37,0,8,0,9,0,5,0,1
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.schedule,ShorthandDuration,20,31,5,2,5,6,5,2,0,2
-coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenPolicyReconciler,98,0,6,0,21,0,8,0,5,0
-coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenController,29,0,0,0,6,0,1,0,1,0
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.metrics,PrometheusMetricSource,33,63,5,7,6,11,5,5,1,3
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,ControllerConfig,3,29,1,3,1,5,2,3,1,2
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenPolicyReconciler,181,0,14,0,44,0,15,0,8,0
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenController,32,0,0,0,7,0,1,0,1,0
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,IntentEmitter,116,46,9,11,21,11,11,5,4,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,UnsupportedCollectorException,0,13,0,0,0,4,0,2,0,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,Collector,0,27,0,0,0,5,0,1,0,1
