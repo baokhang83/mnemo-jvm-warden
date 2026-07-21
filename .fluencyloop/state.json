@@ -1,8 +1,8 @@
 {
-  "feature": "w-203-shrink-sequence-with-the-verification-gate",
-  "branch": "feature/w-203-shrink-sequence-with-the-verification-gate",
+  "feature": "w-204-grow-sequence-cgroup-up-first-via-resizeport-then-rais",
+  "branch": "feature/w-204-grow-sequence-cgroup-up-first-via-resizeport-then-rais",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-203-shrink-sequence-with-the-verification-gate/sessions/slice-3-real-cluster-end-to-end-verification.md",
+  "last_session": "docs/fluencyloop/features/w-204-grow-sequence-cgroup-up-first-via-resizeport-then-rais/sessions/grow-sequence-cgroup-up-first-then-raise-softmax.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
