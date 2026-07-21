@@ -1,0 +1,21 @@
+# The WardenPolicy driving #69's Deployment-targeting demo: targets warden-demo-e2e-deploy
+# (kind: Deployment, see wardenpolicy-demo-deployment.yaml.tmpl) with the same always-firing
+# window and demo-target profile as the single-pod demo, proving IntentEmitter resolves the
+# Deployment to its live replicas and annotates all of them, not just one.
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-demo-e2e-deploy-policy
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: warden-demo-e2e-deploy
+  timezone: UTC
+  profiles:
+    demo-target:
+      request: 100Mi
+      limit: 150Mi
+  schedule:
+    - cron: "* * * * *"
+      profile: demo-target

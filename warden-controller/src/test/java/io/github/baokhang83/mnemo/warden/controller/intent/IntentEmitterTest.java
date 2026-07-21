@@ -6,9 +6,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Exercises {@code emit}'s guard clauses directly — each passes a {@code null} client, which
- * would NPE immediately if any of them fell through to the real Fabric8 call, so a clean return
- * is itself the assertion. The real PATCH behavior is proven against a real cluster by {@code
- * deploy/verify-wardenpolicy-intent.sh} (constitution §8), not a mock client here.
+ * would NPE immediately if any of them fell through to a real Fabric8 call, so a clean return is
+ * itself the assertion. Real {@code Pod}/{@code Deployment}/{@code StatefulSet} resolution
+ * behavior is proven against a real cluster by {@code deploy/verify-wardenpolicy-intent.sh}
+ * (constitution §8), not a mock client here.
  */
 class IntentEmitterTest {
 
@@ -18,8 +19,8 @@ class IntentEmitterTest {
   }
 
   @Test
-  void doesNothingWhenTargetRefKindIsNotPod() {
-    IntentEmitter.emit(null, "default", targetRef("Deployment", "my-app"), profile("128Mi", "256Mi"));
+  void doesNothingForAnUnrecognizedTargetRefKind() {
+    IntentEmitter.emit(null, "default", targetRef("CronJob", "my-cronjob"), profile("128Mi", "256Mi"));
   }
 
   @Test

@@ -8,9 +8,11 @@ import io.github.baokhang83.mnemo.warden.crd.WardenPolicy;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicyStatus;
 import io.javaoperatorsdk.operator.api.reconciler.ControllerConfiguration;
 import io.javaoperatorsdk.operator.api.reconciler.Context;
+import io.javaoperatorsdk.operator.api.reconciler.MaxReconciliationInterval;
 import io.javaoperatorsdk.operator.api.reconciler.Reconciler;
 import io.javaoperatorsdk.operator.api.reconciler.UpdateControl;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,8 +33,14 @@ import org.slf4j.LoggerFactory;
  * decision &mdash; caught directly by a real cluster run where a policy's {@code targetRef}
  * pointed at a pod absent from that test's cluster, and the whole reconcile silently failed to
  * patch status at all until this was isolated.
+ *
+ * <p>{@code maxReconciliationInterval} (#69): for a {@code Deployment}/{@code StatefulSet}
+ * {@code targetRef}, a pod created by a later rollout won't have the intent annotation until
+ * something re-triggers {@code reconcile()} — a 30s periodic resync catches it well within the
+ * schedule's own minute-level grain, without a per-policy dynamic secondary-resource watch (which
+ * would need each policy's target selector known statically at controller startup; it isn't).
  */
-@ControllerConfiguration
+@ControllerConfiguration(maxReconciliationInterval = @MaxReconciliationInterval(interval = 30, timeUnit = TimeUnit.SECONDS))
 public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
 
   private static final Logger log = LoggerFactory.getLogger(WardenPolicyReconciler.class);

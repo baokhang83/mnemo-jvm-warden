@@ -1,8 +1,8 @@
 {
-  "feature": "w-306-intent-to-agent-handoff-controller-patches-the-target",
-  "branch": "feature/w-306-intent-to-agent-handoff-controller-patches-the-target",
+  "feature": "resolve-targetref-for-deployment-statefulset-69-intentemitte",
+  "branch": "feature/resolve-targetref-for-deployment-statefulset-69-intentemitte",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-306-intent-to-agent-handoff-controller-patches-the-target/sessions/build-the-intent-handoff-and-verify-a-scheduled-window-resiz.md",
+  "last_session": "docs/fluencyloop/features/resolve-targetref-for-deployment-statefulset-69-intentemitte/sessions/resolve-deployment-statefulset-targetref-and-verify-all-repl.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
