@@ -3,13 +3,17 @@ package io.github.baokhang83.mnemo.warden.controller.schedule;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.baokhang83.mnemo.warden.crd.LeadTime;
+import io.github.baokhang83.mnemo.warden.crd.ResourceProfile;
 import io.github.baokhang83.mnemo.warden.crd.ScheduleWindow;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicySpec;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -81,6 +85,74 @@ class ScheduleEvaluatorTest {
                 .parse(spec.getSchedule().get(0).getCron()))
         .lastExecution(zonedNow)
         .orElseThrow();
+  }
+
+  @Test
+  void firesShrinkLeadTimeEarly_beforeTheOffPeakWindowsNominalCronTime() {
+    WardenPolicySpec spec = offPeakPeakSpec();
+    // 22:00 - leadTime.shrink (5m) = 21:55; 21:56 is inside that lead-time zone.
+    Instant now = ZonedDateTime.of(2026, 6, 15, 21, 56, 0, 0, ZoneId.of("Europe/Paris")).toInstant();
+
+    assertEquals(Optional.of("off-peak"), ScheduleEvaluator.currentProfileWithLeadTime(spec, now));
+  }
+
+  @Test
+  void doesNotFireEarlyBeforeEnteringTheShrinkLeadTimeZone() {
+    WardenPolicySpec spec = offPeakPeakSpec();
+    Instant now = ZonedDateTime.of(2026, 6, 15, 21, 50, 0, 0, ZoneId.of("Europe/Paris")).toInstant();
+
+    assertEquals(Optional.of("peak"), ScheduleEvaluator.currentProfileWithLeadTime(spec, now));
+  }
+
+  @Test
+  void firesWarmLeadTimeEarly_beforeThePeakWindowsNominalCronTime() {
+    WardenPolicySpec spec = offPeakPeakSpec();
+    // 07:00 - leadTime.warm (10m) = 06:50; 06:52 is inside that lead-time zone.
+    Instant now = ZonedDateTime.of(2026, 6, 15, 6, 52, 0, 0, ZoneId.of("Europe/Paris")).toInstant();
+
+    assertEquals(Optional.of("peak"), ScheduleEvaluator.currentProfileWithLeadTime(spec, now));
+  }
+
+  @Test
+  void doesNotFireEarlyBeforeEnteringTheWarmLeadTimeZone() {
+    WardenPolicySpec spec = offPeakPeakSpec();
+    Instant now = ZonedDateTime.of(2026, 6, 15, 6, 40, 0, 0, ZoneId.of("Europe/Paris")).toInstant();
+
+    assertEquals(Optional.of("off-peak"), ScheduleEvaluator.currentProfileWithLeadTime(spec, now));
+  }
+
+  @Test
+  void withNoLeadTimeDeclared_behavesLikeTheUnadjustedEvaluator() {
+    WardenPolicySpec spec = offPeakPeakSpec();
+    spec.setLeadTime(null);
+    // Same instant as the shrink lead-time test above, but with no leadTime to act on.
+    Instant now = ZonedDateTime.of(2026, 6, 15, 21, 56, 0, 0, ZoneId.of("Europe/Paris")).toInstant();
+
+    assertEquals(Optional.of("peak"), ScheduleEvaluator.currentProfileWithLeadTime(spec, now));
+  }
+
+  /** off-peak (256Mi, smaller) at 22:00, peak (512Mi, larger) at 07:00; leadTime shrink=5m, warm=10m. */
+  private static WardenPolicySpec offPeakPeakSpec() {
+    WardenPolicySpec spec = spec("Europe/Paris", window("0 22 * * *", "off-peak"), window("0 7 * * *", "peak"));
+
+    Map<String, ResourceProfile> profiles = new LinkedHashMap<>();
+    profiles.put("off-peak", profile("128Mi", "256Mi"));
+    profiles.put("peak", profile("384Mi", "512Mi"));
+    spec.setProfiles(profiles);
+
+    LeadTime leadTime = new LeadTime();
+    leadTime.setShrink("5m");
+    leadTime.setWarm("10m");
+    spec.setLeadTime(leadTime);
+
+    return spec;
+  }
+
+  private static ResourceProfile profile(String request, String limit) {
+    ResourceProfile profile = new ResourceProfile();
+    profile.setRequest(request);
+    profile.setLimit(limit);
+    return profile;
   }
 
   private static WardenPolicySpec spec(String timezone, ScheduleWindow... windows) {

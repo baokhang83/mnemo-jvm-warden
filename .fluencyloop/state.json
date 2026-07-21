@@ -1,8 +1,8 @@
 {
-  "feature": "w-303-cron-schedule-evaluation-evaluate-wardenpolicy-schedul",
-  "branch": "feature/w-303-cron-schedule-evaluation-evaluate-wardenpolicy-schedul",
+  "feature": "w-304-lead-time-transition-triggering-fire-a-schedule-transi",
+  "branch": "feature/w-304-lead-time-transition-triggering-fire-a-schedule-transi",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-303-cron-schedule-evaluation-evaluate-wardenpolicy-schedul/sessions/build-the-cron-schedule-evaluator-and-verify-dst-safety-plus.md",
+  "last_session": "docs/fluencyloop/features/w-304-lead-time-transition-triggering-fire-a-schedule-transi/sessions/build-lead-time-aware-schedule-evaluation-and-verify-it-agai.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }

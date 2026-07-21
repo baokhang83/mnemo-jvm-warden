@@ -5,8 +5,11 @@ import com.cronutils.model.CronType;
 import com.cronutils.model.definition.CronDefinitionBuilder;
 import com.cronutils.model.time.ExecutionTime;
 import com.cronutils.parser.CronParser;
+import io.github.baokhang83.mnemo.warden.crd.LeadTime;
+import io.github.baokhang83.mnemo.warden.crd.ResourceProfile;
 import io.github.baokhang83.mnemo.warden.crd.ScheduleWindow;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicySpec;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -53,5 +56,76 @@ public final class ScheduleEvaluator {
       }
     }
     return Optional.ofNullable(bestProfile);
+  }
+
+  /**
+   * {@link #currentProfile} adjusted for W-304's lead time: if the *next* upcoming transition is
+   * within its own {@code leadTime} of firing, its profile is returned early instead of the
+   * unadjusted {@code currentProfile}. Direction (shrink vs. warm) is classified by comparing the
+   * next profile's {@code limit} against the current one's &mdash; smaller uses {@code
+   * leadTime.shrink}, larger uses {@code leadTime.warm}. Falls back to the unadjusted {@code
+   * currentProfile} whenever there's no established "current" to anticipate relative to, no
+   * upcoming transition, or either profile's limit can't be resolved &mdash; this only reasons
+   * about one upcoming transition at a time (see the design doc for why).
+   */
+  public static Optional<String> currentProfileWithLeadTime(WardenPolicySpec spec, Instant now) {
+    Optional<String> base = currentProfile(spec, now);
+    if (base.isEmpty() || spec.getSchedule() == null || spec.getSchedule().isEmpty()) {
+      return base;
+    }
+
+    ZonedDateTime zonedNow = ZonedDateTime.ofInstant(now, ZoneId.of(spec.getTimezone()));
+    NextTransition next = findNextTransition(spec, zonedNow);
+    if (next == null) {
+      return base;
+    }
+
+    Long baseLimitBytes = limitBytes(spec, base.get());
+    Long nextLimitBytes = limitBytes(spec, next.profile());
+    if (baseLimitBytes == null || nextLimitBytes == null || baseLimitBytes.equals(nextLimitBytes)) {
+      return base;
+    }
+
+    Duration leadTime = leadTimeFor(spec.getLeadTime(), nextLimitBytes < baseLimitBytes);
+    if (leadTime == null) {
+      return base;
+    }
+
+    Instant triggerAt = next.fireTime().toInstant().minus(leadTime);
+    return now.isBefore(triggerAt) ? base : Optional.of(next.profile());
+  }
+
+  private record NextTransition(String profile, ZonedDateTime fireTime) {}
+
+  private static NextTransition findNextTransition(WardenPolicySpec spec, ZonedDateTime zonedNow) {
+    NextTransition soonest = null;
+    for (ScheduleWindow window : spec.getSchedule()) {
+      Cron cron = PARSER.parse(window.getCron());
+      Optional<ZonedDateTime> nextFired = ExecutionTime.forCron(cron).nextExecution(zonedNow);
+      if (nextFired.isPresent() && (soonest == null || nextFired.get().isBefore(soonest.fireTime()))) {
+        soonest = new NextTransition(window.getProfile(), nextFired.get());
+      }
+    }
+    return soonest;
+  }
+
+  private static Long limitBytes(WardenPolicySpec spec, String profileName) {
+    if (spec.getProfiles() == null) {
+      return null;
+    }
+    ResourceProfile profile = spec.getProfiles().get(profileName);
+    if (profile == null || profile.getLimit() == null) {
+      return null;
+    }
+    return ResourceQuantity.parseBytes(profile.getLimit());
+  }
+
+  /** @param movingToSmaller true if the transition's target profile has a smaller limit (a shrink) */
+  private static Duration leadTimeFor(LeadTime leadTime, boolean movingToSmaller) {
+    if (leadTime == null) {
+      return null;
+    }
+    String raw = movingToSmaller ? leadTime.getShrink() : leadTime.getWarm();
+    return raw == null ? null : ShorthandDuration.parse(raw);
   }
 }
