@@ -4,6 +4,8 @@ import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,10 +19,35 @@ import javax.management.ObjectName;
  * (constitution §5) gates on.
  *
  * &lt;p&gt;The agent and target are &lt;em&gt;separate containers&lt;/em&gt; in the same pod, so the agent's own
- * {@code /sys/fs/cgroup} is the wrong cgroup entirely. {@link #resolveCgroupRoot} finds the right
- * one by reading {@code /proc/&lt;pid&gt;/cgroup} and combining it with {@code /proc/&lt;pid&gt;/root} &amp;mdash;
- * see its javadoc for the two real environments (private cgroup namespace vs. none) this had to
- * be verified against before it worked in both.
+ * {@code /sys/fs/cgroup} is the wrong cgroup entirely. The original mechanism (crossing into the
+ * target's mount namespace via {@code /proc/&lt;pid&gt;/root}) turned out to require the agent and
+ * target to run as the same UID &amp;mdash; the identical restriction that broke the Attach API
+ * (bug #55) &amp;mdash; confirmed {@code Permission denied} under a genuine UID mismatch on a real
+ * cluster, with no capability grant able to fix it (bug #57).
+ *
+ * &lt;p&gt;{@link #resolveCgroupRoot} instead reads the same cgroup files through a {@code hostPath}
+ * mount of {@code /sys/fs/cgroup} into the agent container ({@value #HOST_CGROUP_ROOT}) &amp;mdash;
+ * confirmed on a real cluster with a genuine UID mismatch that this works, since the restriction
+ * was specifically on traversing {@code /proc/PID/root}, not on the cgroup files' own
+ * permissions. This is a real, explicit cost: cgroup namespacing hides a container's true
+ * absolute path from its own namespaced view (verified: {@code /proc/&lt;pid&gt;/cgroup} reports only
+ * an ancestry-obscured relative path), so there is no way to scope the mount to just this pod
+ * &amp;mdash; the agent can see every cgroup on the node. No narrower alternative was found; this was
+ * weighed and accepted explicitly rather than left implicit.
+ *
+ * &lt;p&gt;Because the mount hides the real path, the target's specific directory is found by a
+ * bounded-depth search under {@value #HOST_CGROUP_ROOT} for one named after the last path segment
+ * {@code /proc/&lt;pid&gt;/cgroup} reports (a container-runtime-specific scope name, e.g. {@code
+ * cri-containerd-&lt;id&gt;.scope}) &amp;mdash; verified real depth on kind/containerd is 5 levels, but the
+ * cgroup driver and exact naming vary by cluster, hence a generous bound rather than a fixed
+ * template. This search runs once per {@link #forTarget}, not per {@link #currentRss()} call.
+ *
+ * &lt;p&gt;Also verified: an alternative that needed no new privilege at all &amp;mdash; reading
+ * container-aware memory metrics over the JMX connection bug #55 already established (({@code
+ * com.sun.management.OperatingSystemMXBean#getTotalMemorySize()}/{@code getFreeMemorySize()})
+ * &amp;mdash; was rejected: those numbers track raw {@code memory.current}, not {@code
+ * memory.current - inactive_file}, so adopting them would have silently regressed the exact
+ * safety property this class exists for (see below).
  *
  * &lt;p&gt;Raw {@code memory.current} is not by itself trustworthy: verified on a real target that it
  * counted ~80MB of reclaimable page cache as &quot;used.&quot; {@link #currentRss()} instead reports
@@ -33,107 +60,133 @@ import javax.management.ObjectName;
  */
 public final class RssReader {
 
-<span class="fc" id="L36">  private static final ObjectName DIAGNOSTIC_COMMAND = objectName(&quot;com.sun.management:type=DiagnosticCommand&quot;);</span>
-<span class="fc" id="L37">  private static final Pattern NMT_COMMITTED = Pattern.compile(&quot;Total:.*?committed=(\\d+)KB&quot;);</span>
+  /** Where the agent's manifest must {@code hostPath}-mount {@code /sys/fs/cgroup}, read-only. */
+  public static final String HOST_CGROUP_ROOT = &quot;/host-cgroup&quot;;
+
+  private static final int MAX_SEARCH_DEPTH = 12;
+
+<span class="fc" id="L68">  private static final ObjectName DIAGNOSTIC_COMMAND = objectName(&quot;com.sun.management:type=DiagnosticCommand&quot;);</span>
+<span class="fc" id="L69">  private static final Pattern NMT_COMMITTED = Pattern.compile(&quot;Total:.*?committed=(\\d+)KB&quot;);</span>
 
   private final long pid;
   private final Path cgroupRoot;
   private final MBeanServerConnection connection;
 
-<span class="fc" id="L43">  private RssReader(long pid, Path cgroupRoot, MBeanServerConnection connection) {</span>
-<span class="fc" id="L44">    this.pid = pid;</span>
-<span class="fc" id="L45">    this.cgroupRoot = cgroupRoot;</span>
-<span class="fc" id="L46">    this.connection = connection;</span>
-<span class="fc" id="L47">  }</span>
-
-  /** @throws UnsupportedCgroupVersionException if the target is not on cgroup v2 */
-  public static RssReader forTarget(AttachedJvm target) throws IOException {
-<span class="fc" id="L51">    Path cgroupRoot = resolveCgroupRoot(target.pid());</span>
-<span class="fc" id="L52">    return forTarget(target.pid(), cgroupRoot, target.mbeanConnection());</span>
-  }
+<span class="fc" id="L75">  private RssReader(long pid, Path cgroupRoot, MBeanServerConnection connection) {</span>
+<span class="fc" id="L76">    this.pid = pid;</span>
+<span class="fc" id="L77">    this.cgroupRoot = cgroupRoot;</span>
+<span class="fc" id="L78">    this.connection = connection;</span>
+<span class="fc" id="L79">  }</span>
 
   /**
-   * {@code /proc/&lt;pid&gt;/root/sys/fs/cgroup} is only already the target's own resolved cgroup when
-   * the target has its own private cgroup namespace &amp;mdash; true for a separate container in a
-   * pod (verified against a real kind pod), signaled by a {@code &quot;/..&quot;} escape prefix in {@code
-   * /proc/&lt;pid&gt;/cgroup}, since that marks the target's cgroup as living outside the *reader's*
-   * own cgroup namespace. Without that escape &amp;mdash; no container boundary at all, verified on a
-   * real GitHub Actions runner &amp;mdash; crossing into {@code /proc/&lt;pid&gt;/root} only changes the
-   * mount namespace, not the cgroup one, so the reported path must be appended by hand.
+   * @throws CgroupNotFoundException if no matching cgroup directory exists under the host mount
+   * @throws UnsupportedCgroupVersionException if found, but it has no {@code memory.current}
+   *     (cgroup v1)
    */
-  static Path resolveCgroupRoot(long pid) throws IOException {
-<span class="fc" id="L65">    Path procRoot = Path.of(&quot;/proc&quot;, Long.toString(pid), &quot;root&quot;, &quot;sys&quot;, &quot;fs&quot;, &quot;cgroup&quot;);</span>
-<span class="fc" id="L66">    String cgroupFile = Files.readString(Path.of(&quot;/proc&quot;, Long.toString(pid), &quot;cgroup&quot;));</span>
-<span class="fc" id="L67">    String relative = parseCgroupPath(cgroupFile);</span>
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">    if (relative.contains(&quot;..&quot;)) {</span>
-<span class="nc" id="L69">      return procRoot;</span>
+  public static RssReader forTarget(AttachedJvm target) throws IOException {
+<span class="nc" id="L87">    Path cgroupRoot = resolveCgroupRoot(target.pid(), Path.of(HOST_CGROUP_ROOT));</span>
+<span class="nc" id="L88">    return forTarget(target.pid(), cgroupRoot, target.mbeanConnection());</span>
+  }
+
+  /** Package-private seam so tests can point at a fake host-mounted cgroup tree. */
+  static Path resolveCgroupRoot(long pid, Path hostCgroupRoot) throws IOException {
+<span class="fc" id="L93">    String cgroupFile = Files.readString(Path.of(&quot;/proc&quot;, Long.toString(pid), &quot;cgroup&quot;));</span>
+<span class="fc" id="L94">    String scopeName = lastPathSegment(parseCgroupPath(cgroupFile));</span>
+
+<span class="fc" id="L96">    Optional&lt;Path&gt; found = searchForCgroupDirectory(hostCgroupRoot, scopeName);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">    if (found.isEmpty()) {</span>
+<span class="fc" id="L98">      throw new CgroupNotFoundException(pid, scopeName);</span>
     }
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">    String trimmed = relative.startsWith(&quot;/&quot;) ? relative.substring(1) : relative;</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">    return trimmed.isEmpty() ? procRoot : procRoot.resolve(trimmed);</span>
+<span class="fc" id="L100">    return found.get();</span>
   }
 
   /** Package-private so the parsing logic is directly testable against captured real output. */
   static String parseCgroupPath(String cgroupFileContents) {
     // cgroup v2 unified hierarchy: a single line &quot;0::&lt;path&gt;&quot;.
-<span class="fc" id="L78">    String line = cgroupFileContents.lines().findFirst().orElse(&quot;0::/&quot;);</span>
-<span class="fc" id="L79">    int separator = line.indexOf(&quot;::&quot;);</span>
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">    return separator &gt;= 0 ? line.substring(separator + 2) : &quot;/&quot;;</span>
+<span class="fc" id="L106">    String line = cgroupFileContents.lines().findFirst().orElse(&quot;0::/&quot;);</span>
+<span class="fc" id="L107">    int separator = line.indexOf(&quot;::&quot;);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">    return separator &gt;= 0 ? line.substring(separator + 2) : &quot;/&quot;;</span>
   }
 
-  /** Package-private seam so tests can point at a fake cgroup layout instead of a real one. */
-  static RssReader forTarget(long pid, Path cgroupRoot, MBeanServerConnection connection) {
-<span class="fc bfc" id="L85" title="All 2 branches covered.">    if (Files.notExists(cgroupRoot.resolve(&quot;memory.current&quot;))) {</span>
-<span class="fc" id="L86">      throw new UnsupportedCgroupVersionException(pid);</span>
+  /**
+   * The last component of a cgroup path (e.g. {@code &quot;cri-containerd-&lt;id&gt;.scope&quot;} from {@code
+   * &quot;/../cri-containerd-&lt;id&gt;.scope&quot;}) &amp;mdash; the only part visible regardless of how deeply
+   * cgroup namespacing obscures the ancestry above it.
+   */
+  static String lastPathSegment(String cgroupPath) {
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">    String trimmed = cgroupPath.startsWith(&quot;/&quot;) ? cgroupPath.substring(1) : cgroupPath;</span>
+<span class="fc" id="L118">    int lastSlash = trimmed.lastIndexOf('/');</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">    return lastSlash &gt;= 0 ? trimmed.substring(lastSlash + 1) : trimmed;</span>
+  }
+
+  /** Package-private so the bounded-depth search is directly testable against a fake tree. */
+  static Optional&lt;Path&gt; searchForCgroupDirectory(Path root, String name) throws IOException {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">    if (Files.notExists(root)) {</span>
+<span class="fc" id="L125">      return Optional.empty();</span>
     }
-<span class="fc" id="L88">    return new RssReader(pid, cgroupRoot, connection);</span>
+<span class="fc" id="L127">    try (var stream = Files.walk(root, MAX_SEARCH_DEPTH)) {</span>
+<span class="fc" id="L128">      return stream</span>
+<span class="fc" id="L129">          .filter(Files::isDirectory)</span>
+<span class="fc" id="L130">          .filter(p -&gt; p.getFileName().toString().equals(name))</span>
+<span class="fc" id="L131">          .sorted(Comparator.comparingInt(Path::getNameCount))</span>
+<span class="fc" id="L132">          .findFirst();</span>
+    }
+  }
+
+  /** Package-private seam so tests can supply a fake cgroup layout instead of a real one. */
+  static RssReader forTarget(long pid, Path cgroupRoot, MBeanServerConnection connection) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">    if (Files.notExists(cgroupRoot.resolve(&quot;memory.current&quot;))) {</span>
+<span class="fc" id="L139">      throw new UnsupportedCgroupVersionException(pid);</span>
+    }
+<span class="fc" id="L141">    return new RssReader(pid, cgroupRoot, connection);</span>
   }
 
   public RssReading currentRss() throws IOException {
-<span class="fc" id="L92">    long current = readLong(cgroupRoot.resolve(&quot;memory.current&quot;));</span>
-<span class="fc" id="L93">    long inactiveFile = readInactiveFile(cgroupRoot.resolve(&quot;memory.stat&quot;));</span>
-<span class="fc" id="L94">    long workingSet = Math.max(0, current - inactiveFile);</span>
-<span class="fc" id="L95">    return new RssReading(current, workingSet, readNmtCommitted());</span>
+<span class="fc" id="L145">    long current = readLong(cgroupRoot.resolve(&quot;memory.current&quot;));</span>
+<span class="fc" id="L146">    long inactiveFile = readInactiveFile(cgroupRoot.resolve(&quot;memory.stat&quot;));</span>
+<span class="fc" id="L147">    long workingSet = Math.max(0, current - inactiveFile);</span>
+<span class="fc" id="L148">    return new RssReading(current, workingSet, readNmtCommitted());</span>
   }
 
   private static long readLong(Path file) throws IOException {
-<span class="fc" id="L99">    return Long.parseLong(Files.readString(file).trim());</span>
+<span class="fc" id="L152">    return Long.parseLong(Files.readString(file).trim());</span>
   }
 
   /** Package-private so the parsing logic is directly testable without real cgroup files. */
   static long readInactiveFile(Path memoryStat) throws IOException {
-<span class="fc" id="L104">    return parseInactiveFile(Files.readString(memoryStat));</span>
+<span class="fc" id="L157">    return parseInactiveFile(Files.readString(memoryStat));</span>
   }
 
   static long parseInactiveFile(String memoryStatContents) {
-<span class="fc" id="L108">    return memoryStatContents</span>
-<span class="fc" id="L109">        .lines()</span>
-<span class="fc" id="L110">        .filter(line -&gt; line.startsWith(&quot;inactive_file &quot;))</span>
-<span class="fc" id="L111">        .findFirst()</span>
-<span class="fc" id="L112">        .map(line -&gt; Long.parseLong(line.substring(&quot;inactive_file &quot;.length()).trim()))</span>
-<span class="fc" id="L113">        .orElse(0L);</span>
+<span class="fc" id="L161">    return memoryStatContents</span>
+<span class="fc" id="L162">        .lines()</span>
+<span class="fc" id="L163">        .filter(line -&gt; line.startsWith(&quot;inactive_file &quot;))</span>
+<span class="fc" id="L164">        .findFirst()</span>
+<span class="fc" id="L165">        .map(line -&gt; Long.parseLong(line.substring(&quot;inactive_file &quot;.length()).trim()))</span>
+<span class="fc" id="L166">        .orElse(0L);</span>
   }
 
   private OptionalLong readNmtCommitted() throws IOException {
     String report;
     try {
-<span class="fc" id="L119">      report = (String) connection.invoke(DIAGNOSTIC_COMMAND, &quot;vmNativeMemory&quot;, new Object[] {new String[] {&quot;summary&quot;}}, new String[] {&quot;[Ljava.lang.String;&quot;});</span>
-<span class="nc" id="L120">    } catch (JMException e) {</span>
-<span class="nc" id="L121">      throw new IOException(&quot;failed to invoke VM.native_memory on target&quot;, e);</span>
-<span class="fc" id="L122">    }</span>
-<span class="fc" id="L123">    return parseNmtCommitted(report);</span>
+<span class="fc" id="L172">      report = (String) connection.invoke(DIAGNOSTIC_COMMAND, &quot;vmNativeMemory&quot;, new Object[] {new String[] {&quot;summary&quot;}}, new String[] {&quot;[Ljava.lang.String;&quot;});</span>
+<span class="nc" id="L173">    } catch (JMException e) {</span>
+<span class="nc" id="L174">      throw new IOException(&quot;failed to invoke VM.native_memory on target&quot;, e);</span>
+<span class="fc" id="L175">    }</span>
+<span class="fc" id="L176">    return parseNmtCommitted(report);</span>
   }
 
   /** Package-private so the parsing logic is directly testable against captured real output. */
   static OptionalLong parseNmtCommitted(String vmNativeMemoryReport) {
-<span class="fc" id="L128">    Matcher matcher = NMT_COMMITTED.matcher(vmNativeMemoryReport);</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">    return matcher.find() ? OptionalLong.of(Long.parseLong(matcher.group(1)) * 1024) : OptionalLong.empty();</span>
+<span class="fc" id="L181">    Matcher matcher = NMT_COMMITTED.matcher(vmNativeMemoryReport);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">    return matcher.find() ? OptionalLong.of(Long.parseLong(matcher.group(1)) * 1024) : OptionalLong.empty();</span>
   }
 
   private static ObjectName objectName(String name) {
     try {
-<span class="fc" id="L134">      return new ObjectName(name);</span>
-<span class="nc" id="L135">    } catch (MalformedObjectNameException e) {</span>
-<span class="nc" id="L136">      throw new AssertionError(&quot;hardcoded ObjectName is invalid: &quot; + name, e);</span>
+<span class="fc" id="L187">      return new ObjectName(name);</span>
+<span class="nc" id="L188">    } catch (MalformedObjectNameException e) {</span>
+<span class="nc" id="L189">      throw new AssertionError(&quot;hardcoded ObjectName is invalid: &quot; + name, e);</span>
     }
   }
 }

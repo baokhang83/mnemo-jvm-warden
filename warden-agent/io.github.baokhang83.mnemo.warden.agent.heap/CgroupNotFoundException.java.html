@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CgroupNotFoundException.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.heap</a> &gt; <span class="el_source">CgroupNotFoundException.java</span></div><h1>CgroupNotFoundException.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.heap;
+
+/**
+ * Thrown when the target's cgroup could not be located under the agent's host-mounted cgroup
+ * view at all &amp;mdash; distinct from {@link UnsupportedCgroupVersionException} (found, but it's
+ * cgroup v1: nothing the operator can do). This one most likely means the agent's deployment is
+ * missing the required {@code hostPath} mount of {@code /sys/fs/cgroup} (see {@code
+ * RssReader}'s javadoc), which is fixable.
+ */
+public final class CgroupNotFoundException extends RuntimeException {
+
+  public CgroupNotFoundException(long pid, String scopeName) {
+<span class="fc" id="L13">    super(&quot;could not find a cgroup directory named \&quot;&quot; + scopeName + &quot;\&quot; (target pid &quot; + pid</span>
+        + &quot;) anywhere under the host-mounted cgroup view; is the hostPath mount configured?&quot;);
+<span class="fc" id="L15">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
