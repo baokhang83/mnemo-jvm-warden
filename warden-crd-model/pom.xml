@@ -16,9 +16,37 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-client-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>generator-annotations</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Generates the CRD YAML (target/classes/META-INF/fabric8/) from the annotated
+           WardenPolicy class at build time — the OpenAPI schema the API server itself
+           enforces `timezone` being required against, not just a Java-side check. -->
+      <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>crd-generator-maven-plugin</artifactId>
+        <version>${fabric8.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

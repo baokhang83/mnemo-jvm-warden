@@ -33,6 +33,10 @@
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
     <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+    <!-- Verified against Maven Central (not guessed): 7.3.1 is the latest kubernetes-client
+         release as of W-301, and crd-generator-maven-plugin/generator-annotations ship on the
+         same release train. -->
+    <fabric8.version>7.3.1</fabric8.version>
   </properties>
 
   <dependencyManagement>
@@ -45,6 +49,20 @@
         <version>${junit.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- kubernetes-client-api, not the full kubernetes-client: this only needs the
+           CustomResource base type + model annotations to declare the CRD, never an actual
+           client connection (that's warden-controller's concern, when it exists) — the
+           lighter -api artifact keeps warden-crd-model's footprint proportionate (§4). -->
+      <dependency>
+        <groupId>io.fabric8</groupId>
+        <artifactId>kubernetes-client-api</artifactId>
+        <version>${fabric8.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.fabric8</groupId>
+        <artifactId>generator-annotations</artifactId>
+        <version>${fabric8.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

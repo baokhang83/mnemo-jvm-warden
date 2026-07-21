@@ -1,0 +1,16 @@
+# Identical to wardenpolicy-sample-valid.yaml but with `timezone` omitted — the one thing
+# deploy/verify-wardenpolicy-schema.sh proves the API server itself rejects, not just a
+# Java-side check.
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-policy-sample-invalid
+spec:
+  targetRef:
+    apiVersion: v1
+    kind: Pod
+    name: warden-example
+  profiles:
+    off-peak:
+      request: 128Mi
+      limit: 256Mi

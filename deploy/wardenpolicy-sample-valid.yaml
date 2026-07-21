@@ -1,0 +1,35 @@
+# A minimally complete WardenPolicy — every W-301 field populated with plausible values, used by
+# deploy/verify-wardenpolicy-schema.sh to prove the API server accepts a policy that actually has
+# a timezone (the counterpart to wardenpolicy-sample-invalid.yaml, which omits it).
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-policy-sample
+spec:
+  targetRef:
+    apiVersion: v1
+    kind: Pod
+    name: warden-example
+  timezone: Europe/Paris
+  profiles:
+    off-peak:
+      request: 128Mi
+      limit: 256Mi
+    peak:
+      request: 384Mi
+      limit: 512Mi
+  schedule:
+    - cron: "0 22 * * *"
+      profile: off-peak
+    - cron: "0 7 * * *"
+      profile: peak
+  leadTime:
+    shrink: 5m
+    warm: 10m
+  blackout:
+    - start: "2026-12-24T00:00:00Z"
+      end: "2026-12-26T00:00:00Z"
+  guardrail:
+    metric: 'sum(rate(http_requests_total[5m]))'
+    shrinkBelow: "1"
+    emergencyGrowAbove: "100"
