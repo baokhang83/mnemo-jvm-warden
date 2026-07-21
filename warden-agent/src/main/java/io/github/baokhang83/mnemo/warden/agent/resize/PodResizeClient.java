@@ -33,7 +33,7 @@ import java.util.Map;
  * normalizes the representation (confirmed: a byte count PATCHed as {@code "209715200"} comes
  * back in status as {@code "200Mi"} &mdash; a different string for the same value).
  */
-public final class PodResizeClient {
+public final class PodResizeClient implements ResizePort {
 
   private static final Duration POLL_INTERVAL = Duration.ofMillis(250);
 
@@ -58,6 +58,7 @@ public final class PodResizeClient {
    *
    * @throws ResizeTimeoutException if the kubelet hadn't applied it by the deadline
    */
+  @Override
   public void resizeMemory(String podName, String containerName, long requestBytes, long limitBytes, Duration timeout)
       throws IOException, InterruptedException {
     patch(podName, containerName, requestBytes, limitBytes);

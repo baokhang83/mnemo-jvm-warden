@@ -109,7 +109,11 @@ spec:
   containers:
     - name: app
       # The target JVM Warden manages. A real long-running JVM — the JDK's Simple Web Server —
-      # using the default collector (G1), which the agent's GcDetector recognises.
+      # explicitly on G1, which the agent's GcDetector recognises. Explicit, not left to JVM
+      # ergonomics: verified against a real target that at this container's memory size (512Mi
+      # limit), the JVM's own default-collector heuristic actually picks Serial GC, not G1 —
+      # Collector.OTHER, which AttachedHeapController correctly refuses to manage (§9: verify
+      # the actual behavior, don't assume it from a doc-level "G1 is the default" claim).
       #
       # Launched via `java -m jdk.httpserver/...` (what the `jwebserver` launcher wraps), not the
       # `jwebserver` binary itself: verified that binary does not honor JDK_JAVA_OPTIONS the way
@@ -125,6 +129,7 @@ spec:
       image: eclipse-temurin:21-jdk
       command:
         - java
+        - -XX:+UseG1GC
         - -Dcom.sun.management.jmxremote.port=9999
         - -Dcom.sun.management.jmxremote.rmi.port=9999
         - -Dcom.sun.management.jmxremote.host=127.0.0.1

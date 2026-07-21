@@ -38,6 +38,15 @@ kind delete cluster --name warden-demo
 The `warden` container serves `/healthz` (liveness) and `/readyz` (readiness) on port 8080; the
 `app` container is the JDK's Simple Web Server on port 8000, standing in for a real workload.
 
+### The `app` container's `-XX:+UseG1GC` flag is explicit, not assumed
+
+Verified against a real target (via `jcmd <pid> VM.flags`) that at this container's memory size
+(512Mi limit), the JVM's own default-collector ergonomics actually pick **Serial GC**, not G1 —
+`Collector.OTHER`, which `AttachedHeapController` (W-203) correctly refuses to manage. `-XX:+UseG1GC`
+is set explicitly on the `app` container's launch command so this example always demonstrates a
+collector Warden can actually shrink, rather than silently depending on a default that only holds
+at larger heap sizes.
+
 ### The `app` container's JMX flags are required
 
 The agent connects to the target over a JMX port the target opens at launch, not the JDK Attach
