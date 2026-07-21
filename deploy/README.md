@@ -134,3 +134,29 @@ deploy/verify-lifecycle-ordering.sh --cluster N   # reuse an existing kind clust
 ```
 
 Prints `PASS`/`FAIL` for each direction and exits non-zero on any failure.
+
+## `oomkill-safety-check.yaml.tmpl` — the ordering holds under adversarial load (W-206)
+
+Verifies, against a real cluster, W-206's acceptance criterion: under adversarial load a shrink
+is a safe no-op, and under idle load a shrink actually completes — neither ever OOMKills the pod.
+Uses the real agent image for **both** containers: the `warden` sidecar unchanged, and the `app`
+container running the image's own `harness.LoadTarget` class instead of a real workload — a
+fixture that retains a controllable amount of live heap, so the two scenarios are deterministic
+instead of depending on flaky, traffic-driven memory pressure.
+
+A real shrink attempt is driven by `harness.ShrinkTrialDriver`, `kubectl exec`'d into the running
+`warden` container — a test-only entry point, not the production one (nothing wires
+`ShrinkSequence` into `WardenAgent`'s own runtime loop yet; that is M3's intent handoff, W-306).
+See `docs/fluencyloop/features/w-206-*/design.md` for the full reasoning.
+
+```bash
+deploy/verify-oomkill-safety.sh              # spins up + tears down its own kind cluster
+deploy/verify-oomkill-safety.sh --keep        # leaves the cluster + pods up for inspection
+deploy/verify-oomkill-safety.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Requires `kind`, `docker`, and `envsubst` locally; builds the agent image and loads it into the
+cluster itself (no registry needed). Manual-run only for now, matching the lifecycle check above
+— CI wiring (building the image and running kind inside GitHub Actions) is a deliberate
+fast-follow, not part of this slice. Prints `PASS`/`FAIL` for each scenario and exits non-zero on
+any failure.

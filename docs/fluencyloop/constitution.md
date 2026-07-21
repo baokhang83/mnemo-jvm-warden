@@ -95,6 +95,19 @@ pipeline. Only found by deploying the "fixed" code end-to-end and seeing the pod
 reach Ready. *A decision violates this when* a design says a piece "isn't affected" without a
 citation of having actually run that piece under the real failure condition.
 
+### §10 — A process's exit-code space must be deliberately partitioned
+
+Any process whose exit code is programmatically asserted on (a test harness driver, a CLI tool)
+must choose its recognized-outcome codes so none of them can collide with the runtime's own
+default failure code (e.g. a bare uncaught exception exiting `1`), and must catch unexpected
+failures explicitly to exit a distinct, reserved code rather than falling through to that
+default. *Prevents* an unrelated crash being silently miscounted as a recognized, expected
+outcome. *A decision violates this when* a "success" or a specific "expected failure" code is
+the same value the language runtime already uses for an unhandled error, or when a process has no
+top-level catch-all directing unexpected failures to their own code — exactly the gap that let
+`ShrinkTrialDriver`'s original `EXIT_ABORTED = 1` collide with an uncaught JMX exception during
+W-206's real-cluster verification, producing a false PASS in `verify-oomkill-safety.sh`.
+
 ## Out of scope
 
 - **Formatting and mechanical style** (indentation, import order, line length) — owned by
