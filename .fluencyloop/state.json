@@ -1,8 +1,8 @@
 {
-  "feature": "w-401-prometheus-metric-source-prometheusmetricsource-evalua",
-  "branch": "feature/w-401-prometheus-metric-source-prometheusmetricsource-evalua",
+  "feature": "w-402-shrinkbelow-veto-a-scheduled-shrink-is-blocked-when-li",
+  "branch": "feature/w-402-shrinkbelow-veto-a-scheduled-shrink-is-blocked-when-li",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-401-prometheus-metric-source-prometheusmetricsource-evalua/sessions/build-the-prometheus-metric-source-and-verify-it-against-a-r.md",
+  "last_session": "docs/fluencyloop/features/w-402-shrinkbelow-veto-a-scheduled-shrink-is-blocked-when-li/sessions/build-the-shrinkbelow-veto-shrinkvetoevaluator-reconciler-wi.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
