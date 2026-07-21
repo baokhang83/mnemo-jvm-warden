@@ -1,6 +1,7 @@
 package io.github.baokhang83.mnemo.warden.controller;
 
 import io.github.baokhang83.mnemo.warden.controller.guardrail.EmergencyGrowEvaluator;
+import io.github.baokhang83.mnemo.warden.controller.guardrail.PrecedenceEngine;
 import io.github.baokhang83.mnemo.warden.controller.guardrail.ShrinkVetoEvaluator;
 import io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter;
 import io.github.baokhang83.mnemo.warden.controller.metrics.PrometheusMetricSource;
@@ -32,17 +33,19 @@ import org.slf4j.LoggerFactory;
  * schedule for that reconcile entirely &mdash; when the metric spikes past {@code
  * guardrail.emergencyGrowAbove} (W-403, via {@link EmergencyGrowEvaluator}).
  *
- * <p>{@link BlackoutEvaluator} (W-305) gates the schedule-driven writes entirely: while blacked
- * out, neither {@code status.currentProfile} nor the target pod's intent annotations change, a
- * hard "do not touch" override, and neither a schedule candidate nor an emergency grow is even
- * resolved. Inside that block, {@link EmergencyGrowEvaluator} is checked *first*: when it finds a
- * grow target, {@link ScheduleEvaluator#currentProfileWithLeadTime} is never even called for that
- * reconcile &mdash; the literal "bypasses the calendar." Only when it doesn't fire does the normal
- * schedule path run, where {@link ShrinkVetoEvaluator} is a narrower gate that only fires once a
- * schedule candidate is known, so it can tell a shrink from a grow. Metric *observation* itself
- * stays unconditional — it's passive telemetry, not a shrink/grow action, so blackout doesn't
- * apply to it, and it runs first each reconcile so both guardrails can use this reconcile's own
- * fresh reading (see the W-402/W-403 design docs; W-404 documents the full three-way precedence).
+ * <p>{@code reconcile()} computes each of those signals and hands them to {@link
+ * PrecedenceEngine#resolve} (W-404), the single place {@code blackout > metric > schedule} is
+ * written down. While blacked out, neither a schedule candidate nor an emergency grow is even
+ * resolved &mdash; the hard "do not touch" override. Not blacked out, {@link
+ * EmergencyGrowEvaluator} is checked first: when it finds a grow target, {@link
+ * ScheduleEvaluator#currentProfileWithLeadTime} is never even called for that reconcile &mdash;
+ * the literal "bypasses the calendar." Only when it doesn't fire is the schedule consulted, and
+ * only then does {@link ShrinkVetoEvaluator} have a candidate to veto. {@link PrecedenceEngine}
+ * itself doesn't know any of that context — it just combines whichever of the four signals
+ * {@code reconcile()} handed it. Metric *observation* itself stays unconditional — it's passive
+ * telemetry, not a shrink/grow action, so blackout doesn't apply to it, and it runs first each
+ * reconcile so every guardrail shares this reconcile's own fresh reading (see the
+ * W-402/W-403/W-404 design docs).
  *
  * <p>Intent emission and metric evaluation are each isolated in their own {@code try}/{@code
  * catch} (constitution §12): a target pod that doesn't exist, or a Prometheus query failure, must
@@ -72,46 +75,54 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
   public UpdateControl<WardenPolicy> reconcile(WardenPolicy policy, Context<WardenPolicy> context) {
     Instant now = Instant.now();
     Double metricValue = evaluateMetric(policy);
-    if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {
-      Optional<String> emergencyProfile = EmergencyGrowEvaluator.emergencyProfile(policy.getSpec(), metricValue);
-      if (emergencyProfile.isPresent()) {
-        applyEmergencyGrow(policy, context, emergencyProfile.get(), metricValue);
-      } else {
-        ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)
-            .ifPresent(candidateProfile -> applyScheduleDecision(policy, context, candidateProfile, metricValue));
+    boolean blackedOut = BlackoutEvaluator.isBlackedOut(policy.getSpec(), now);
+    String previousProfile = policy.getStatus() == null ? null : policy.getStatus().getCurrentProfile();
+
+    Optional<String> emergencyGrowProfile = Optional.empty();
+    Optional<String> scheduleCandidate = Optional.empty();
+    boolean shrinkVetoed = false;
+    if (!blackedOut) {
+      emergencyGrowProfile = EmergencyGrowEvaluator.emergencyProfile(policy.getSpec(), metricValue);
+      if (emergencyGrowProfile.isEmpty()) {
+        scheduleCandidate = ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now);
+        shrinkVetoed =
+            scheduleCandidate.isPresent()
+                && ShrinkVetoEvaluator.vetoesShrink(
+                    policy.getSpec(), previousProfile, scheduleCandidate.get(), metricValue);
       }
     }
-    return UpdateControl.patchStatus(policy);
-  }
 
-  private void applyEmergencyGrow(
-      WardenPolicy policy, Context<WardenPolicy> context, String emergencyProfile, Double metricValue) {
-    ensureStatus(policy);
-    log.info(
-        "guardrail forced emergency grow for WardenPolicy {}/{}: metric={} exceeds emergencyGrowAbove, growing to {}",
-        policy.getMetadata().getNamespace(),
-        policy.getMetadata().getName(),
-        metricValue,
-        emergencyProfile);
-    policy.getStatus().setCurrentProfile(emergencyProfile);
-    emitIntent(policy, context, emergencyProfile);
-  }
-
-  private void applyScheduleDecision(
-      WardenPolicy policy, Context<WardenPolicy> context, String candidateProfile, Double metricValue) {
-    ensureStatus(policy);
-    String previousProfile = policy.getStatus().getCurrentProfile();
-    if (ShrinkVetoEvaluator.vetoesShrink(policy.getSpec(), previousProfile, candidateProfile, metricValue)) {
+    Optional<String> resolved = PrecedenceEngine.resolve(blackedOut, emergencyGrowProfile, scheduleCandidate, shrinkVetoed);
+    if (resolved.isPresent()) {
+      applyResolvedProfile(policy, context, resolved.get(), emergencyGrowProfile.isPresent(), metricValue);
+    } else if (shrinkVetoed) {
       log.info(
           "guardrail vetoed shrink for WardenPolicy {}/{}: metric={} not verified below shrinkBelow, staying on {}",
           policy.getMetadata().getNamespace(),
           policy.getMetadata().getName(),
           metricValue,
           previousProfile);
-      return;
     }
-    policy.getStatus().setCurrentProfile(candidateProfile);
-    emitIntent(policy, context, candidateProfile);
+    return UpdateControl.patchStatus(policy);
+  }
+
+  private void applyResolvedProfile(
+      WardenPolicy policy,
+      Context<WardenPolicy> context,
+      String resolvedProfile,
+      boolean isEmergencyGrow,
+      Double metricValue) {
+    ensureStatus(policy);
+    if (isEmergencyGrow) {
+      log.info(
+          "guardrail forced emergency grow for WardenPolicy {}/{}: metric={} exceeds emergencyGrowAbove, growing to {}",
+          policy.getMetadata().getNamespace(),
+          policy.getMetadata().getName(),
+          metricValue,
+          resolvedProfile);
+    }
+    policy.getStatus().setCurrentProfile(resolvedProfile);
+    emitIntent(policy, context, resolvedProfile);
   }
 
   private void emitIntent(WardenPolicy policy, Context<WardenPolicy> context, String currentProfile) {

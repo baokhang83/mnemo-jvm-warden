@@ -1,8 +1,8 @@
 {
-  "feature": "w-403-emergencygrowabove-reactive-grow-an-off-schedule-traff",
-  "branch": "feature/w-403-emergencygrowabove-reactive-grow-an-off-schedule-traff",
+  "feature": "w-404-precedence-engine-one-deterministic-rule-blackout-metr",
+  "branch": "feature/w-404-precedence-engine-one-deterministic-rule-blackout-metr",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-403-emergencygrowabove-reactive-grow-an-off-schedule-traff/sessions/build-the-emergencygrowabove-reactive-grow-emergencygroweval.md",
+  "last_session": "docs/fluencyloop/features/w-404-precedence-engine-one-deterministic-rule-blackout-metr/sessions/build-the-precedence-engine-precedenceengine-reconciler-refa.md",
   "base_ref": "main",
   "updated": "2026-07-21"
 }
