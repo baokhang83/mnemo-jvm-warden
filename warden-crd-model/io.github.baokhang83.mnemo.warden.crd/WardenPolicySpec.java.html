@@ -33,28 +33,28 @@ import java.util.Map;
   /** IANA zone id (e.g. {@code &quot;Europe/Paris&quot;}); required so W-303 always has a zone to evaluate
    *  the schedule in. */
   public String getTimezone() {
-<span class="nc" id="L36">    return timezone;</span>
+<span class="fc" id="L36">    return timezone;</span>
   }
 
   public void setTimezone(String timezone) {
-<span class="nc" id="L40">    this.timezone = timezone;</span>
-<span class="nc" id="L41">  }</span>
+<span class="fc" id="L40">    this.timezone = timezone;</span>
+<span class="fc" id="L41">  }</span>
 
   public Map&lt;String, ResourceProfile&gt; getProfiles() {
-<span class="fc" id="L44">    return profiles;</span>
+<span class="nc" id="L44">    return profiles;</span>
   }
 
   public void setProfiles(Map&lt;String, ResourceProfile&gt; profiles) {
-<span class="fc" id="L48">    this.profiles = profiles;</span>
-<span class="fc" id="L49">  }</span>
+<span class="nc" id="L48">    this.profiles = profiles;</span>
+<span class="nc" id="L49">  }</span>
 
   public List&lt;ScheduleWindow&gt; getSchedule() {
-<span class="nc" id="L52">    return schedule;</span>
+<span class="fc" id="L52">    return schedule;</span>
   }
 
   public void setSchedule(List&lt;ScheduleWindow&gt; schedule) {
-<span class="nc" id="L56">    this.schedule = schedule;</span>
-<span class="nc" id="L57">  }</span>
+<span class="fc" id="L56">    this.schedule = schedule;</span>
+<span class="fc" id="L57">  }</span>
 
   public LeadTime getLeadTime() {
 <span class="nc" id="L60">    return leadTime;</span>
