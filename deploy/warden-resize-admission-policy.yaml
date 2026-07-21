@@ -1,0 +1,47 @@
+# #71: narrows the pods/resize PATCH write path — the only side of the Deployment/StatefulSet
+# RBAC gap that admission control can actually help with (GET/LIST/WATCH bypass admission
+# entirely; only writes are ever intercepted, so the read side has no native fix — see #71's
+# design doc). Every pod's default projected service-account token is bound to that specific pod
+# (BoundServiceAccountTokenVolume), carrying its own name/uid as extra claims in
+# request.userInfo.extra even when many pods share one ServiceAccount — this policy requires that
+# claim to match the pod actually being resized, so one replica's own token can never resize a
+# different replica, regardless of how broad the underlying RBAC grant is.
+#
+# GA since Kubernetes 1.30 (ValidatingAdmissionPolicy) — no new version floor: this project
+# already requires 1.35+ for in-place resize itself.
+#
+# Applies cluster-wide to every pods/resize PATCH, not just this demo's pods — reasonable for a
+# throwaway verification cluster; a real multi-workload cluster may want to add an
+# objectSelector here to scope it to just the labels this project's pods use.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: warden-resize-own-pod-only
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods/resize"]
+  validations:
+    - expression: >-
+        !has(request.userInfo.extra) ||
+        !('authentication.kubernetes.io/pod-name' in request.userInfo.extra) ||
+        request.userInfo.extra['authentication.kubernetes.io/pod-name'][0] == request.name
+      message: "a pod's own token may only resize itself, not a different pod"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: warden-resize-own-pod-only
+spec:
+  policyName: warden-resize-own-pod-only
+  validationActions: ["Deny"]
+  matchResources:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods/resize"]
