@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IntentWatcher.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.intent</a> &gt; <span class="el_source">IntentWatcher.java</span></div><h1>IntentWatcher.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.intent;
+
+import io.github.baokhang83.mnemo.warden.agent.AgentConfig;
+import io.github.baokhang83.mnemo.warden.agent.AgentLog;
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import io.github.baokhang83.mnemo.warden.agent.heap.AttachedHeapController;
+import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
+import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
+import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
+import io.github.baokhang83.mnemo.warden.agent.sequence.GrowSequence;
+import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
+import java.util.Optional;
+import java.util.OptionalLong;
+
+/**
+ * Polls the agent's own pod for W-306 intent (via {@link PodIntentReader}) and drives {@link
+ * ShrinkSequence}/{@link GrowSequence} against the {@link AttachSupervisor}'s currently attached
+ * target &amp;mdash; the wire between the controller's schedule decision and M2's already-built
+ * safety handshake.
+ *
+ * &lt;p&gt;Direction is decided by comparing the intent's {@code limitBytes} to the target container's
+ * &lt;em&gt;actual current&lt;/em&gt; limit (read fresh every poll, not cached): smaller shrinks, larger
+ * grows, equal is a no-op. Once a resize succeeds, the actual limit matches the intent, so the
+ * very next poll's comparison is naturally a no-op &amp;mdash; no separate &quot;last applied&quot; state to
+ * keep in sync, and a failed/aborted attempt is simply retried on the next tick.
+ */
+public final class IntentWatcher {
+
+  private final AgentConfig config;
+  private final AttachSupervisor attachSupervisor;
+  private final PodIntentReader intentReader;
+  private final Thread thread;
+  private volatile boolean running;
+
+<span class="nc" id="L36">  public IntentWatcher(AgentConfig config, AttachSupervisor attachSupervisor, PodIntentReader intentReader) {</span>
+<span class="nc" id="L37">    this.config = config;</span>
+<span class="nc" id="L38">    this.attachSupervisor = attachSupervisor;</span>
+<span class="nc" id="L39">    this.intentReader = intentReader;</span>
+<span class="nc" id="L40">    this.thread = new Thread(this::run, &quot;warden-intent-watcher&quot;);</span>
+<span class="nc" id="L41">    this.thread.setDaemon(true);</span>
+<span class="nc" id="L42">  }</span>
+
+  public void start() {
+<span class="nc" id="L45">    running = true;</span>
+<span class="nc" id="L46">    thread.start();</span>
+<span class="nc" id="L47">  }</span>
+
+  public void stop() {
+<span class="nc" id="L50">    running = false;</span>
+<span class="nc" id="L51">    thread.interrupt();</span>
+    try {
+<span class="nc" id="L53">      thread.join(config.intentPollInterval().multipliedBy(2).toMillis());</span>
+<span class="nc" id="L54">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L55">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L56">    }</span>
+<span class="nc" id="L57">  }</span>
+
+  private void run() {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">    while (running) {</span>
+      try {
+<span class="nc" id="L62">        pollOnce();</span>
+<span class="nc" id="L63">      } catch (Exception e) {</span>
+<span class="nc" id="L64">        AgentLog.info(&quot;intent poll failed, retrying next tick: &quot; + e.getMessage());</span>
+<span class="nc" id="L65">      }</span>
+<span class="nc" id="L66">      sleep();</span>
+    }
+<span class="nc" id="L68">  }</span>
+
+  private void pollOnce() throws Exception {
+<span class="nc" id="L71">    Optional&lt;AttachedJvm&gt; target = attachSupervisor.currentTarget();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">    if (target.isEmpty()) {</span>
+<span class="nc" id="L73">      return;</span>
+    }
+
+<span class="nc" id="L76">    PodState state = intentReader.read();</span>
+<span class="nc" id="L77">    Optional&lt;Intent&gt; intent = state.intent();</span>
+<span class="nc" id="L78">    OptionalLong currentLimitBytes = state.currentLimitBytes();</span>
+<span class="nc bnc" id="L79" title="All 4 branches missed.">    if (intent.isEmpty() || currentLimitBytes.isEmpty()) {</span>
+<span class="nc" id="L80">      return;</span>
+    }
+
+<span class="nc" id="L83">    long desiredLimit = intent.get().limitBytes();</span>
+<span class="nc" id="L84">    long currentLimit = currentLimitBytes.getAsLong();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    if (desiredLimit == currentLimit) {</span>
+<span class="nc" id="L86">      return;</span>
+    }
+
+<span class="nc" id="L89">    HeapController heap = AttachedHeapController.forTarget(target.get());</span>
+<span class="nc" id="L90">    ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
+<span class="nc" id="L91">    long requestBytes = intent.get().requestBytes();</span>
+
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
+<span class="nc" id="L94">      ShrinkSequence sequence =</span>
+          new ShrinkSequence(
+<span class="nc" id="L96">              heap, resizeClient, config.podName(), config.targetContainerName(), config.gcTimeout(), config.resizeTimeout());</span>
+<span class="nc" id="L97">      var outcome = sequence.shrinkTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L98">      AgentLog.info(&quot;intent-driven shrink: &quot; + outcome);</span>
+<span class="nc" id="L99">    } else {</span>
+<span class="nc" id="L100">      GrowSequence sequence =</span>
+<span class="nc" id="L101">          new GrowSequence(heap, resizeClient, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
+<span class="nc" id="L102">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L103">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
+    }
+<span class="nc" id="L105">  }</span>
+
+  private void sleep() {
+    try {
+<span class="nc" id="L109">      Thread.sleep(config.intentPollInterval().toMillis());</span>
+<span class="nc" id="L110">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L111">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L112">    }</span>
+<span class="nc" id="L113">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

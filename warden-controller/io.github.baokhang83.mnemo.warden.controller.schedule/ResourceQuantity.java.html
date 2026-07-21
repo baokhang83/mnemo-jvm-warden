@@ -14,47 +14,52 @@ import java.util.regex.Pattern;
  * pom.xml} says so), and the agent's copy is tied to a different problem (confirming a PATCHed
  * value against the API server's normalized echo) than this one (comparing two static spec
  * values) — see W-304's design doc.
+ *
+ * &lt;p&gt;Public, not package-private: {@code
+ * io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter} (W-306) also needs to parse
+ * a {@code ResourceProfile}'s {@code request}/{@code limit} to bytes, and reuses this rather than
+ * a third copy in the same module.
  */
-final class ResourceQuantity {
+public final class ResourceQuantity {
 
-<span class="fc" id="L20">  private static final Map&lt;String, BigDecimal&gt; BINARY_SUFFIXES =</span>
-<span class="fc" id="L21">      Map.of(</span>
-<span class="fc" id="L22">          &quot;Ki&quot;, BigDecimal.valueOf(1024L),</span>
-<span class="fc" id="L23">          &quot;Mi&quot;, BigDecimal.valueOf(1024L * 1024),</span>
-<span class="fc" id="L24">          &quot;Gi&quot;, BigDecimal.valueOf(1024L * 1024 * 1024),</span>
-<span class="fc" id="L25">          &quot;Ti&quot;, BigDecimal.valueOf(1024L * 1024 * 1024 * 1024));</span>
+<span class="fc" id="L25">  private static final Map&lt;String, BigDecimal&gt; BINARY_SUFFIXES =</span>
+<span class="fc" id="L26">      Map.of(</span>
+<span class="fc" id="L27">          &quot;Ki&quot;, BigDecimal.valueOf(1024L),</span>
+<span class="fc" id="L28">          &quot;Mi&quot;, BigDecimal.valueOf(1024L * 1024),</span>
+<span class="fc" id="L29">          &quot;Gi&quot;, BigDecimal.valueOf(1024L * 1024 * 1024),</span>
+<span class="fc" id="L30">          &quot;Ti&quot;, BigDecimal.valueOf(1024L * 1024 * 1024 * 1024));</span>
 
-<span class="fc" id="L27">  private static final Map&lt;String, BigDecimal&gt; DECIMAL_SUFFIXES =</span>
-<span class="fc" id="L28">      Map.of(</span>
-<span class="fc" id="L29">          &quot;k&quot;, BigDecimal.valueOf(1_000L),</span>
-<span class="fc" id="L30">          &quot;M&quot;, BigDecimal.valueOf(1_000_000L),</span>
-<span class="fc" id="L31">          &quot;G&quot;, BigDecimal.valueOf(1_000_000_000L),</span>
-<span class="fc" id="L32">          &quot;T&quot;, BigDecimal.valueOf(1_000_000_000_000L));</span>
+<span class="fc" id="L32">  private static final Map&lt;String, BigDecimal&gt; DECIMAL_SUFFIXES =</span>
+<span class="fc" id="L33">      Map.of(</span>
+<span class="fc" id="L34">          &quot;k&quot;, BigDecimal.valueOf(1_000L),</span>
+<span class="fc" id="L35">          &quot;M&quot;, BigDecimal.valueOf(1_000_000L),</span>
+<span class="fc" id="L36">          &quot;G&quot;, BigDecimal.valueOf(1_000_000_000L),</span>
+<span class="fc" id="L37">          &quot;T&quot;, BigDecimal.valueOf(1_000_000_000_000L));</span>
 
-<span class="fc" id="L34">  private static final Pattern QUANTITY = Pattern.compile(&quot;^(\\d+(?:\\.\\d+)?)([A-Za-z]*)$&quot;);</span>
+<span class="fc" id="L39">  private static final Pattern QUANTITY = Pattern.compile(&quot;^(\\d+(?:\\.\\d+)?)([A-Za-z]*)$&quot;);</span>
 
   private ResourceQuantity() {}
 
-  static long parseBytes(String quantity) {
-<span class="fc" id="L39">    Matcher matcher = QUANTITY.matcher(quantity.trim());</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">    if (!matcher.matches()) {</span>
-<span class="nc" id="L41">      throw new IllegalArgumentException(&quot;not a recognized Quantity: &quot; + quantity);</span>
+  public static long parseBytes(String quantity) {
+<span class="fc" id="L44">    Matcher matcher = QUANTITY.matcher(quantity.trim());</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">    if (!matcher.matches()) {</span>
+<span class="nc" id="L46">      throw new IllegalArgumentException(&quot;not a recognized Quantity: &quot; + quantity);</span>
     }
 
-<span class="fc" id="L44">    BigDecimal number = new BigDecimal(matcher.group(1));</span>
-<span class="fc" id="L45">    String suffix = matcher.group(2);</span>
-<span class="pc bpc" id="L46" title="1 of 2 branches missed.">    if (suffix.isEmpty()) {</span>
-<span class="nc" id="L47">      return number.longValueExact();</span>
+<span class="fc" id="L49">    BigDecimal number = new BigDecimal(matcher.group(1));</span>
+<span class="fc" id="L50">    String suffix = matcher.group(2);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">    if (suffix.isEmpty()) {</span>
+<span class="nc" id="L52">      return number.longValueExact();</span>
     }
 
-<span class="fc" id="L50">    BigDecimal multiplier = BINARY_SUFFIXES.get(suffix);</span>
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">    if (multiplier == null) {</span>
-<span class="nc" id="L52">      multiplier = DECIMAL_SUFFIXES.get(suffix);</span>
+<span class="fc" id="L55">    BigDecimal multiplier = BINARY_SUFFIXES.get(suffix);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    if (multiplier == null) {</span>
+<span class="nc" id="L57">      multiplier = DECIMAL_SUFFIXES.get(suffix);</span>
     }
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    if (multiplier == null) {</span>
-<span class="nc" id="L55">      throw new IllegalArgumentException(&quot;unsupported Quantity suffix: &quot; + suffix + &quot; in &quot; + quantity);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">    if (multiplier == null) {</span>
+<span class="nc" id="L60">      throw new IllegalArgumentException(&quot;unsupported Quantity suffix: &quot; + suffix + &quot; in &quot; + quantity);</span>
     }
-<span class="fc" id="L57">    return number.multiply(multiplier).longValueExact();</span>
+<span class="fc" id="L62">    return number.multiply(multiplier).longValueExact();</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

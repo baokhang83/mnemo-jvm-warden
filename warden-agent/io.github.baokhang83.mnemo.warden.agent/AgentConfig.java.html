@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AgentConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent</a> &gt; <span class="el_source">AgentConfig.java</span></div><h1>AgentConfig.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent;
 
+import java.time.Duration;
 import java.util.function.Function;
 
 /**
@@ -8,19 +9,44 @@ import java.util.function.Function;
  * &lt;p&gt;Environment variables are the Kubernetes-native way to configure a sidecar, so no config
  * file or YAML library is pulled in.
  *
+ * &lt;p&gt;{@code podName} and {@code targetContainerName} are required, with no default (W-306):
+ * unlike the other fields here, guessing wrong means silently resizing nothing or resizing the
+ * wrong container, so this fails fast instead — the same posture {@code InClusterApiServer}
+ * already takes for {@code KUBERNETES_SERVICE_HOST}.
+ *
  * @param healthPort TCP port the health endpoints listen on
+ * @param podName this pod's own name (Downward API {@code fieldRef: metadata.name}), so the
+ *     agent can read back its own pod's intent annotations
+ * @param targetContainerName the sibling container {@code ShrinkSequence}/{@code GrowSequence}
+ *     resize
+ * @param gcTimeout how long a shrink's deep-GC-and-uncommit step waits before giving up
+ * @param resizeTimeout how long a resize PATCH waits for kubelet confirmation
+ * @param intentPollInterval how often the agent re-reads its own pod's intent annotations
  */
-<span class="fc" id="L13">public record AgentConfig(int healthPort) {</span>
+<span class="fc" id="L26">public record AgentConfig(</span>
+    int healthPort,
+    String podName,
+    String targetContainerName,
+    Duration gcTimeout,
+    Duration resizeTimeout,
+    Duration intentPollInterval) {
 
   /** Default health-probe port. */
   public static final int DEFAULT_HEALTH_PORT = 8080;
+<span class="fc" id="L36">  public static final Duration DEFAULT_GC_TIMEOUT = Duration.ofSeconds(30);</span>
+<span class="fc" id="L37">  public static final Duration DEFAULT_RESIZE_TIMEOUT = Duration.ofSeconds(30);</span>
+<span class="fc" id="L38">  public static final Duration DEFAULT_INTENT_POLL_INTERVAL = Duration.ofSeconds(5);</span>
 
-  /** Environment variable that overrides {@link #DEFAULT_HEALTH_PORT}. */
   public static final String ENV_HEALTH_PORT = &quot;WARDEN_HEALTH_PORT&quot;;
+  public static final String ENV_POD_NAME = &quot;WARDEN_POD_NAME&quot;;
+  public static final String ENV_TARGET_CONTAINER_NAME = &quot;WARDEN_TARGET_CONTAINER_NAME&quot;;
+  public static final String ENV_GC_TIMEOUT_SECONDS = &quot;WARDEN_GC_TIMEOUT_SECONDS&quot;;
+  public static final String ENV_RESIZE_TIMEOUT_SECONDS = &quot;WARDEN_RESIZE_TIMEOUT_SECONDS&quot;;
+  public static final String ENV_INTENT_POLL_INTERVAL_SECONDS = &quot;WARDEN_INTENT_POLL_INTERVAL_SECONDS&quot;;
 
   /** Reads configuration from the process environment, falling back to defaults. */
   public static AgentConfig fromEnv() {
-<span class="nc" id="L23">    return fromEnv(System::getenv);</span>
+<span class="nc" id="L49">    return fromEnv(System::getenv);</span>
   }
 
   /**
@@ -28,23 +54,51 @@ import java.util.function.Function;
    * supply a fake environment without mutating the real process environment.
    */
   static AgentConfig fromEnv(Function&lt;String, String&gt; env) {
-<span class="fc" id="L31">    return new AgentConfig(parsePort(env.apply(ENV_HEALTH_PORT)));</span>
+<span class="fc" id="L57">    return new AgentConfig(</span>
+<span class="fc" id="L58">        parsePort(env.apply(ENV_HEALTH_PORT)),</span>
+<span class="fc" id="L59">        requireEnv(env, ENV_POD_NAME),</span>
+<span class="fc" id="L60">        requireEnv(env, ENV_TARGET_CONTAINER_NAME),</span>
+<span class="fc" id="L61">        parseSeconds(env.apply(ENV_GC_TIMEOUT_SECONDS), DEFAULT_GC_TIMEOUT, ENV_GC_TIMEOUT_SECONDS),</span>
+<span class="fc" id="L62">        parseSeconds(env.apply(ENV_RESIZE_TIMEOUT_SECONDS), DEFAULT_RESIZE_TIMEOUT, ENV_RESIZE_TIMEOUT_SECONDS),</span>
+<span class="fc" id="L63">        parseSeconds(</span>
+<span class="fc" id="L64">            env.apply(ENV_INTENT_POLL_INTERVAL_SECONDS),</span>
+            DEFAULT_INTENT_POLL_INTERVAL,
+            ENV_INTENT_POLL_INTERVAL_SECONDS));
+  }
+
+  private static String requireEnv(Function&lt;String, String&gt; env, String name) {
+<span class="fc" id="L70">    String value = env.apply(name);</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">    if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L72">      throw new IllegalArgumentException(name + &quot; is not set; is this running as a Warden sidecar?&quot;);</span>
+    }
+<span class="fc" id="L74">    return value.trim();</span>
   }
 
   private static int parsePort(String raw) {
-<span class="pc bpc" id="L35" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
-<span class="fc" id="L36">      return DEFAULT_HEALTH_PORT;</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L79">      return DEFAULT_HEALTH_PORT;</span>
     }
     final int port;
     try {
-<span class="fc" id="L40">      port = Integer.parseInt(raw.trim());</span>
-<span class="fc" id="L41">    } catch (NumberFormatException e) {</span>
-<span class="fc" id="L42">      throw new IllegalArgumentException(ENV_HEALTH_PORT + &quot; must be an integer, got: &quot; + raw, e);</span>
-<span class="fc" id="L43">    }</span>
-<span class="pc bpc" id="L44" title="1 of 4 branches missed.">    if (port &lt; 1 || port &gt; 65535) {</span>
-<span class="fc" id="L45">      throw new IllegalArgumentException(ENV_HEALTH_PORT + &quot; must be in 1..65535, got: &quot; + port);</span>
+<span class="fc" id="L83">      port = Integer.parseInt(raw.trim());</span>
+<span class="fc" id="L84">    } catch (NumberFormatException e) {</span>
+<span class="fc" id="L85">      throw new IllegalArgumentException(ENV_HEALTH_PORT + &quot; must be an integer, got: &quot; + raw, e);</span>
+<span class="fc" id="L86">    }</span>
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">    if (port &lt; 1 || port &gt; 65535) {</span>
+<span class="fc" id="L88">      throw new IllegalArgumentException(ENV_HEALTH_PORT + &quot; must be in 1..65535, got: &quot; + port);</span>
     }
-<span class="fc" id="L47">    return port;</span>
+<span class="fc" id="L90">    return port;</span>
+  }
+
+  private static Duration parseSeconds(String raw, Duration fallback, String envName) {
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L95">      return fallback;</span>
+    }
+    try {
+<span class="fc" id="L98">      return Duration.ofSeconds(Long.parseLong(raw.trim()));</span>
+<span class="fc" id="L99">    } catch (NumberFormatException e) {</span>
+<span class="fc" id="L100">      throw new IllegalArgumentException(envName + &quot; must be an integer number of seconds, got: &quot; + raw, e);</span>
+    }
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

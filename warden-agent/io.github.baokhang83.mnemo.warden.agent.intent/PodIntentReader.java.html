@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PodIntentReader.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.intent</a> &gt; <span class="el_source">PodIntentReader.java</span></div><h1>PodIntentReader.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.intent;
+
+import io.github.baokhang83.mnemo.warden.agent.resize.InClusterApiServer;
+import io.github.baokhang83.mnemo.warden.agent.resize.K8sQuantity;
+import io.github.baokhang83.mnemo.warden.agent.resize.MinimalJson;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.security.GeneralSecurityException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
+
+/**
+ * Reads the agent's own pod &amp;mdash; its W-306 intent annotations (target request/limit bytes)
+ * and the target container's &lt;em&gt;actual current&lt;/em&gt; memory limit &amp;mdash; over the same
+ * in-cluster API server connection {@code PodResizeClient} uses, via {@link InClusterApiServer}
+ * and the shared {@link MinimalJson} reader.
+ *
+ * &lt;p&gt;Reading the actual current limit (not tracking a separately-cached &quot;last applied&quot; value)
+ * is deliberate: once a resize succeeds, the actual limit matches the intent, so the next poll's
+ * comparison naturally becomes a no-op. No extra state to keep in sync, and a failed/timed-out
+ * resize is retried automatically on the next tick.
+ */
+public final class PodIntentReader {
+
+  static final String ANNOTATION_REQUEST_BYTES = &quot;warden.mnemo.io/target-request-bytes&quot;;
+  static final String ANNOTATION_LIMIT_BYTES = &quot;warden.mnemo.io/target-limit-bytes&quot;;
+
+  private final InClusterApiServer apiServer;
+  private final HttpClient httpClient;
+  private final String podName;
+  private final String containerName;
+
+  /** Builds a reader using the pod's own in-cluster credentials. */
+  public static PodIntentReader forInClusterAgent(String podName, String containerName)
+      throws IOException, GeneralSecurityException {
+<span class="nc" id="L41">    InClusterApiServer apiServer = InClusterApiServer.discover();</span>
+<span class="nc" id="L42">    HttpClient httpClient = HttpClient.newBuilder().sslContext(apiServer.sslContext()).build();</span>
+<span class="nc" id="L43">    return new PodIntentReader(apiServer, httpClient, podName, containerName);</span>
+  }
+
+<span class="nc" id="L46">  PodIntentReader(InClusterApiServer apiServer, HttpClient httpClient, String podName, String containerName) {</span>
+<span class="nc" id="L47">    this.apiServer = apiServer;</span>
+<span class="nc" id="L48">    this.httpClient = httpClient;</span>
+<span class="nc" id="L49">    this.podName = podName;</span>
+<span class="nc" id="L50">    this.containerName = containerName;</span>
+<span class="nc" id="L51">  }</span>
+
+  /** The current intent (if any annotation is present) and the container's actual live limit. */
+  public PodState read() throws IOException, InterruptedException {
+<span class="nc" id="L55">    String body = getPod();</span>
+<span class="nc" id="L56">    return new PodState(extractIntent(body), extractCurrentLimitBytes(body, containerName));</span>
+  }
+
+  /**
+   * Package-private and static, taking the raw JSON string directly &amp;mdash; mirrors {@code
+   * PodResizeClient.extractConfirmedMemory}'s existing pattern, so tests exercise the real
+   * parsing logic without a live HTTP round trip.
+   */
+  @SuppressWarnings(&quot;unchecked&quot;)
+  static Optional&lt;Intent&gt; extractIntent(String getPodResponseJson) {
+<span class="fc" id="L66">    Map&lt;String, Object&gt; pod = (Map&lt;String, Object&gt;) MinimalJson.parse(getPodResponseJson);</span>
+<span class="fc" id="L67">    Map&lt;String, Object&gt; metadata = (Map&lt;String, Object&gt;) pod.get(&quot;metadata&quot;);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">    if (metadata == null) {</span>
+<span class="nc" id="L69">      return Optional.empty();</span>
+    }
+<span class="fc" id="L71">    Map&lt;String, Object&gt; annotations = (Map&lt;String, Object&gt;) metadata.get(&quot;annotations&quot;);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    if (annotations == null) {</span>
+<span class="fc" id="L73">      return Optional.empty();</span>
+    }
+<span class="fc" id="L75">    String requestRaw = (String) annotations.get(ANNOTATION_REQUEST_BYTES);</span>
+<span class="fc" id="L76">    String limitRaw = (String) annotations.get(ANNOTATION_LIMIT_BYTES);</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">    if (requestRaw == null || limitRaw == null) {</span>
+<span class="fc" id="L78">      return Optional.empty();</span>
+    }
+<span class="fc" id="L80">    return Optional.of(new Intent(Long.parseLong(requestRaw), Long.parseLong(limitRaw)));</span>
+  }
+
+  @SuppressWarnings(&quot;unchecked&quot;)
+  static OptionalLong extractCurrentLimitBytes(String getPodResponseJson, String containerName) {
+<span class="fc" id="L85">    Map&lt;String, Object&gt; pod = (Map&lt;String, Object&gt;) MinimalJson.parse(getPodResponseJson);</span>
+<span class="fc" id="L86">    Map&lt;String, Object&gt; status = (Map&lt;String, Object&gt;) pod.get(&quot;status&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">    if (status == null) {</span>
+<span class="nc" id="L88">      return OptionalLong.empty();</span>
+    }
+<span class="fc" id="L90">    List&lt;Object&gt; containerStatuses = (List&lt;Object&gt;) status.get(&quot;containerStatuses&quot;);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">    if (containerStatuses == null) {</span>
+<span class="fc" id="L92">      return OptionalLong.empty();</span>
+    }
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">    for (Object entry : containerStatuses) {</span>
+<span class="fc" id="L95">      Map&lt;String, Object&gt; containerStatus = (Map&lt;String, Object&gt;) entry;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">      if (!containerName.equals(containerStatus.get(&quot;name&quot;))) {</span>
+<span class="fc" id="L97">        continue;</span>
+      }
+<span class="fc" id="L99">      Map&lt;String, Object&gt; resources = (Map&lt;String, Object&gt;) containerStatus.get(&quot;resources&quot;);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">      if (resources == null) {</span>
+<span class="nc" id="L101">        return OptionalLong.empty();</span>
+      }
+<span class="fc" id="L103">      Map&lt;String, Object&gt; limits = (Map&lt;String, Object&gt;) resources.get(&quot;limits&quot;);</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">      if (limits == null || limits.get(&quot;memory&quot;) == null) {</span>
+<span class="nc" id="L105">        return OptionalLong.empty();</span>
+      }
+<span class="fc" id="L107">      return OptionalLong.of(K8sQuantity.parseBytes((String) limits.get(&quot;memory&quot;)));</span>
+    }
+<span class="nc" id="L109">    return OptionalLong.empty();</span>
+  }
+
+  private String getPod() throws IOException, InterruptedException {
+<span class="nc" id="L113">    HttpRequest request =</span>
+<span class="nc" id="L114">        HttpRequest.newBuilder(podUri())</span>
+<span class="nc" id="L115">            .header(&quot;Authorization&quot;, &quot;Bearer &quot; + apiServer.bearerToken())</span>
+<span class="nc" id="L116">            .GET()</span>
+<span class="nc" id="L117">            .build();</span>
+<span class="nc" id="L118">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L120">      throw new IOException(&quot;GET pod &quot; + podName + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+    }
+<span class="nc" id="L122">    return response.body();</span>
+  }
+
+  private URI podUri() {
+<span class="nc" id="L126">    return apiServer.baseUri().resolve(&quot;/api/v1/namespaces/&quot; + apiServer.namespace() + &quot;/pods/&quot; + podName);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
