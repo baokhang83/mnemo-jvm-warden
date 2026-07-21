@@ -1,22 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IntentEmitter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.intent</a> &gt; <span class="el_source">IntentEmitter.java</span></div><h1>IntentEmitter.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.intent;
 
+import io.fabric8.kubernetes.api.model.LabelSelector;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
+import io.fabric8.kubernetes.api.model.apps.Deployment;
+import io.fabric8.kubernetes.api.model.apps.StatefulSet;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity;
 import io.github.baokhang83.mnemo.warden.crd.ResourceProfile;
 import io.github.baokhang83.mnemo.warden.crd.TargetRef;
+import java.util.List;
 
 /**
- * Resolves a profile to bytes and PATCHes the target pod's own annotations with it (W-306) —
- * read back by {@code warden-agent}'s {@code PodIntentReader}. The exact same two annotation
- * keys are duplicated on both sides deliberately: the two modules don't share a dependency
- * (agent has none on {@code warden-crd-model}), so the annotation contract is the only thing
- * that has to stay in sync, documented on both ends.
+ * Resolves a profile to bytes and PATCHes the target's live pod(s) with it (W-306, generalized
+ * for #69) — read back by {@code warden-agent}'s {@code PodIntentReader}. The exact same two
+ * annotation keys are duplicated on both sides deliberately: the two modules don't share a
+ * dependency (agent has none on {@code warden-crd-model}), so the annotation contract is the
+ * only thing that has to stay in sync, documented on both ends.
  *
- * &lt;p&gt;Scoped to {@code targetRef.kind == &quot;Pod&quot;} only, direct by name — every existing example
- * targets a pod directly. Resolving a {@code Deployment}/{@code StatefulSet} to its live pod(s)
- * via label selectors is separate, undesigned work (tracked as a follow-up issue), not built
- * here (§1).
+ * &lt;p&gt;{@code targetRef.kind}: {@code Pod} is annotated directly by name; {@code Deployment}/{@code
+ * StatefulSet} are resolved to their live pods via the workload's own {@code spec.selector} and
+ * &lt;em&gt;every&lt;/em&gt; matching pod is annotated identically — the schedule targets the whole
+ * workload, not a subset of its replicas. Each pod's own agent already only reads its own pod's
+ * annotations (W-306), so nothing on the agent side changes to support this.
+ *
+ * &lt;p&gt;A pod created by a later rollout won't have the annotation until the next reconcile —
+ * {@link io.github.baokhang83.mnemo.warden.controller.WardenPolicyReconciler}'s 30s periodic
+ * resync (not a per-policy dynamic secondary watch, which would need a selector known statically
+ * at controller startup) catches it well within the schedule's own minute-level grain. See the
+ * design doc for why the pod &lt;em&gt;template&lt;/em&gt; isn't the transport instead: it would force a
+ * full rolling restart just to deliver an annotation, the exact cost Warden exists to avoid.
  */
 public final class IntentEmitter {
 
@@ -26,38 +39,62 @@ public final class IntentEmitter {
   /** Must match {@code PodIntentReader.ANNOTATION_LIMIT_BYTES} in warden-agent exactly. */
   public static final String ANNOTATION_LIMIT_BYTES = &quot;warden.mnemo.io/target-limit-bytes&quot;;
 
-  private static final String SUPPORTED_KIND = &quot;Pod&quot;;
-
   private IntentEmitter() {}
 
   /**
-   * PATCHes {@code targetRef}'s own annotations with {@code profile}'s resolved request/limit
-   * bytes, in {@code namespace} (the WardenPolicy's own namespace — no cross-namespace targeting
-   * yet). A no-op if {@code targetRef} isn't a {@code Pod} or {@code profile} can't be resolved.
+   * PATCHes {@code targetRef}'s live pod(s) with {@code profile}'s resolved request/limit bytes,
+   * in {@code namespace} (the WardenPolicy's own namespace — no cross-namespace targeting yet).
+   * A no-op if {@code targetRef}'s kind is unsupported, the target doesn't exist, or {@code
+   * profile} can't be resolved.
    */
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef, ResourceProfile profile) {
-<span class="fc bfc" id="L39" title="All 6 branches covered.">    if (targetRef == null || profile == null || !SUPPORTED_KIND.equals(targetRef.getKind())) {</span>
-<span class="fc" id="L40">      return;</span>
-    }
-<span class="pc bpc" id="L42" title="3 of 4 branches missed.">    if (profile.getRequest() == null || profile.getLimit() == null) {</span>
-<span class="fc" id="L43">      return;</span>
+<span class="pc bpc" id="L51" title="1 of 8 branches missed.">    if (targetRef == null || profile == null || profile.getRequest() == null || profile.getLimit() == null) {</span>
+<span class="fc" id="L52">      return;</span>
     }
 
-<span class="nc" id="L46">    long requestBytes = ResourceQuantity.parseBytes(profile.getRequest());</span>
-<span class="nc" id="L47">    long limitBytes = ResourceQuantity.parseBytes(profile.getLimit());</span>
+<span class="fc" id="L55">    long requestBytes = ResourceQuantity.parseBytes(profile.getRequest());</span>
+<span class="fc" id="L56">    long limitBytes = ResourceQuantity.parseBytes(profile.getLimit());</span>
 
-<span class="nc" id="L49">    client</span>
-<span class="nc" id="L50">        .pods()</span>
-<span class="nc" id="L51">        .inNamespace(namespace)</span>
-<span class="nc" id="L52">        .withName(targetRef.getName())</span>
-<span class="nc" id="L53">        .edit(</span>
-            pod -&gt;
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">    for (String podName : resolvePodNames(client, namespace, targetRef)) {</span>
+<span class="nc" id="L59">      annotate(client, namespace, podName, requestBytes, limitBytes);</span>
+<span class="nc" id="L60">    }</span>
+<span class="fc" id="L61">  }</span>
+
+  private static List&lt;String&gt; resolvePodNames(KubernetesClient client, String namespace, TargetRef targetRef) {
+<span class="fc" id="L64">    String kind = targetRef.getKind();</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">    if (&quot;Pod&quot;.equals(kind)) {</span>
+<span class="nc" id="L66">      return List.of(targetRef.getName());</span>
+    }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">    if (&quot;Deployment&quot;.equals(kind)) {</span>
+<span class="nc" id="L69">      Deployment deployment = client.apps().deployments().inNamespace(namespace).withName(targetRef.getName()).get();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">      return deployment == null ? List.of() : podNamesForSelector(client, namespace, deployment.getSpec().getSelector());</span>
+    }
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">    if (&quot;StatefulSet&quot;.equals(kind)) {</span>
+<span class="nc" id="L73">      StatefulSet statefulSet = client.apps().statefulSets().inNamespace(namespace).withName(targetRef.getName()).get();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">      return statefulSet == null ? List.of() : podNamesForSelector(client, namespace, statefulSet.getSpec().getSelector());</span>
+    }
+<span class="fc" id="L76">    return List.of();</span>
+  }
+
+  private static List&lt;String&gt; podNamesForSelector(KubernetesClient client, String namespace, LabelSelector selector) {
+<span class="nc" id="L80">    return client.pods().inNamespace(namespace).withLabelSelector(selector).list().getItems().stream()</span>
+<span class="nc" id="L81">        .map(pod -&gt; pod.getMetadata().getName())</span>
+<span class="nc" id="L82">        .toList();</span>
+  }
+
+  private static void annotate(KubernetesClient client, String namespace, String podName, long requestBytes, long limitBytes) {
+<span class="nc" id="L86">    client</span>
+<span class="nc" id="L87">        .pods()</span>
+<span class="nc" id="L88">        .inNamespace(namespace)</span>
+<span class="nc" id="L89">        .withName(podName)</span>
+<span class="nc" id="L90">        .edit(</span>
+            (Pod pod) -&gt;
                 new PodBuilder(pod)
-<span class="nc" id="L56">                    .editMetadata()</span>
-<span class="nc" id="L57">                    .addToAnnotations(ANNOTATION_REQUEST_BYTES, String.valueOf(requestBytes))</span>
-<span class="nc" id="L58">                    .addToAnnotations(ANNOTATION_LIMIT_BYTES, String.valueOf(limitBytes))</span>
-<span class="nc" id="L59">                    .endMetadata()</span>
-<span class="nc" id="L60">                    .build());</span>
-<span class="nc" id="L61">  }</span>
+<span class="nc" id="L93">                    .editMetadata()</span>
+<span class="nc" id="L94">                    .addToAnnotations(ANNOTATION_REQUEST_BYTES, String.valueOf(requestBytes))</span>
+<span class="nc" id="L95">                    .addToAnnotations(ANNOTATION_LIMIT_BYTES, String.valueOf(limitBytes))</span>
+<span class="nc" id="L96">                    .endMetadata()</span>
+<span class="nc" id="L97">                    .build());</span>
+<span class="nc" id="L98">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

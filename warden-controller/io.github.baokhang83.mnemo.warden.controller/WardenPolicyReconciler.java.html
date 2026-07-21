@@ -8,9 +8,11 @@ import io.github.baokhang83.mnemo.warden.crd.WardenPolicy;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicyStatus;
 import io.javaoperatorsdk.operator.api.reconciler.ControllerConfiguration;
 import io.javaoperatorsdk.operator.api.reconciler.Context;
+import io.javaoperatorsdk.operator.api.reconciler.MaxReconciliationInterval;
 import io.javaoperatorsdk.operator.api.reconciler.Reconciler;
 import io.javaoperatorsdk.operator.api.reconciler.UpdateControl;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,41 +33,47 @@ import org.slf4j.LoggerFactory;
  * decision &amp;mdash; caught directly by a real cluster run where a policy's {@code targetRef}
  * pointed at a pod absent from that test's cluster, and the whole reconcile silently failed to
  * patch status at all until this was isolated.
+ *
+ * &lt;p&gt;{@code maxReconciliationInterval} (#69): for a {@code Deployment}/{@code StatefulSet}
+ * {@code targetRef}, a pod created by a later rollout won't have the intent annotation until
+ * something re-triggers {@code reconcile()} — a 30s periodic resync catches it well within the
+ * schedule's own minute-level grain, without a per-policy dynamic secondary-resource watch (which
+ * would need each policy's target selector known statically at controller startup; it isn't).
  */
-@ControllerConfiguration
-<span class="nc" id="L36">public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {</span>
+@ControllerConfiguration(maxReconciliationInterval = @MaxReconciliationInterval(interval = 30, timeUnit = TimeUnit.SECONDS))
+<span class="nc" id="L44">public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {</span>
 
-<span class="nc" id="L38">  private static final Logger log = LoggerFactory.getLogger(WardenPolicyReconciler.class);</span>
+<span class="nc" id="L46">  private static final Logger log = LoggerFactory.getLogger(WardenPolicyReconciler.class);</span>
 
   @Override
   public UpdateControl&lt;WardenPolicy&gt; reconcile(WardenPolicy policy, Context&lt;WardenPolicy&gt; context) {
-<span class="nc" id="L42">    Instant now = Instant.now();</span>
-<span class="nc bnc" id="L43" title="All 2 branches missed.">    if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {</span>
-<span class="nc" id="L44">      ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)</span>
-<span class="nc" id="L45">          .ifPresent(</span>
+<span class="nc" id="L50">    Instant now = Instant.now();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">    if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {</span>
+<span class="nc" id="L52">      ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)</span>
+<span class="nc" id="L53">          .ifPresent(</span>
               currentProfile -&gt; {
-<span class="nc bnc" id="L47" title="All 2 branches missed.">                if (policy.getStatus() == null) {</span>
-<span class="nc" id="L48">                  policy.setStatus(new WardenPolicyStatus());</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                if (policy.getStatus() == null) {</span>
+<span class="nc" id="L56">                  policy.setStatus(new WardenPolicyStatus());</span>
                 }
-<span class="nc" id="L50">                policy.getStatus().setCurrentProfile(currentProfile);</span>
-<span class="nc" id="L51">                emitIntent(policy, context, currentProfile);</span>
-<span class="nc" id="L52">              });</span>
+<span class="nc" id="L58">                policy.getStatus().setCurrentProfile(currentProfile);</span>
+<span class="nc" id="L59">                emitIntent(policy, context, currentProfile);</span>
+<span class="nc" id="L60">              });</span>
     }
-<span class="nc" id="L54">    return UpdateControl.patchStatus(policy);</span>
+<span class="nc" id="L62">    return UpdateControl.patchStatus(policy);</span>
   }
 
   private void emitIntent(WardenPolicy policy, Context&lt;WardenPolicy&gt; context, String currentProfile) {
     try {
       ResourceProfile profile =
-<span class="nc bnc" id="L60" title="All 2 branches missed.">          policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);</span>
-<span class="nc" id="L61">      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile);</span>
-<span class="nc" id="L62">    } catch (RuntimeException e) {</span>
-<span class="nc" id="L63">      log.warn(</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">          policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);</span>
+<span class="nc" id="L69">      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile);</span>
+<span class="nc" id="L70">    } catch (RuntimeException e) {</span>
+<span class="nc" id="L71">      log.warn(</span>
           &quot;failed to emit intent for WardenPolicy {}/{} (status.currentProfile still updated): {}&quot;,
-<span class="nc" id="L65">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L66">          policy.getMetadata().getName(),</span>
-<span class="nc" id="L67">          e.getMessage());</span>
-<span class="nc" id="L68">    }</span>
-<span class="nc" id="L69">  }</span>
+<span class="nc" id="L73">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L74">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L75">          e.getMessage());</span>
+<span class="nc" id="L76">    }</span>
+<span class="nc" id="L77">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

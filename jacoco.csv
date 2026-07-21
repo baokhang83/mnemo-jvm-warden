@@ -15,7 +15,7 @@ coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.schedule
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.schedule,ShorthandDuration,20,31,5,2,5,6,5,2,0,2
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenPolicyReconciler,98,0,6,0,21,0,8,0,5,0
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenController,29,0,0,0,6,0,1,0,1,0
-coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,IntentEmitter,45,14,3,7,13,4,3,4,1,1
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,IntentEmitter,116,46,9,11,21,11,11,5,4,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,UnsupportedCollectorException,0,13,0,0,0,4,0,2,0,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,Collector,0,27,0,0,0,5,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,GcDetector,0,65,0,9,0,15,0,9,0,4
