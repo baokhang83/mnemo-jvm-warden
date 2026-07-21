@@ -213,43 +213,65 @@ Applies two policies:
 
 Manual-run only for now, matching the other checks above.
 
-## `verify-wardenpolicy-intent.sh` — a scheduled window actually resizes a real workload, end to end (W-306)
+## `verify-wardenpolicy-intent.sh` — a scheduled window actually resizes a real workload, end to end (W-306/#69)
 
 The capstone check tying M2 to M3: a `WardenPolicy`'s schedule decision reaches the **real**
 agent image (the actual init-container sidecar, not a `kubectl exec`'d test driver like W-206's)
 via a pod-annotation intent handoff, and drives a real `ShrinkSequence` call — a genuine in-place
-resize confirmed on the live pod.
+resize confirmed on the live pod(s). Covers both a directly-named `Pod` targetRef (W-306) and a
+`Deployment` resolved to its live replicas via its own label selector (#69).
 
 ```bash
 deploy/verify-wardenpolicy-intent.sh              # spins up + tears down its own kind cluster
-deploy/verify-wardenpolicy-intent.sh --keep        # leaves the cluster + pod up for inspection
+deploy/verify-wardenpolicy-intent.sh --keep        # leaves the cluster + pods up for inspection
 deploy/verify-wardenpolicy-intent.sh --cluster N   # reuse an existing kind cluster named N
 ```
 
-Deploys `warden-demo-e2e` (`wardenpolicy-demo-pod.yaml.tmpl`) — sized and configured identically
-to W-206's proven-working idle-load scenario (`-Xmx350m`, `RETAIN_MB=10`, initial
-400Mi/450Mi request/limit) so this doesn't re-debug G1 heap sizing already solved there — then
-applies `wardenpolicy-demo-policy.yaml`, whose always-firing schedule (`* * * * *`) resolves to a
-`demo-target` profile of `100Mi`/`150Mi`. Confirms the app container's actual memory limit
-changes from `450Mi` to `150Mi`, `status.currentProfile` reaches `demo-target`, and the container
-never restarts (no OOMKill).
+Deploys two demos, both sized and configured identically to W-206's proven-working idle-load
+scenario (`-Xmx350m`, `RETAIN_MB=10`, initial 400Mi/450Mi request/limit) so neither re-debugs G1
+heap sizing already solved there:
 
-Runs the real `WardenController` out-of-cluster (same as the reconciler check above) alongside
-the real agent image running *in* the demo pod — both sides of the intent handoff, for real.
-Manual-run only for now, matching every other check in this directory.
+- `warden-demo-e2e` (`wardenpolicy-demo-pod.yaml.tmpl`) + `wardenpolicy-demo-policy.yaml`
+  (`targetRef.kind: Pod`) — confirms the single pod's actual memory limit changes from `450Mi` to
+  `150Mi`.
+- `warden-demo-e2e-deploy`, a **2-replica Deployment** (`wardenpolicy-demo-deployment.yaml.tmpl`)
+  + `wardenpolicy-demo-deployment-policy.yaml` (`targetRef.kind: Deployment`) — confirms **every**
+  replica resizes to `150Mi`, not just one.
+
+Both policies' always-firing schedule (`* * * * *`) resolves to the same `demo-target` profile
+(`100Mi`/`150Mi`). Confirms `status.currentProfile` reaches `demo-target` for both policies, and
+no container ever restarts (no OOMKill).
+
+Runs one real `WardenController` process out-of-cluster (same as the reconciler check above)
+alongside the real agent image running *in* every demo pod — both sides of the intent handoff,
+for both targetRef shapes, for real. Manual-run only for now, matching every other check in this
+directory.
 
 ### How the fields wire up
 
-`IntentEmitter` (controller) resolves `demo-target`'s `request`/`limit` to bytes and PATCHes
-`warden-demo-e2e`'s own annotations (`warden.mnemo.io/target-request-bytes`,
-`warden.mnemo.io/target-limit-bytes`). `PodIntentReader`/`IntentWatcher` (agent) poll that same
-pod every `WARDEN_INTENT_POLL_INTERVAL_SECONDS` (2s here, 5s default), compare the intent's
-`limitBytes` to the container's *actual current* limit, and call `ShrinkSequence`/`GrowSequence`
-accordingly — smaller shrinks, larger grows, equal is a no-op. Two new **required** agent env
-vars make this possible: `WARDEN_POD_NAME` (Downward API `fieldRef: metadata.name`) and
-`WARDEN_TARGET_CONTAINER_NAME` — both now present on `example-sidecar.yaml` and
-`oomkill-safety-check.yaml.tmpl` too, since the agent fails fast without them.
+`IntentEmitter` (controller) resolves the target profile's `request`/`limit` to bytes. For
+`targetRef.kind: Pod` it PATCHes that pod's own annotations directly; for `Deployment`/
+`StatefulSet` it reads the workload's own `spec.selector`, lists every live pod matching it, and
+PATCHes each one identically — `warden.mnemo.io/target-request-bytes` /
+`warden.mnemo.io/target-limit-bytes`, the same two keys `PodIntentReader`/`IntentWatcher` (agent)
+already read. Each pod's own agent is completely unaware of this — it already only ever polls its
+own pod, so **no agent-side change was needed** to support Deployment/StatefulSet targets.
 
-Scoped to `targetRef.kind: Pod` only, direct by name, for this slice — resolving a
-`Deployment`/`StatefulSet` targetRef to its live pod(s) is tracked separately
-([#69](https://github.com/baokhang83/mnemo-jvm-warden/issues/69)).
+Two new **required** agent env vars make the whole handoff possible: `WARDEN_POD_NAME` (Downward
+API `fieldRef: metadata.name`) and `WARDEN_TARGET_CONTAINER_NAME` — both now present on
+`example-sidecar.yaml` and `oomkill-safety-check.yaml.tmpl` too, since the agent fails fast
+without them.
+
+A pod created by a later rollout won't have the annotation until something re-triggers
+`reconcile()` — `WardenPolicyReconciler`'s 30-second `maxReconciliationInterval` periodic resync
+catches it, well within the schedule's own minute-level grain, without a per-policy dynamic
+secondary-resource watch (which would need each policy's target selector known statically at
+controller startup; it isn't).
+
+**A real, explicit RBAC tradeoff, not a free generalization:** every `Pod`-targeting example
+scopes its `Role` to one static, pre-known pod name via `resourceNames` — but a
+`Deployment`/`StatefulSet`'s replica names are generated dynamically, so that pattern can't be
+provisioned ahead of time. `wardenpolicy-demo-deployment.yaml.tmpl`'s `Role` grants `get`/`patch`
+on **every pod in the namespace** instead — real, working, and a genuine widening from
+least-privilege. Designing something narrower is tracked separately
+([#71](https://github.com/baokhang83/mnemo-jvm-warden/issues/71)).

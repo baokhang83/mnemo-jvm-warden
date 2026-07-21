@@ -1,0 +1,129 @@
+# #69's end-to-end demo fixture, templated with envsubst by deploy/verify-wardenpolicy-intent.sh
+# (never applied directly): a real 2-replica Deployment, proving IntentEmitter resolves
+# targetRef.kind: Deployment to its live pods (via spec.selector) and annotates every replica,
+# not just one. Same app-container sizing as wardenpolicy-demo-pod.yaml.tmpl (proven working in
+# W-206/W-306) so this doesn't re-debug G1 heap sizing already solved there.
+#
+# RBAC here is deliberately NOT resourceNames-scoped, unlike every Pod-based example in this
+# directory — replica pod names are generated dynamically, so a Role naming one specific pod
+# can't be provisioned ahead of time. This grants get/patch on every pod in the namespace instead,
+# a real, broader-than-elsewhere tradeoff the design doc for #69 flags explicitly (and a
+# dedicated follow-up issue tracks designing something narrower).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: warden-demo-e2e-deploy
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: warden-demo-e2e-deploy-resize
+rules:
+  - apiGroups: [""]
+    resources: ["pods/resize"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: warden-demo-e2e-deploy-resize
+subjects:
+  - kind: ServiceAccount
+    name: warden-demo-e2e-deploy
+roleRef:
+  kind: Role
+  name: warden-demo-e2e-deploy-resize
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warden-demo-e2e-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: warden-demo-e2e-deploy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: warden-demo-e2e-deploy
+    spec:
+      serviceAccountName: warden-demo-e2e-deploy
+      shareProcessNamespace: true
+      volumes:
+        - name: host-cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+
+      initContainers:
+        - name: warden
+          image: ${WARDEN_IMAGE}
+          imagePullPolicy: IfNotPresent
+          restartPolicy: Always # native sidecar
+          ports:
+            - name: health
+              containerPort: 8080
+          env:
+            - name: WARDEN_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: WARDEN_TARGET_CONTAINER_NAME
+              value: app
+            - name: WARDEN_INTENT_POLL_INTERVAL_SECONDS
+              value: "2"
+          volumeMounts:
+            - name: host-cgroup
+              mountPath: /host-cgroup
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+
+      containers:
+        - name: app
+          image: ${WARDEN_IMAGE}
+          imagePullPolicy: IfNotPresent
+          command:
+            - java
+            - -XX:+UseG1GC
+            - -Xmx350m
+            - -Dcom.sun.management.jmxremote.port=9999
+            - -Dcom.sun.management.jmxremote.rmi.port=9999
+            - -Dcom.sun.management.jmxremote.host=127.0.0.1
+            - -Dcom.sun.management.jmxremote.authenticate=false
+            - -Dcom.sun.management.jmxremote.ssl=false
+            - -Djava.rmi.server.hostname=127.0.0.1
+            - -cp
+            - /app/warden-agent.jar
+            - io.github.baokhang83.mnemo.warden.agent.harness.LoadTarget
+          env:
+            - name: WARDEN_LOAD_TARGET_RETAIN_MB
+              value: "10"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 400Mi
+            limits:
+              memory: 450Mi
+          resizePolicy:
+            - resourceName: memory
+              restartPolicy: NotRequired
