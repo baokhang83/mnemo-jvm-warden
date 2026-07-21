@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EmergencyGrowEvaluator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.guardrail</a> &gt; <span class="el_source">EmergencyGrowEvaluator.java</span></div><h1>EmergencyGrowEvaluator.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.guardrail;
+
+import io.github.baokhang83.mnemo.warden.controller.schedule.ScheduleEvaluator;
+import io.github.baokhang83.mnemo.warden.crd.Guardrail;
+import io.github.baokhang83.mnemo.warden.crd.WardenPolicySpec;
+import java.util.Optional;
+
+/**
+ * Whether an off-schedule traffic spike must force an immediate grow &amp;mdash; W-403's {@code
+ * emergencyGrowAbove} reactive grow. Same shape as {@link ShrinkVetoEvaluator} and {@link
+ * io.github.baokhang83.mnemo.warden.controller.schedule.BlackoutEvaluator}: a pure static function
+ * of the spec plus the reconcile's own inputs, no state of its own.
+ *
+ * &lt;p&gt;The grow target is never a new CRD field: it's the profile in {@code spec.profiles} with the
+ * largest {@code limit}, resolved via {@link ScheduleEvaluator#limitBytes} (its third call site,
+ * after W-304's lead-time direction and W-402's shrink classification). That's the profile
+ * declaring the most headroom this policy has &amp;mdash; exactly what &quot;emergency grow&quot; means &amp;mdash;
+ * and in the common two-profile off-peak/peak shape it's simply {@code peak}.
+ *
+ * &lt;p&gt;A missing metric reading returns {@link Optional#empty()}, the mirror of {@link
+ * ShrinkVetoEvaluator}'s fail-closed choice: silence isn't evidence of a spike, so there's nothing
+ * to react to. When this returns a profile, the reconciler applies it &lt;em&gt;instead of&lt;/em&gt;
+ * consulting {@link ScheduleEvaluator#currentProfileWithLeadTime} for that reconcile &amp;mdash; the
+ * literal &quot;bypasses the calendar&quot; from the acceptance criteria. See the design doc.
+ */
+public final class EmergencyGrowEvaluator {
+
+  private EmergencyGrowEvaluator() {}
+
+  public static Optional&lt;String&gt; emergencyProfile(WardenPolicySpec spec, Double metricValue) {
+<span class="fc" id="L31">    Guardrail guardrail = spec.getGuardrail();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">    if (guardrail == null</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        || guardrail.getEmergencyGrowAbove() == null</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        || guardrail.getEmergencyGrowAbove().isBlank()) {</span>
+<span class="fc" id="L35">      return Optional.empty();</span>
+    }
+<span class="fc bfc" id="L37" title="All 2 branches covered.">    if (metricValue == null) {</span>
+<span class="fc" id="L38">      return Optional.empty();</span>
+    }
+<span class="fc bfc" id="L40" title="All 2 branches covered.">    if (metricValue &lt;= Double.parseDouble(guardrail.getEmergencyGrowAbove())) {</span>
+<span class="fc" id="L41">      return Optional.empty();</span>
+    }
+
+<span class="fc" id="L44">    return largestProfile(spec);</span>
+  }
+
+  private static Optional&lt;String&gt; largestProfile(WardenPolicySpec spec) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">    if (spec.getProfiles() == null) {</span>
+<span class="nc" id="L49">      return Optional.empty();</span>
+    }
+
+<span class="fc" id="L52">    String largestName = null;</span>
+<span class="fc" id="L53">    long largestBytes = -1;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">    for (String name : spec.getProfiles().keySet()) {</span>
+<span class="fc" id="L55">      Long bytes = ScheduleEvaluator.limitBytes(spec, name);</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">      if (bytes != null &amp;&amp; bytes &gt; largestBytes) {</span>
+<span class="fc" id="L57">        largestBytes = bytes;</span>
+<span class="fc" id="L58">        largestName = name;</span>
+      }
+<span class="fc" id="L60">    }</span>
+<span class="fc" id="L61">    return Optional.ofNullable(largestName);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

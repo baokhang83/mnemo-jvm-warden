@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WardenPolicyReconciler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller</a> &gt; <span class="el_source">WardenPolicyReconciler.java</span></div><h1>WardenPolicyReconciler.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller;
 
+import io.github.baokhang83.mnemo.warden.controller.guardrail.EmergencyGrowEvaluator;
 import io.github.baokhang83.mnemo.warden.controller.guardrail.ShrinkVetoEvaluator;
 import io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter;
 import io.github.baokhang83.mnemo.warden.controller.metrics.PrometheusMetricSource;
@@ -15,6 +16,7 @@ import io.javaoperatorsdk.operator.api.reconciler.Reconciler;
 import io.javaoperatorsdk.operator.api.reconciler.UpdateControl;
 import java.net.http.HttpClient;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -25,17 +27,22 @@ import org.slf4j.LoggerFactory;
  * (W-302/W-303/W-304), PATCHes the target pod's own annotations with the resolved profile
  * (W-306) so {@code warden-agent}'s {@code IntentWatcher} can drive a real resize, evaluates
  * {@code spec.guardrail.metric} against Prometheus into {@code status.currentMetricValue}
- * (W-401), and vetoes a schedule-resolved shrink candidate when that metric isn't verified quiet
- * (W-402, via {@link ShrinkVetoEvaluator}).
+ * (W-401), vetoes a schedule-resolved shrink candidate when that metric isn't verified quiet
+ * (W-402, via {@link ShrinkVetoEvaluator}), and forces an immediate grow &amp;mdash; bypassing the
+ * schedule for that reconcile entirely &amp;mdash; when the metric spikes past {@code
+ * guardrail.emergencyGrowAbove} (W-403, via {@link EmergencyGrowEvaluator}).
  *
  * &lt;p&gt;{@link BlackoutEvaluator} (W-305) gates the schedule-driven writes entirely: while blacked
  * out, neither {@code status.currentProfile} nor the target pod's intent annotations change, a
- * hard &quot;do not touch&quot; override, and no candidate is even resolved to check against the guardrail.
- * {@link ShrinkVetoEvaluator} is a second, narrower gate *inside* that block: it only fires once a
- * candidate is known, so it can tell a shrink from a grow. Metric *observation* itself stays
- * unconditional — it's passive telemetry, not a shrink/grow action, so blackout doesn't apply to
- * it, and it now runs first each reconcile so the veto can use this reconcile's own fresh reading
- * (see the W-402 design doc; W-404 documents the full three-way precedence).
+ * hard &quot;do not touch&quot; override, and neither a schedule candidate nor an emergency grow is even
+ * resolved. Inside that block, {@link EmergencyGrowEvaluator} is checked *first*: when it finds a
+ * grow target, {@link ScheduleEvaluator#currentProfileWithLeadTime} is never even called for that
+ * reconcile &amp;mdash; the literal &quot;bypasses the calendar.&quot; Only when it doesn't fire does the normal
+ * schedule path run, where {@link ShrinkVetoEvaluator} is a narrower gate that only fires once a
+ * schedule candidate is known, so it can tell a shrink from a grow. Metric *observation* itself
+ * stays unconditional — it's passive telemetry, not a shrink/grow action, so blackout doesn't
+ * apply to it, and it runs first each reconcile so both guardrails can use this reconcile's own
+ * fresh reading (see the W-402/W-403 design docs; W-404 documents the full three-way precedence).
  *
  * &lt;p&gt;Intent emission and metric evaluation are each isolated in their own {@code try}/{@code
  * catch} (constitution §12): a target pod that doesn't exist, or a Prometheus query failure, must
@@ -52,56 +59,74 @@ import org.slf4j.LoggerFactory;
 @ControllerConfiguration(maxReconciliationInterval = @MaxReconciliationInterval(interval = 30, timeUnit = TimeUnit.SECONDS))
 public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {
 
-<span class="nc" id="L55">  private static final Logger log = LoggerFactory.getLogger(WardenPolicyReconciler.class);</span>
+<span class="nc" id="L62">  private static final Logger log = LoggerFactory.getLogger(WardenPolicyReconciler.class);</span>
 
   private final ControllerConfig config;
-<span class="nc" id="L58">  private final HttpClient httpClient = HttpClient.newHttpClient();</span>
+<span class="nc" id="L65">  private final HttpClient httpClient = HttpClient.newHttpClient();</span>
 
-<span class="nc" id="L60">  public WardenPolicyReconciler(ControllerConfig config) {</span>
-<span class="nc" id="L61">    this.config = config;</span>
-<span class="nc" id="L62">  }</span>
+<span class="nc" id="L67">  public WardenPolicyReconciler(ControllerConfig config) {</span>
+<span class="nc" id="L68">    this.config = config;</span>
+<span class="nc" id="L69">  }</span>
 
   @Override
   public UpdateControl&lt;WardenPolicy&gt; reconcile(WardenPolicy policy, Context&lt;WardenPolicy&gt; context) {
-<span class="nc" id="L66">    Instant now = Instant.now();</span>
-<span class="nc" id="L67">    Double metricValue = evaluateMetric(policy);</span>
-<span class="nc bnc" id="L68" title="All 2 branches missed.">    if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {</span>
-<span class="nc" id="L69">      ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)</span>
-<span class="nc" id="L70">          .ifPresent(candidateProfile -&gt; applyScheduleDecision(policy, context, candidateProfile, metricValue));</span>
+<span class="nc" id="L73">    Instant now = Instant.now();</span>
+<span class="nc" id="L74">    Double metricValue = evaluateMetric(policy);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">    if (!BlackoutEvaluator.isBlackedOut(policy.getSpec(), now)) {</span>
+<span class="nc" id="L76">      Optional&lt;String&gt; emergencyProfile = EmergencyGrowEvaluator.emergencyProfile(policy.getSpec(), metricValue);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">      if (emergencyProfile.isPresent()) {</span>
+<span class="nc" id="L78">        applyEmergencyGrow(policy, context, emergencyProfile.get(), metricValue);</span>
+      } else {
+<span class="nc" id="L80">        ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now)</span>
+<span class="nc" id="L81">            .ifPresent(candidateProfile -&gt; applyScheduleDecision(policy, context, candidateProfile, metricValue));</span>
+      }
     }
-<span class="nc" id="L72">    return UpdateControl.patchStatus(policy);</span>
+<span class="nc" id="L84">    return UpdateControl.patchStatus(policy);</span>
   }
+
+  private void applyEmergencyGrow(
+      WardenPolicy policy, Context&lt;WardenPolicy&gt; context, String emergencyProfile, Double metricValue) {
+<span class="nc" id="L89">    ensureStatus(policy);</span>
+<span class="nc" id="L90">    log.info(</span>
+        &quot;guardrail forced emergency grow for WardenPolicy {}/{}: metric={} exceeds emergencyGrowAbove, growing to {}&quot;,
+<span class="nc" id="L92">        policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L93">        policy.getMetadata().getName(),</span>
+        metricValue,
+        emergencyProfile);
+<span class="nc" id="L96">    policy.getStatus().setCurrentProfile(emergencyProfile);</span>
+<span class="nc" id="L97">    emitIntent(policy, context, emergencyProfile);</span>
+<span class="nc" id="L98">  }</span>
 
   private void applyScheduleDecision(
       WardenPolicy policy, Context&lt;WardenPolicy&gt; context, String candidateProfile, Double metricValue) {
-<span class="nc" id="L77">    ensureStatus(policy);</span>
-<span class="nc" id="L78">    String previousProfile = policy.getStatus().getCurrentProfile();</span>
-<span class="nc bnc" id="L79" title="All 2 branches missed.">    if (ShrinkVetoEvaluator.vetoesShrink(policy.getSpec(), previousProfile, candidateProfile, metricValue)) {</span>
-<span class="nc" id="L80">      log.info(</span>
+<span class="nc" id="L102">    ensureStatus(policy);</span>
+<span class="nc" id="L103">    String previousProfile = policy.getStatus().getCurrentProfile();</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">    if (ShrinkVetoEvaluator.vetoesShrink(policy.getSpec(), previousProfile, candidateProfile, metricValue)) {</span>
+<span class="nc" id="L105">      log.info(</span>
           &quot;guardrail vetoed shrink for WardenPolicy {}/{}: metric={} not verified below shrinkBelow, staying on {}&quot;,
-<span class="nc" id="L82">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L83">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L107">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L108">          policy.getMetadata().getName(),</span>
           metricValue,
           previousProfile);
-<span class="nc" id="L86">      return;</span>
+<span class="nc" id="L111">      return;</span>
     }
-<span class="nc" id="L88">    policy.getStatus().setCurrentProfile(candidateProfile);</span>
-<span class="nc" id="L89">    emitIntent(policy, context, candidateProfile);</span>
-<span class="nc" id="L90">  }</span>
+<span class="nc" id="L113">    policy.getStatus().setCurrentProfile(candidateProfile);</span>
+<span class="nc" id="L114">    emitIntent(policy, context, candidateProfile);</span>
+<span class="nc" id="L115">  }</span>
 
   private void emitIntent(WardenPolicy policy, Context&lt;WardenPolicy&gt; context, String currentProfile) {
     try {
       ResourceProfile profile =
-<span class="nc bnc" id="L95" title="All 2 branches missed.">          policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);</span>
-<span class="nc" id="L96">      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile);</span>
-<span class="nc" id="L97">    } catch (RuntimeException e) {</span>
-<span class="nc" id="L98">      log.warn(</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">          policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);</span>
+<span class="nc" id="L121">      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile);</span>
+<span class="nc" id="L122">    } catch (RuntimeException e) {</span>
+<span class="nc" id="L123">      log.warn(</span>
           &quot;failed to emit intent for WardenPolicy {}/{} (status.currentProfile still updated): {}&quot;,
-<span class="nc" id="L100">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L101">          policy.getMetadata().getName(),</span>
-<span class="nc" id="L102">          e.getMessage());</span>
-<span class="nc" id="L103">    }</span>
-<span class="nc" id="L104">  }</span>
+<span class="nc" id="L125">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L126">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L127">          e.getMessage());</span>
+<span class="nc" id="L128">    }</span>
+<span class="nc" id="L129">  }</span>
 
   /**
    * Returns this reconcile's freshly evaluated metric value (also recorded to {@code
@@ -110,35 +135,35 @@ public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {
    * quiet,&quot; not &quot;no reading needed.&quot;
    */
   private Double evaluateMetric(WardenPolicy policy) {
-<span class="nc bnc" id="L113" title="All 2 branches missed.">    if (config.prometheusUri().isEmpty()) {</span>
-<span class="nc" id="L114">      return null;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">    if (config.prometheusUri().isEmpty()) {</span>
+<span class="nc" id="L139">      return null;</span>
     }
-<span class="nc bnc" id="L116" title="All 2 branches missed.">    String promQl = policy.getSpec().getGuardrail() == null ? null : policy.getSpec().getGuardrail().getMetric();</span>
-<span class="nc bnc" id="L117" title="All 4 branches missed.">    if (promQl == null || promQl.isBlank()) {</span>
-<span class="nc" id="L118">      return null;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">    String promQl = policy.getSpec().getGuardrail() == null ? null : policy.getSpec().getGuardrail().getMetric();</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">    if (promQl == null || promQl.isBlank()) {</span>
+<span class="nc" id="L143">      return null;</span>
     }
     try {
-<span class="nc" id="L121">      OptionalDouble result = PrometheusMetricSource.query(httpClient, config.prometheusUri().get(), promQl);</span>
-<span class="nc bnc" id="L122" title="All 2 branches missed.">      if (result.isEmpty()) {</span>
-<span class="nc" id="L123">        return null;</span>
+<span class="nc" id="L146">      OptionalDouble result = PrometheusMetricSource.query(httpClient, config.prometheusUri().get(), promQl);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">      if (result.isEmpty()) {</span>
+<span class="nc" id="L148">        return null;</span>
       }
-<span class="nc" id="L125">      ensureStatus(policy);</span>
-<span class="nc" id="L126">      policy.getStatus().setCurrentMetricValue(result.getAsDouble());</span>
-<span class="nc" id="L127">      return result.getAsDouble();</span>
-<span class="nc" id="L128">    } catch (Exception e) {</span>
-<span class="nc" id="L129">      log.warn(</span>
+<span class="nc" id="L150">      ensureStatus(policy);</span>
+<span class="nc" id="L151">      policy.getStatus().setCurrentMetricValue(result.getAsDouble());</span>
+<span class="nc" id="L152">      return result.getAsDouble();</span>
+<span class="nc" id="L153">    } catch (Exception e) {</span>
+<span class="nc" id="L154">      log.warn(</span>
           &quot;failed to evaluate guardrail metric for WardenPolicy {}/{} (status.currentProfile still updated): {}&quot;,
-<span class="nc" id="L131">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L132">          policy.getMetadata().getName(),</span>
-<span class="nc" id="L133">          e.getMessage());</span>
-<span class="nc" id="L134">      return null;</span>
+<span class="nc" id="L156">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L157">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L158">          e.getMessage());</span>
+<span class="nc" id="L159">      return null;</span>
     }
   }
 
   private static void ensureStatus(WardenPolicy policy) {
-<span class="nc bnc" id="L139" title="All 2 branches missed.">    if (policy.getStatus() == null) {</span>
-<span class="nc" id="L140">      policy.setStatus(new WardenPolicyStatus());</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">    if (policy.getStatus() == null) {</span>
+<span class="nc" id="L165">      policy.setStatus(new WardenPolicyStatus());</span>
     }
-<span class="nc" id="L142">  }</span>
+<span class="nc" id="L167">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
