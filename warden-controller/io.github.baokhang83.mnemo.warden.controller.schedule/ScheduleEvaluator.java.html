@@ -5,8 +5,11 @@ import com.cronutils.model.CronType;
 import com.cronutils.model.definition.CronDefinitionBuilder;
 import com.cronutils.model.time.ExecutionTime;
 import com.cronutils.parser.CronParser;
+import io.github.baokhang83.mnemo.warden.crd.LeadTime;
+import io.github.baokhang83.mnemo.warden.crd.ResourceProfile;
 import io.github.baokhang83.mnemo.warden.crd.ScheduleWindow;
 import io.github.baokhang83.mnemo.warden.crd.WardenPolicySpec;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -25,8 +28,8 @@ import java.util.Optional;
  */
 public final class ScheduleEvaluator {
 
-<span class="fc" id="L28">  private static final CronParser PARSER =</span>
-<span class="fc" id="L29">      new CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX));</span>
+<span class="fc" id="L31">  private static final CronParser PARSER =</span>
+<span class="fc" id="L32">      new CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX));</span>
 
   private ScheduleEvaluator() {}
 
@@ -36,23 +39,94 @@ public final class ScheduleEvaluator {
    * in the future).
    */
   public static Optional&lt;String&gt; currentProfile(WardenPolicySpec spec, Instant now) {
-<span class="pc bpc" id="L39" title="1 of 4 branches missed.">    if (spec.getSchedule() == null || spec.getSchedule().isEmpty()) {</span>
-<span class="fc" id="L40">      return Optional.empty();</span>
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">    if (spec.getSchedule() == null || spec.getSchedule().isEmpty()) {</span>
+<span class="fc" id="L43">      return Optional.empty();</span>
     }
 
-<span class="fc" id="L43">    ZonedDateTime zonedNow = ZonedDateTime.ofInstant(now, ZoneId.of(spec.getTimezone()));</span>
+<span class="fc" id="L46">    ZonedDateTime zonedNow = ZonedDateTime.ofInstant(now, ZoneId.of(spec.getTimezone()));</span>
 
-<span class="fc" id="L45">    String bestProfile = null;</span>
-<span class="fc" id="L46">    ZonedDateTime bestFireTime = null;</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">    for (ScheduleWindow window : spec.getSchedule()) {</span>
-<span class="fc" id="L48">      Cron cron = PARSER.parse(window.getCron());</span>
-<span class="fc" id="L49">      Optional&lt;ZonedDateTime&gt; lastFired = ExecutionTime.forCron(cron).lastExecution(zonedNow);</span>
-<span class="pc bpc" id="L50" title="1 of 6 branches missed.">      if (lastFired.isPresent() &amp;&amp; (bestFireTime == null || lastFired.get().isAfter(bestFireTime))) {</span>
-<span class="fc" id="L51">        bestFireTime = lastFired.get();</span>
-<span class="fc" id="L52">        bestProfile = window.getProfile();</span>
+<span class="fc" id="L48">    String bestProfile = null;</span>
+<span class="fc" id="L49">    ZonedDateTime bestFireTime = null;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    for (ScheduleWindow window : spec.getSchedule()) {</span>
+<span class="fc" id="L51">      Cron cron = PARSER.parse(window.getCron());</span>
+<span class="fc" id="L52">      Optional&lt;ZonedDateTime&gt; lastFired = ExecutionTime.forCron(cron).lastExecution(zonedNow);</span>
+<span class="pc bpc" id="L53" title="1 of 6 branches missed.">      if (lastFired.isPresent() &amp;&amp; (bestFireTime == null || lastFired.get().isAfter(bestFireTime))) {</span>
+<span class="fc" id="L54">        bestFireTime = lastFired.get();</span>
+<span class="fc" id="L55">        bestProfile = window.getProfile();</span>
       }
-<span class="fc" id="L54">    }</span>
-<span class="fc" id="L55">    return Optional.ofNullable(bestProfile);</span>
+<span class="fc" id="L57">    }</span>
+<span class="fc" id="L58">    return Optional.ofNullable(bestProfile);</span>
+  }
+
+  /**
+   * {@link #currentProfile} adjusted for W-304's lead time: if the *next* upcoming transition is
+   * within its own {@code leadTime} of firing, its profile is returned early instead of the
+   * unadjusted {@code currentProfile}. Direction (shrink vs. warm) is classified by comparing the
+   * next profile's {@code limit} against the current one's &amp;mdash; smaller uses {@code
+   * leadTime.shrink}, larger uses {@code leadTime.warm}. Falls back to the unadjusted {@code
+   * currentProfile} whenever there's no established &quot;current&quot; to anticipate relative to, no
+   * upcoming transition, or either profile's limit can't be resolved &amp;mdash; this only reasons
+   * about one upcoming transition at a time (see the design doc for why).
+   */
+  public static Optional&lt;String&gt; currentProfileWithLeadTime(WardenPolicySpec spec, Instant now) {
+<span class="fc" id="L72">    Optional&lt;String&gt; base = currentProfile(spec, now);</span>
+<span class="pc bpc" id="L73" title="3 of 6 branches missed.">    if (base.isEmpty() || spec.getSchedule() == null || spec.getSchedule().isEmpty()) {</span>
+<span class="nc" id="L74">      return base;</span>
+    }
+
+<span class="fc" id="L77">    ZonedDateTime zonedNow = ZonedDateTime.ofInstant(now, ZoneId.of(spec.getTimezone()));</span>
+<span class="fc" id="L78">    NextTransition next = findNextTransition(spec, zonedNow);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">    if (next == null) {</span>
+<span class="nc" id="L80">      return base;</span>
+    }
+
+<span class="fc" id="L83">    Long baseLimitBytes = limitBytes(spec, base.get());</span>
+<span class="fc" id="L84">    Long nextLimitBytes = limitBytes(spec, next.profile());</span>
+<span class="pc bpc" id="L85" title="3 of 6 branches missed.">    if (baseLimitBytes == null || nextLimitBytes == null || baseLimitBytes.equals(nextLimitBytes)) {</span>
+<span class="nc" id="L86">      return base;</span>
+    }
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">    Duration leadTime = leadTimeFor(spec.getLeadTime(), nextLimitBytes &lt; baseLimitBytes);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">    if (leadTime == null) {</span>
+<span class="fc" id="L91">      return base;</span>
+    }
+
+<span class="fc" id="L94">    Instant triggerAt = next.fireTime().toInstant().minus(leadTime);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">    return now.isBefore(triggerAt) ? base : Optional.of(next.profile());</span>
+  }
+
+<span class="fc" id="L98">  private record NextTransition(String profile, ZonedDateTime fireTime) {}</span>
+
+  private static NextTransition findNextTransition(WardenPolicySpec spec, ZonedDateTime zonedNow) {
+<span class="fc" id="L101">    NextTransition soonest = null;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">    for (ScheduleWindow window : spec.getSchedule()) {</span>
+<span class="fc" id="L103">      Cron cron = PARSER.parse(window.getCron());</span>
+<span class="fc" id="L104">      Optional&lt;ZonedDateTime&gt; nextFired = ExecutionTime.forCron(cron).nextExecution(zonedNow);</span>
+<span class="pc bpc" id="L105" title="1 of 6 branches missed.">      if (nextFired.isPresent() &amp;&amp; (soonest == null || nextFired.get().isBefore(soonest.fireTime()))) {</span>
+<span class="fc" id="L106">        soonest = new NextTransition(window.getProfile(), nextFired.get());</span>
+      }
+<span class="fc" id="L108">    }</span>
+<span class="fc" id="L109">    return soonest;</span>
+  }
+
+  private static Long limitBytes(WardenPolicySpec spec, String profileName) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">    if (spec.getProfiles() == null) {</span>
+<span class="nc" id="L114">      return null;</span>
+    }
+<span class="fc" id="L116">    ResourceProfile profile = spec.getProfiles().get(profileName);</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">    if (profile == null || profile.getLimit() == null) {</span>
+<span class="nc" id="L118">      return null;</span>
+    }
+<span class="fc" id="L120">    return ResourceQuantity.parseBytes(profile.getLimit());</span>
+  }
+
+  /** @param movingToSmaller true if the transition's target profile has a smaller limit (a shrink) */
+  private static Duration leadTimeFor(LeadTime leadTime, boolean movingToSmaller) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">    if (leadTime == null) {</span>
+<span class="fc" id="L126">      return null;</span>
+    }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">    String raw = movingToSmaller ? leadTime.getShrink() : leadTime.getWarm();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">    return raw == null ? null : ShorthandDuration.parse(raw);</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

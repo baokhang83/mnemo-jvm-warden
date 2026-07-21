@@ -11,25 +11,26 @@ import java.time.Instant;
 
 /**
  * Watches {@code WardenPolicy} objects and patches {@code status.currentProfile} back, evaluated
- * by {@link ScheduleEvaluator} (W-303) &amp;mdash; replacing W-302's placeholder (the
- * alphabetically-first profile key) with the real, cron-schedule-driven selection. Nothing else
- * about the reconcile/patch wiring changed shape from W-302: same {@link
- * UpdateControl#patchStatus} call site, a real value instead of a placeholder.
+ * by {@link ScheduleEvaluator#currentProfileWithLeadTime} (W-303/W-304) &amp;mdash; replacing
+ * W-302's placeholder (the alphabetically-first profile key) with the real, cron-schedule-driven
+ * selection, fired {@code leadTime} early where applicable. Nothing else about the reconcile/patch
+ * wiring changed shape from W-302: same {@link UpdateControl#patchStatus} call site, a real value
+ * instead of a placeholder.
  */
 @ControllerConfiguration
-<span class="nc" id="L20">public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {</span>
+<span class="nc" id="L21">public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {</span>
 
   @Override
   public UpdateControl&lt;WardenPolicy&gt; reconcile(WardenPolicy policy, Context&lt;WardenPolicy&gt; context) {
-<span class="nc" id="L24">    ScheduleEvaluator.currentProfile(policy.getSpec(), Instant.now())</span>
-<span class="nc" id="L25">        .ifPresent(</span>
+<span class="nc" id="L25">    ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), Instant.now())</span>
+<span class="nc" id="L26">        .ifPresent(</span>
             currentProfile -&gt; {
-<span class="nc bnc" id="L27" title="All 2 branches missed.">              if (policy.getStatus() == null) {</span>
-<span class="nc" id="L28">                policy.setStatus(new WardenPolicyStatus());</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">              if (policy.getStatus() == null) {</span>
+<span class="nc" id="L29">                policy.setStatus(new WardenPolicyStatus());</span>
               }
-<span class="nc" id="L30">              policy.getStatus().setCurrentProfile(currentProfile);</span>
-<span class="nc" id="L31">            });</span>
-<span class="nc" id="L32">    return UpdateControl.patchStatus(policy);</span>
+<span class="nc" id="L31">              policy.getStatus().setCurrentProfile(currentProfile);</span>
+<span class="nc" id="L32">            });</span>
+<span class="nc" id="L33">    return UpdateControl.patchStatus(policy);</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
