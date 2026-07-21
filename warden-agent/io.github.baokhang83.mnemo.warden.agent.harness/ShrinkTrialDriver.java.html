@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ShrinkTrialDriver.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.harness</a> &gt; <span class="el_source">ShrinkTrialDriver.java</span></div><h1>ShrinkTrialDriver.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.harness;
+
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import io.github.baokhang83.mnemo.warden.agent.attach.TargetAttacher;
+import io.github.baokhang83.mnemo.warden.agent.attach.TargetLocator;
+import io.github.baokhang83.mnemo.warden.agent.heap.AttachedHeapController;
+import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
+import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
+import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
+import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkOutcome;
+import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
+import java.time.Duration;
+import java.util.Optional;
+
+/**
+ * W-206 test-only driver, run via {@code kubectl exec} inside the {@code warden} container
+ * (never the production entry point &amp;mdash; {@link io.github.baokhang83.mnemo.warden.agent.WardenAgent}
+ * is unchanged). Nothing wires {@code ShrinkSequence} into the running agent yet (that's M3's
+ * intent-handoff, W-306); this exists solely so {@code deploy/verify-oomkill-safety.sh} can drive
+ * one real shrink attempt against the real attached target and real Kubernetes API, using exactly
+ * the production collaborators ({@link AttachedHeapController}, {@link PodResizeClient}) rather
+ * than fakes.
+ *
+ * &lt;p&gt;Usage: {@code java -cp warden-agent.jar ...harness.ShrinkTrialDriver &lt;podName&gt; &lt;containerName&gt;
+ * &lt;requestBytes&gt; &lt;limitBytes&gt; &lt;gcTimeoutSeconds&gt; &lt;resizeTimeoutSeconds&gt;}. Exits {@code 0} on a
+ * completed shrink, {@code 3} on a verification-gate abort, {@code 2} if no target was found, and
+ * {@code 70} on any other failure. {@code 70}, not the JVM's own default-uncaught-exception exit
+ * code ({@code 1}), is deliberate: a bare uncaught exception exits {@code 1} too, which would be
+ * indistinguishable from a deliberately chosen {@code EXIT_ABORTED} of {@code 1} &amp;mdash;
+ * indistinguishable enough that an early version of this driver used {@code 1} for both, and
+ * {@code deploy/verify-oomkill-safety.sh} logged a false PASS when a real JMX connection failure
+ * happened to share the abort scenario's expected exit code.
+ */
+public final class ShrinkTrialDriver {
+
+  static final int EXIT_COMPLETED = 0;
+  static final int EXIT_NO_TARGET = 2;
+  static final int EXIT_ABORTED = 3;
+  static final int EXIT_UNEXPECTED_FAILURE = 70; // EX_SOFTWARE
+
+  private ShrinkTrialDriver() {}
+
+  public static void main(String[] args) {
+    try {
+<span class="nc" id="L45">      run(args);</span>
+<span class="nc" id="L46">    } catch (Throwable t) {</span>
+<span class="nc" id="L47">      t.printStackTrace();</span>
+<span class="nc" id="L48">      System.err.println(&quot;SHRINK_TRIAL_RESULT=unexpected-failure&quot;);</span>
+<span class="nc" id="L49">      System.exit(EXIT_UNEXPECTED_FAILURE);</span>
+<span class="nc" id="L50">    }</span>
+<span class="nc" id="L51">  }</span>
+
+  private static void run(String[] args) throws Exception {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">    if (args.length != 6) {</span>
+<span class="nc" id="L55">      System.err.println(</span>
+          &quot;usage: ShrinkTrialDriver &lt;podName&gt; &lt;containerName&gt; &lt;requestBytes&gt; &lt;limitBytes&gt; &quot;
+              + &quot;&lt;gcTimeoutSeconds&gt; &lt;resizeTimeoutSeconds&gt;&quot;);
+<span class="nc" id="L58">      System.exit(64); // EX_USAGE</span>
+<span class="nc" id="L59">      return;</span>
+    }
+<span class="nc" id="L61">    String podName = args[0];</span>
+<span class="nc" id="L62">    String containerName = args[1];</span>
+<span class="nc" id="L63">    long requestBytes = Long.parseLong(args[2]);</span>
+<span class="nc" id="L64">    long limitBytes = Long.parseLong(args[3]);</span>
+<span class="nc" id="L65">    Duration gcTimeout = Duration.ofSeconds(Long.parseLong(args[4]));</span>
+<span class="nc" id="L66">    Duration resizeTimeout = Duration.ofSeconds(Long.parseLong(args[5]));</span>
+
+<span class="nc" id="L68">    Optional&lt;Long&gt; targetPid = TargetLocator.findTarget();</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">    if (targetPid.isEmpty()) {</span>
+<span class="nc" id="L70">      System.err.println(&quot;SHRINK_TRIAL_RESULT=no-target&quot;);</span>
+<span class="nc" id="L71">      System.exit(EXIT_NO_TARGET);</span>
+<span class="nc" id="L72">      return;</span>
+    }
+
+<span class="nc" id="L75">    try (AttachedJvm target = TargetAttacher.attach(targetPid.get())) {</span>
+<span class="nc" id="L76">      HeapController heap = AttachedHeapController.forTarget(target);</span>
+<span class="nc" id="L77">      ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
+<span class="nc" id="L78">      ShrinkSequence sequence =</span>
+          new ShrinkSequence(heap, resizeClient, podName, containerName, gcTimeout, resizeTimeout);
+
+<span class="nc" id="L81">      ShrinkOutcome outcome = sequence.shrinkTo(requestBytes, limitBytes);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">      switch (outcome) {</span>
+<span class="nc" id="L83">        case ShrinkOutcome.Completed completed -&gt; {</span>
+<span class="nc" id="L84">          System.out.println(&quot;SHRINK_TRIAL_RESULT=completed finalRssBytes=&quot; + completed.finalRssBytes());</span>
+<span class="nc" id="L85">          System.exit(EXIT_COMPLETED);</span>
+<span class="nc" id="L86">        }</span>
+<span class="nc" id="L87">        case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; {</span>
+<span class="nc" id="L88">          System.out.println(</span>
+              &quot;SHRINK_TRIAL_RESULT=aborted observedRssBytes=&quot;
+<span class="nc" id="L90">                  + aborted.observedRssBytes()</span>
+                  + &quot; targetBytes=&quot;
+<span class="nc" id="L92">                  + aborted.targetBytes());</span>
+<span class="nc" id="L93">          System.exit(EXIT_ABORTED);</span>
+        }
+      }
+    }
+<span class="nc" id="L97">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

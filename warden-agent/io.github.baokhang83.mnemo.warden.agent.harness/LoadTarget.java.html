@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LoadTarget.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.harness</a> &gt; <span class="el_source">LoadTarget.java</span></div><h1>LoadTarget.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.harness;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * W-206 test fixture, not a production entry point: a real target JVM that retains a
+ * controllable amount of live heap, so {@code deploy/verify-oomkill-safety.sh} can deterministically
+ * pose two scenarios &amp;mdash; adversarial load that must survive as a correctly aborted shrink, and
+ * a genuinely idle heap that must survive as a completed one. A live-held allocation is used
+ * instead of driving real HTTP traffic against it: traffic-driven garbage would mostly be
+ * collected by {@code ShrinkSequence}'s own deep GC step regardless of &quot;load,&quot; so it can't
+ * reliably force the RSS gate either way &amp;mdash; a fixed live set can.
+ *
+ * &lt;p&gt;Runs under the same JMX flags and {@code -XX:+UseG1GC} as {@code example-sidecar.yaml}'s
+ * {@code app} container (see {@code TargetAttacher}'s javadoc for why those flags are load-bearing),
+ * launched from the same image as a different main class ({@code java -cp warden-agent.jar
+ * ...harness.LoadTarget}), so the safety check needs no separate image build.
+ */
+public final class LoadTarget {
+
+  /** How many megabytes of live heap to retain; 0 (default) retains none. */
+  public static final String ENV_RETAIN_MB = &quot;WARDEN_LOAD_TARGET_RETAIN_MB&quot;;
+
+  // Deliberately well under 1 MiB, not a round 1 MiB chunk: G1's default region size can be as
+  // small as 1 MiB, and any object over half a region becomes a &quot;humongous&quot; allocation spanning
+  // whole extra regions on its own — a 1 MiB byte[] (slightly over 1 MiB once its header is
+  // added) hit exactly that on a 250m heap, needing roughly double the retained size in heap
+  // space and OOMing well before reaching the intended live-set size. 256 KiB stays comfortably
+  // under half of any region size G1 would pick at these heap sizes.
+  private static final int CHUNK_BYTES = 256 * 1024;
+  private static final int CHUNKS_PER_MB = (1024 * 1024) / CHUNK_BYTES;
+
+  private LoadTarget() {}
+
+  public static void main(String[] args) throws InterruptedException {
+<span class="nc" id="L39">    int retainMb = parseRetainMb(System.getenv(ENV_RETAIN_MB));</span>
+<span class="nc" id="L40">    List&lt;byte[]&gt; retained = retain(retainMb);</span>
+<span class="nc" id="L41">    System.out.println(&quot;load-target ready, retainedMb=&quot; + retainMb + &quot; chunks=&quot; + retained.size());</span>
+
+<span class="nc" id="L43">    Runtime.getRuntime().addShutdownHook(new Thread(() -&gt; System.out.println(&quot;load-target shutting down&quot;), &quot;load-target-shutdown&quot;));</span>
+<span class="nc" id="L44">    new CountDownLatch(1).await();</span>
+<span class="nc" id="L45">  }</span>
+
+  static int parseRetainMb(String raw) {
+<span class="fc bfc" id="L48" title="All 4 branches covered.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L49">      return 0;</span>
+    }
+<span class="fc" id="L51">    return Integer.parseInt(raw.trim());</span>
+  }
+
+  /**
+   * Allocates {@code retainMb} megabytes' worth of chunks filled with non-zero, non-compressible
+   * data (real pages the OS/collector can't dedupe or elide) and keeps a strong reference to
+   * every one, so they stay live across {@code ShrinkSequence}'s deep GC step &amp;mdash; that's the
+   * point: this is simulated real application memory, not collectible garbage.
+   *
+   * &lt;p&gt;Package-private, not private: {@code LoadTargetTest} exercises this chunk-sizing
+   * arithmetic directly &amp;mdash; the same math a real cluster run caught a humongous-object bug
+   * in &amp;mdash; rather than forking a process just to prove it stays correct.
+   */
+  static List&lt;byte[]&gt; retain(int retainMb) {
+<span class="fc" id="L65">    Random random = new Random(42); // fixed seed: deterministic fixture, not security-sensitive</span>
+<span class="fc" id="L66">    int chunkCount = retainMb * CHUNKS_PER_MB;</span>
+<span class="fc" id="L67">    List&lt;byte[]&gt; chunks = new ArrayList&lt;&gt;(chunkCount);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">    for (int i = 0; i &lt; chunkCount; i++) {</span>
+<span class="fc" id="L69">      byte[] chunk = new byte[CHUNK_BYTES];</span>
+<span class="fc" id="L70">      random.nextBytes(chunk);</span>
+<span class="fc" id="L71">      chunks.add(chunk);</span>
+    }
+<span class="fc" id="L73">    return chunks;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
