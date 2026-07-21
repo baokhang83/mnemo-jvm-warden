@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Verifies W-302's acceptance criterion for real: java-operator-sdk's watch -> reconcile ->
-# status-patch loop actually works against a real cluster, not just a unit test of the pure
-# placeholder-selection logic (constitution §8). Runs the real WardenController process
-# (out-of-cluster, against kind's own kubeconfig context — production runs in-cluster and needs
-# no such override) and confirms a real WardenPolicy's status.currentProfile gets patched.
+# Verifies W-302/W-303's acceptance criteria for real: java-operator-sdk's watch -> reconcile ->
+# status-patch loop actually works against a real cluster, and status.currentProfile reflects
+# real cron schedule evaluation (W-303), not just a unit test of the pure evaluator logic
+# (constitution §8). Runs the real WardenController process (out-of-cluster, against kind's own
+# kubeconfig context — production runs in-cluster and needs no such override).
+#
+# Uses wardenpolicy-sample-schedule.yaml, not wardenpolicy-sample-valid.yaml: its schedule is
+# deterministic regardless of wall-clock time ("* * * * *" always fired within the last minute),
+# so this check never depends on what time of day it happens to run.
 #
 # Manual-run only, matching W-202/W-206/W-301's precedent.
 #
@@ -38,7 +42,7 @@ cleanup() {
   fi
   rm -f "$CLASSPATH_FILE" "$CONTROLLER_LOG"
   if [[ "$KEEP_CLUSTER" == false ]]; then
-    kubectl --context "kind-$CLUSTER_NAME" delete wardenpolicy warden-policy-sample \
+    kubectl --context "kind-$CLUSTER_NAME" delete wardenpolicy warden-policy-sample-schedule \
       --ignore-not-found --wait=false >/dev/null 2>&1 || true
     if [[ "$OWN_CLUSTER" == true ]]; then
       kind delete cluster --name "$CLUSTER_NAME" >/dev/null 2>&1 || true
@@ -70,7 +74,7 @@ echo "==> applying the WardenPolicy CRD and a sample policy"
 kubectl --context "kind-$CLUSTER_NAME" apply -f "$GENERATED_CRD" >/dev/null
 kubectl --context "kind-$CLUSTER_NAME" wait --for=condition=Established \
   crd/wardenpolicies.warden.mnemo.io --timeout=30s >/dev/null
-kubectl --context "kind-$CLUSTER_NAME" apply -f "$SCRIPT_DIR/wardenpolicy-sample-valid.yaml" >/dev/null
+kubectl --context "kind-$CLUSTER_NAME" apply -f "$SCRIPT_DIR/wardenpolicy-sample-schedule.yaml" >/dev/null
 
 echo "==> starting the real WardenController (out-of-cluster, kind's own kubeconfig context)"
 # The controller has no in-cluster config here — it picks up the current kubeconfig context,
@@ -85,16 +89,16 @@ echo "==> waiting for status.currentProfile to be patched"
 fail=false
 current_profile=""
 for _ in $(seq 1 30); do
-  current_profile="$(kubectl --context "kind-$CLUSTER_NAME" get wardenpolicy warden-policy-sample \
+  current_profile="$(kubectl --context "kind-$CLUSTER_NAME" get wardenpolicy warden-policy-sample-schedule \
     -o jsonpath='{.status.currentProfile}' 2>/dev/null || true)"
   [[ -n "$current_profile" ]] && break
   sleep 1
 done
 
-if [[ "$current_profile" == "off-peak" ]]; then
-  echo "PASS: status.currentProfile patched to \"off-peak\" (alphabetically first of off-peak/peak)"
+if [[ "$current_profile" == "always-on" ]]; then
+  echo "PASS: status.currentProfile patched to \"always-on\" (its cron fired more recently than \"yearly\"'s)"
 else
-  echo "FAIL: expected status.currentProfile=\"off-peak\", got \"$current_profile\""
+  echo "FAIL: expected status.currentProfile=\"always-on\", got \"$current_profile\""
   echo "--- controller log ---"
   cat "$CONTROLLER_LOG"
   fail=true
@@ -104,4 +108,4 @@ if [[ "$fail" == true ]]; then
   echo "==> RESULT: FAIL"
   exit 1
 fi
-echo "==> RESULT: PASS — the reconciler watches WardenPolicy and patches status for real"
+echo "==> RESULT: PASS — real cron schedule evaluation drives status.currentProfile"
