@@ -1,8 +1,8 @@
 {
-  "feature": "w-502-flush-evictable-only-on-shrink-shrinksequence-calls-ca",
-  "branch": "feature/w-502-flush-evictable-only-on-shrink-shrinksequence-calls-ca",
+  "feature": "w-503-pre-warm-on-grow-growsequence-calls-cachehook-prewarm",
+  "branch": "feature/w-503-pre-warm-on-grow-growsequence-calls-cachehook-prewarm",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-502-flush-evictable-only-on-shrink-shrinksequence-calls-ca/sessions/wire-cachehook-flushevictable-into-shrinksequence.md",
+  "last_session": "docs/fluencyloop/features/w-503-pre-warm-on-grow-growsequence-calls-cachehook-prewarm/sessions/wire-cachehook-prewarm-into-growsequence.md",
   "base_ref": "main",
   "updated": "2026-07-22"
 }

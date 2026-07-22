@@ -2,14 +2,19 @@ package io.github.baokhang83.mnemo.warden.agent.sequence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.baokhang83.mnemo.warden.agent.heap.GcCapabilities;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizeTimeoutException;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import io.github.baokhang83.mnemo.warden.cache.CacheStats;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,7 +30,7 @@ class GrowSequenceTest {
     List<String> callOrder = new ArrayList<>();
     FakeHeapController heap = new FakeHeapController(callOrder);
     FakeResizePort resizeClient = new FakeResizePort(callOrder);
-    GrowSequence sequence = new GrowSequence(heap, resizeClient, "my-pod", "app", RESIZE_TIMEOUT);
+    GrowSequence sequence = new GrowSequence(heap, resizeClient, Map.of(), "my-pod", "app", RESIZE_TIMEOUT);
 
     GrowOutcome outcome = sequence.growTo(150L * 1024 * 1024, 200L * 1024 * 1024);
 
@@ -49,12 +54,78 @@ class GrowSequenceTest {
     FakeHeapController heap = new FakeHeapController(callOrder);
     FakeResizePort resizeClient = new FakeResizePort(callOrder);
     resizeClient.timeoutOnNextCall = true;
-    GrowSequence sequence = new GrowSequence(heap, resizeClient, "my-pod", "app", RESIZE_TIMEOUT);
+    GrowSequence sequence = new GrowSequence(heap, resizeClient, Map.of(), "my-pod", "app", RESIZE_TIMEOUT);
 
     assertThrows(
         ResizeTimeoutException.class, () -> sequence.growTo(150L * 1024 * 1024, 200L * 1024 * 1024));
 
     assertEquals(List.of("resizeMemory"), callOrder, "SoftMax must never be raised on an unconfirmed resize");
+  }
+
+  @Test
+  void preWarmsEveryRegisteredCacheHookAfterSoftMaxIsRaised() throws Exception {
+    List<String> callOrder = new ArrayList<>();
+    FakeHeapController heap = new FakeHeapController(callOrder);
+    FakeResizePort resizeClient = new FakeResizePort(callOrder);
+    FakeCacheHook sessionCache = new FakeCacheHook();
+    FakeCacheHook queryCache = new FakeCacheHook();
+    Map<String, CacheHook> cacheHooks = new LinkedHashMap<>();
+    cacheHooks.put("sessionCache", sessionCache);
+    cacheHooks.put("queryCache", queryCache);
+    GrowSequence sequence =
+        new GrowSequence(heap, resizeClient, cacheHooks, "my-pod", "app", RESIZE_TIMEOUT);
+
+    sequence.growTo(150L * 1024 * 1024, 200L * 1024 * 1024);
+
+    assertTrue(sessionCache.warmed, "every registered hook must be pre-warmed");
+    assertTrue(queryCache.warmed, "every registered hook must be pre-warmed");
+    assertEquals(
+        List.of("resizeMemory", "setSoftMax"),
+        callOrder,
+        "preWarm must happen after SoftMax is raised, off the HeapController/ResizePort path");
+  }
+
+  @Test
+  void aHookThatThrowsDoesNotStopTheOthersOrFailTheGrow() throws Exception {
+    List<String> callOrder = new ArrayList<>();
+    FakeHeapController heap = new FakeHeapController(callOrder);
+    FakeResizePort resizeClient = new FakeResizePort(callOrder);
+    FakeCacheHook brokenCache = new FakeCacheHook();
+    brokenCache.throwOnWarm = true;
+    FakeCacheHook healthyCache = new FakeCacheHook();
+    Map<String, CacheHook> cacheHooks = new LinkedHashMap<>();
+    cacheHooks.put("brokenCache", brokenCache);
+    cacheHooks.put("healthyCache", healthyCache);
+    GrowSequence sequence =
+        new GrowSequence(heap, resizeClient, cacheHooks, "my-pod", "app", RESIZE_TIMEOUT);
+
+    GrowOutcome outcome = sequence.growTo(150L * 1024 * 1024, 200L * 1024 * 1024);
+
+    assertEquals(200L * 1024 * 1024, outcome.confirmedLimitBytes());
+    assertTrue(healthyCache.warmed, "a sibling hook's throw must not stop this hook from being pre-warmed");
+  }
+
+  private static final class FakeCacheHook implements CacheHook {
+    boolean warmed;
+    boolean throwOnWarm;
+
+    @Override
+    public void flushEvictable() {
+      throw new UnsupportedOperationException("GrowSequence must not call flushEvictable — that's shrink's job");
+    }
+
+    @Override
+    public void preWarm() {
+      if (throwOnWarm) {
+        throw new IllegalStateException("boom");
+      }
+      warmed = true;
+    }
+
+    @Override
+    public CacheStats stats() {
+      throw new UnsupportedOperationException("GrowSequence has no need to read cache stats");
+    }
   }
 
   private static final class FakeHeapController implements HeapController {
