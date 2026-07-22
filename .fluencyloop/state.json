@@ -1,8 +1,8 @@
 {
-  "feature": "w-404-precedence-engine-one-deterministic-rule-blackout-metr",
-  "branch": "feature/w-404-precedence-engine-one-deterministic-rule-blackout-metr",
+  "feature": "w-501-cachehook-spi-app-owner-cache-coordination-during-resi",
+  "branch": "feature/w-501-cachehook-spi-app-owner-cache-coordination-during-resi",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-404-precedence-engine-one-deterministic-rule-blackout-metr/sessions/build-the-precedence-engine-precedenceengine-reconciler-refa.md",
+  "last_session": "docs/fluencyloop/features/w-501-cachehook-spi-app-owner-cache-coordination-during-resi/sessions/build-the-cachehook-spi-warden-cache-api-module-cachehookloo.md",
   "base_ref": "main",
-  "updated": "2026-07-21"
+  "updated": "2026-07-22"
 }

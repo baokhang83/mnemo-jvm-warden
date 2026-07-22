@@ -15,6 +15,12 @@
   <description>Sidecar agent: JVM heap control + in-place resize. Deliberately has no dependency on warden-crd-model.</description>
 
   <dependencies>
+    <!-- The one settled internal edge: CacheHookLookup discovers the app-registered SPI. -->
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>warden-cache-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
