@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CacheHookLookup.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.cache</a> &gt; <span class="el_source">CacheHookLookup.java</span></div><h1>CacheHookLookup.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.cache;
+
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import javax.management.JMX;
+import javax.management.MBeanServerConnection;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+
+/**
+ * Discovers every {@link CacheHook} the target JVM has registered, over the same JMX connection
+ * {@code SoftMax}/{@code G1PeriodicGc} already use to read platform MXBeans (W-501).
+ *
+ * &lt;p&gt;{@link #lookupAll(AttachedJvm)} queries {@link CacheHook#OBJECT_NAME_PATTERN} first and
+ * builds one MXBean proxy per match, keyed by that registration's {@code name} key property. An
+ * app that never registered a {@code CacheHook} gets back an empty map, not an exception &amp;mdash;
+ * &quot;optional and safely absent&quot; made concrete.
+ */
+public final class CacheHookLookup {
+
+  private CacheHookLookup() {}
+
+  public static Map&lt;String, CacheHook&gt; lookupAll(AttachedJvm target) throws IOException {
+<span class="fc" id="L28">    MBeanServerConnection connection = target.mbeanConnection();</span>
+<span class="fc" id="L29">    Set&lt;ObjectName&gt; registered = connection.queryNames(pattern(), null);</span>
+
+<span class="fc" id="L31">    Map&lt;String, CacheHook&gt; hooks = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">    for (ObjectName name : registered) {</span>
+      // CacheHook.objectName(...) always builds the &quot;name&quot; property via ObjectName.quote(...)
+      // (see its javadoc), so getKeyProperty always hands back the quoted form here — verified
+      // directly: even a plain alphanumeric cache name comes back wrapped in quotes.
+<span class="fc" id="L36">      String cacheName = ObjectName.unquote(name.getKeyProperty(&quot;name&quot;));</span>
+<span class="fc" id="L37">      hooks.put(cacheName, JMX.newMXBeanProxy(connection, name, CacheHook.class));</span>
+<span class="fc" id="L38">    }</span>
+<span class="fc" id="L39">    return hooks;</span>
+  }
+
+  private static ObjectName pattern() {
+    try {
+<span class="fc" id="L44">      return new ObjectName(CacheHook.OBJECT_NAME_PATTERN);</span>
+<span class="nc" id="L45">    } catch (MalformedObjectNameException e) {</span>
+<span class="nc" id="L46">      throw new AssertionError(&quot;CacheHook.OBJECT_NAME_PATTERN is not a valid ObjectName pattern&quot;, e);</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
