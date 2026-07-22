@@ -51,6 +51,12 @@
          warden-controller doesn't rely on an undeclared transitive dependency for its own
          Prometheus response parsing (W-401). -->
     <jackson.version>2.19.0</jackson.version>
+    <!-- Verified against Maven Central (not guessed): 0.1.0 is mnemo-cache's latest published
+         release; examples/ wraps its real SeasonalCache as a CacheHook reference adapter
+         (W-504), not a fake. Caffeine's version matches what mnemo-cache itself builds
+         against (its pom marks the dependency optional, so consumers pin their own). -->
+    <mnemo-cache.version>0.1.0</mnemo-cache.version>
+    <caffeine.version>3.1.8</caffeine.version>
   </properties>
 
   <dependencyManagement>
@@ -92,6 +98,16 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.baokhang83.mnemo</groupId>
+        <artifactId>mnemo-cache</artifactId>
+        <version>${mnemo-cache.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
