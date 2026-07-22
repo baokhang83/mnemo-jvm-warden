@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SeasonalCacheHook.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">examples</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.examples.cache</a> &gt; <span class="el_source">SeasonalCacheHook.java</span></div><h1>SeasonalCacheHook.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.examples.cache;
+
+import io.github.baokhang83.mnemo.cache.SeasonalCache;
+import io.github.baokhang83.mnemo.cache.SeasonalCacheState;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import io.github.baokhang83.mnemo.warden.cache.CacheStats;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Supplier;
+
+/**
+ * A working {@link CacheHook} for the real &lt;a href=&quot;https://github.com/baokhang83/mnemo-cache&quot;&gt;
+ * mnemo-cache&lt;/a&gt; library (W-504) &amp;mdash; not a fake, and no changes to mnemo-cache itself: it's
+ * built only against {@link SeasonalCache}'s existing public surface.
+ *
+ * &lt;p&gt;mnemo-cache exposes no per-key hotness signal (Caffeine's W-TinyLFU owns that judgment
+ * internally) and no {@code invalidateAll()}, so this adapter treats the whole cache it wraps as
+ * &quot;evictable&quot; &amp;mdash; matching {@link CacheHook#flushEvictable()}'s own contract: whatever
+ * &lt;em&gt;this cache&lt;/em&gt; considers safely evictable, not a per-key split within it. An app that
+ * wants a true hot working set simply keeps that state in a cache it never registers a {@link
+ * CacheHook} for &amp;mdash; see {@code QueryCacheApp}'s {@code sessionCache}.
+ *
+ * &lt;p&gt;Every key ever inserted is tracked locally, since {@link SeasonalCache} has no way to
+ * enumerate or clear its own contents; {@link #flushEvictable()} invalidates each tracked key in
+ * turn. Hit/miss counts are tracked here too, purely for {@link #stats()} &amp;mdash;
+ * {@link SeasonalCacheState} doesn't carry a hit rate.
+ */
+public final class SeasonalCacheHook implements CacheHook {
+
+  private final SeasonalCache&lt;String, String&gt; cache;
+  private final Map&lt;String, Supplier&lt;String&gt;&gt; warmSet;
+<span class="fc" id="L34">  private final Set&lt;String&gt; trackedKeys = ConcurrentHashMap.newKeySet();</span>
+<span class="fc" id="L35">  private final LongAdder hits = new LongAdder();</span>
+<span class="fc" id="L36">  private final LongAdder misses = new LongAdder();</span>
+
+<span class="fc" id="L38">  public SeasonalCacheHook(SeasonalCache&lt;String, String&gt; cache, Map&lt;String, Supplier&lt;String&gt;&gt; warmSet) {</span>
+<span class="fc" id="L39">    this.cache = cache;</span>
+<span class="fc" id="L40">    this.warmSet = Map.copyOf(warmSet);</span>
+<span class="fc" id="L41">  }</span>
+
+  /** Get-or-load, exactly as an app would call it day-to-day. */
+  public String get(String key, Supplier&lt;String&gt; loader) {
+<span class="nc" id="L45">    String value = cache.get(key, k -&gt; loader.get());</span>
+<span class="nc" id="L46">    trackedKeys.add(key);</span>
+<span class="nc" id="L47">    return value;</span>
+  }
+
+  public String getIfPresent(String key) {
+<span class="fc" id="L51">    String value = cache.getIfPresent(key);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">    if (value != null) {</span>
+<span class="fc" id="L53">      hits.increment();</span>
+    } else {
+<span class="fc" id="L55">      misses.increment();</span>
+    }
+<span class="fc" id="L57">    return value;</span>
+  }
+
+  public void put(String key, String value) {
+<span class="fc" id="L61">    cache.put(key, value);</span>
+<span class="fc" id="L62">    trackedKeys.add(key);</span>
+<span class="fc" id="L63">  }</span>
+
+  /** Invalidates every key this adapter has ever inserted &amp;mdash; the whole cache is evictable. */
+  @Override
+  public void flushEvictable() {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">    for (String key : trackedKeys) {</span>
+<span class="fc" id="L69">      cache.invalidate(key);</span>
+<span class="fc" id="L70">    }</span>
+<span class="fc" id="L71">    trackedKeys.clear();</span>
+<span class="fc" id="L72">  }</span>
+
+  /** Re-loads the fixed warm set an app owner configured this adapter with. */
+  @Override
+  public void preWarm() {
+<span class="fc" id="L77">    warmSet.forEach(</span>
+        (key, loader) -&gt; {
+<span class="fc" id="L79">          cache.get(key, k -&gt; loader.get());</span>
+<span class="fc" id="L80">          trackedKeys.add(key);</span>
+<span class="fc" id="L81">        });</span>
+<span class="fc" id="L82">  }</span>
+
+  @Override
+  public CacheStats stats() {
+<span class="fc" id="L86">    SeasonalCacheState state = cache.state();</span>
+<span class="fc" id="L87">    long total = hits.sum() + misses.sum();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">    double hitRate = total == 0 ? 0.0 : (double) hits.sum() / total;</span>
+<span class="fc" id="L89">    return new CacheStats(state.size(), state.size(), hitRate);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
