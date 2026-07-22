@@ -12,9 +12,31 @@
 
   <artifactId>examples</artifactId>
   <name>examples</name>
-  <description>Placeholder module. Grows into a sample target-JVM workload for W-005.</description>
+  <description>Sample target-JVM workload for W-005; also hosts the mnemo-cache CacheHook reference adapter (W-504).</description>
 
   <dependencies>
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>warden-cache-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>mnemo-cache</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+    <!-- Test-only: drives the real ShrinkSequence/GrowSequence against the real adapter
+         in-process (W-504) — a normal test-scope dependency on the main artifact, not a
+         test-jar; CacheHookLookupTest already covers the spawn/attach/JMX path generically. -->
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>warden-agent</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
