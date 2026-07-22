@@ -167,7 +167,7 @@ sequenceDiagram
     C-->>L: {} (empty set)
     L-->>Caller: {} (empty map)
   end
-  Note over Caller: this slice stops at the lookup; W-502/W-503 call<br/>flushEvictable()/preWarm() on every value in the map
+  Note over Caller: this slice stops at the lookup - W-502/W-503 call<br/>flushEvictable()/preWarm() on every value in the map
 ```
 
 ## Out of scope for this slice

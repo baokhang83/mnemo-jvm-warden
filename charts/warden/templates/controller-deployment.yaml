@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "warden.fullname" . }}-controller
+  labels:
+    {{- include "warden.labels" . | nindent 4 }}
+spec:
+  # Hardcoded, not a value: WardenPolicyReconciler has no leader election configured, so a
+  # second replica would double-reconcile every WardenPolicy independently (duplicate intent
+  # PATCHes, duplicate status writes) instead of standing by - there's no safe "just scale it up"
+  # yet, so this isn't exposed as a knob a values.yaml edit could quietly break.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "warden.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "warden.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "warden.controller.serviceAccountName" . }}
+      containers:
+        - name: controller
+          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          {{- if .Values.controller.prometheusUrl }}
+          env:
+            - name: WARDEN_PROMETHEUS_URL
+              value: {{ .Values.controller.prometheusUrl | quote }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}

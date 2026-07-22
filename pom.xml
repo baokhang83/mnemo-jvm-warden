@@ -33,6 +33,11 @@
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    <!-- Verified against Maven Central (not guessed): 3.6.2 is latest. Only warden-controller
+         needs this — unlike warden-agent (zero runtime deps), it pulls in a real dependency
+         graph (fabric8 kubernetes-client, operator-framework, cron-utils), so a plain jar with
+         just a Main-Class manifest wouldn't run standalone. -->
+    <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
     <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
     <!-- Verified against Maven Central (not guessed): 7.3.1 is the latest kubernetes-client
          release as of W-301, and crd-generator-maven-plugin/generator-annotations ship on the
@@ -129,6 +134,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
           <version>${maven-jar-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${maven-shade-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>

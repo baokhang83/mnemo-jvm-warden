@@ -1,0 +1,46 @@
+# -- Controller: the cluster-wide Deployment that watches WardenPolicy objects.
+controller:
+  image:
+    repository: ghcr.io/baokhang83/mnemo-jvm-warden-controller
+    tag: latest
+    pullPolicy: IfNotPresent
+  # -- Where Prometheus lives, for guardrail metric evaluation (W-401). Optional: leave empty
+  # and no WARDEN_PROMETHEUS_URL is set, the same "not every policy needs a guardrail" posture
+  # ControllerConfig.fromEnv already takes.
+  prometheusUrl: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# -- Sidecar: reference values for this chart's own `warden.sidecar` named template
+# (templates/_helpers.tpl). An operator's own app chart including that template supplies its
+# own equivalent dict as `cfg` — these are the defaults/shape that dict is expected to follow.
+# See deploy/example-sidecar.yaml for the hand-authored pattern this reproduces.
+sidecar:
+  # -- Master toggle: an operator's app chart is expected to gate its own
+  # `{{ include "warden.sidecar" ... }}` call on this (or its own equivalent flag) so the
+  # sidecar can be turned off per-deployment without forking the app chart's templates.
+  enabled: true
+  image:
+    repository: ghcr.io/baokhang83/mnemo-jvm-warden
+    tag: latest
+    pullPolicy: IfNotPresent
+  # -- The sibling container the agent resizes. No default (mirrors AgentConfig's own
+  # fail-fast posture, W-306): guessing wrong here means silently resizing nothing, or
+  # resizing the wrong container.
+  targetContainerName: app
+  healthPort: 8080
+  gc:
+    timeoutSeconds: 30
+  resize:
+    timeoutSeconds: 30
+  intentPollIntervalSeconds: 5
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi

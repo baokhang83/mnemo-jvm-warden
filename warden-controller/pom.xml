@@ -39,4 +39,38 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Unlike warden-agent, this module pulls in a real dependency graph (fabric8
+           kubernetes-client, operator-framework, cron-utils), so a plain jar can't run
+           standalone: it needs those classes on its classpath. Shaded into one runnable jar
+           rather than assembling a classpath at container-build time, so the runtime image
+           stays a single `COPY jar` + `java -jar`, the same shape as warden-agent's Dockerfile.
+           ServicesResourceTransformer is required, not optional: kubernetes-client picks its
+           HTTP client (vertx vs JDK) via java.util.ServiceLoader over META-INF/services, and a
+           plain shade merge overwrites one implementation's descriptor with the other's instead
+           of merging them, which would silently break client selection at runtime. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>io.github.baokhang83.mnemo.warden.controller.WardenController</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

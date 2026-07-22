@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "warden.controller.serviceAccountName" . }}
+  labels:
+    {{- include "warden.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "warden.fullname" . }}-controller
+  labels:
+    {{- include "warden.labels" . | nindent 4 }}
+rules:
+  # WardenPolicyReconciler's informer (java-operator-sdk) watches every WardenPolicy in the
+  # cluster - no per-policy namespace scoping is configured, so this is cluster-wide, not a
+  # namespaced Role.
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenpolicies"]
+    verbs: ["get", "list", "watch"]
+  # reconcile() ends in UpdateControl.patchStatus - a PATCH on the status subresource only;
+  # no finalizer is added (WardenPolicyReconciler doesn't implement Cleaner), so no "update" verb
+  # on the main wardenpolicies resource is needed.
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenpolicies/status"]
+    verbs: ["get", "patch"]
+  # IntentEmitter.resolvePodNames: read-only lookups by name, to resolve a targetRef's
+  # spec.selector - never created, updated, or deleted by the controller.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get"]
+  # IntentEmitter: list a Deployment/StatefulSet's pods by selector, then PATCH each one's
+  # annotations (IntentEmitter.annotate). Distinct from the sidecar's own namespaced
+  # pods/resize Role (deploy/example-sidecar.yaml) - the controller only ever touches
+  # annotations, never the resize subresource itself.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "warden.fullname" . }}-controller
+  labels:
+    {{- include "warden.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "warden.controller.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "warden.fullname" . }}-controller
+  apiGroup: rbac.authorization.k8s.io

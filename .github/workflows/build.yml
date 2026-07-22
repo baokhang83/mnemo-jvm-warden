@@ -25,6 +25,16 @@ jobs:
       - name: Build and test
         run: mvn -B --no-transfer-progress verify
 
+      - name: Check charts/warden/crds is in sync with the generated CRD
+        run: |
+          diff -u charts/warden/crds/wardenpolicy-crd.yaml \
+                  warden-crd-model/target/classes/META-INF/fabric8/wardenpolicies.warden.mnemo.io-v1.yml || {
+            echo "::error::charts/warden/crds/wardenpolicy-crd.yaml is stale — regenerate it from" \
+                 "warden-crd-model/target/classes/META-INF/fabric8/wardenpolicies.warden.mnemo.io-v1.yml" \
+                 "(mvn -pl warden-crd-model process-classes) and commit the copy."
+            exit 1
+          }
+
       - name: Generate JaCoCo badge
         uses: cicirello/jacoco-badge-generator@v2
         with:

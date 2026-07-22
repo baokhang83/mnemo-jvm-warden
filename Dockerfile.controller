@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+
+# --- Stage 1: build the controller jar (this whole stage is discarded) ---
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
+
+# Same reactor-narrowing trick as the agent's Dockerfile: every module POM so the reactor loads,
+# then only the controller's sources (plus warden-crd-model's, its one internal dependency).
+COPY pom.xml ./
+COPY warden-crd-model/pom.xml warden-crd-model/pom.xml
+COPY warden-cache-api/pom.xml warden-cache-api/pom.xml
+COPY warden-controller/pom.xml warden-controller/pom.xml
+COPY warden-agent/pom.xml warden-agent/pom.xml
+COPY examples/pom.xml examples/pom.xml
+COPY coverage/pom.xml coverage/pom.xml
+COPY warden-crd-model/src warden-crd-model/src
+COPY warden-controller/src warden-controller/src
+
+RUN mvn -q -B -pl warden-controller -am -DskipTests package
+
+# --- Stage 2: runtime (this is what ships) ---
+FROM eclipse-temurin:21-jdk AS runtime
+
+# Run unprivileged.
+RUN groupadd --system warden && useradd --system --gid warden --home-dir /app warden
+WORKDIR /app
+
+# The shaded jar (maven-shade-plugin, warden-controller/pom.xml) already bundles its dependency
+# graph (fabric8 kubernetes-client, operator-framework, cron-utils) with merged
+# META-INF/services — a plain `java -jar` needs nothing else on the classpath.
+COPY --from=builder /build/warden-controller/target/warden-controller-*.jar /app/warden-controller.jar
+
+USER warden
+ENTRYPOINT ["java", "-jar", "/app/warden-controller.jar"]
