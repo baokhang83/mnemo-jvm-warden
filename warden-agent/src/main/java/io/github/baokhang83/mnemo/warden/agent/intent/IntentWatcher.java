@@ -5,7 +5,6 @@ import io.github.baokhang83.mnemo.warden.agent.AgentLog;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import io.github.baokhang83.mnemo.warden.agent.cache.CacheHookLookup;
-import io.github.baokhang83.mnemo.warden.agent.heap.AttachedHeapController;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
 import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
@@ -41,6 +40,12 @@ import java.util.OptionalLong;
  * GrowSequence} themselves stay free of any metrics dependency (constitution &sect;2). A metrics
  * sampling failure is isolated from the resize decision (constitution &sect;12): it must never be
  * the reason a real resize/abort is skipped.
+ *
+ * <p>A target whose collector doesn't support Warden at all ({@link
+ * io.github.baokhang83.mnemo.warden.agent.heap.GcCapabilities#supported()} false, e.g. Serial/
+ * Parallel/Epsilon) is a permanent state for that attach, not a transient poll failure &mdash; W-603
+ * resolves it once per target identity, logs it once, and records it on {@link AgentMetrics} so
+ * it's visible on {@code /metrics}, rather than re-attempting and re-logging every tick.
  */
 public final class IntentWatcher {
 
@@ -51,11 +56,8 @@ public final class IntentWatcher {
   private final Thread thread;
   private volatile boolean running;
 
-  // Touched only from the poll thread (`thread`, below): no synchronization needed. Caches the
-  // constructed HeapController per attached-target identity so the gauge sample on every tick
-  // doesn't redo RssReader's bounded-depth cgroup filesystem walk (constitution §4).
-  private AttachedJvm cachedTargetJvm;
-  private HeapController cachedHeap;
+  // Touched only from the poll thread (`thread`, below): no synchronization needed.
+  private final TargetHeapControllerResolver heapResolver;
 
   public IntentWatcher(
       AgentConfig config, AttachSupervisor attachSupervisor, PodIntentReader intentReader, AgentMetrics metrics) {
@@ -63,6 +65,7 @@ public final class IntentWatcher {
     this.attachSupervisor = attachSupervisor;
     this.intentReader = intentReader;
     this.metrics = metrics;
+    this.heapResolver = new TargetHeapControllerResolver(metrics);
     this.thread = new Thread(this::run, "warden-intent-watcher");
     this.thread.setDaemon(true);
   }
@@ -115,7 +118,11 @@ public final class IntentWatcher {
       return;
     }
 
-    HeapController heap = heapControllerFor(jvm);
+    Optional<HeapController> heapOpt = heapResolver.resolve(jvm);
+    if (heapOpt.isEmpty()) {
+      return; // target's collector is unsupported; agent is read-only for it (W-603)
+    }
+    HeapController heap = heapOpt.get();
     ResizePort resizeClient = PodResizeClient.forInClusterAgent();
     Map<String, CacheHook> cacheHooks = CacheHookLookup.lookupAll(jvm);
     long requestBytes = intent.get().requestBytes();
@@ -158,14 +165,20 @@ public final class IntentWatcher {
   /**
    * Samples the target's current RSS and cumulative GC stats into {@link #metrics}. Isolated from
    * the resize decision (constitution &sect;12): a sampling failure is logged and swallowed here,
-   * never allowed to stop an intent-driven resize/abort from being evaluated this tick.
+   * never allowed to stop an intent-driven resize/abort from being evaluated this tick. A no-op
+   * (not a failure) when the target's collector is unsupported &mdash; {@link TargetHeapControllerResolver#resolve}
+   * already logged and recorded that once.
    *
    * @return the sampled RSS, if sampling succeeded &mdash; reused as the "before" baseline for a
    *     shrink's bytes-reclaimed counter, so a shrink never triggers a second RSS read for it.
    */
   private OptionalLong sampleMetrics(AttachedJvm jvm) {
     try {
-      long rss = heapControllerFor(jvm).currentRss();
+      Optional<HeapController> heap = heapResolver.resolve(jvm);
+      if (heap.isEmpty()) {
+        return OptionalLong.empty();
+      }
+      long rss = heap.get().currentRss();
       metrics.setRss(rss);
 
       List<GarbageCollectorMXBean> gcBeans =
@@ -182,21 +195,6 @@ public final class IntentWatcher {
       AgentLog.info("metrics sampling failed, continuing: " + e.getMessage());
       return OptionalLong.empty();
     }
-  }
-
-  /**
-   * A {@link HeapController} construction resolves the target's cgroup directory via a
-   * bounded-depth filesystem walk ({@code RssReader.resolveCgroupRoot}) &mdash; expensive enough
-   * that redoing it every poll tick just to sample a gauge would violate the agent's own
-   * lean-footprint principle (constitution &sect;4). Cached per attached target identity and
-   * rebuilt only when {@link AttachSupervisor} hands back a new {@link AttachedJvm} (a reattach).
-   */
-  private HeapController heapControllerFor(AttachedJvm target) throws IOException {
-    if (cachedHeap == null || cachedTargetJvm != target) {
-      cachedHeap = AttachedHeapController.forTarget(target);
-      cachedTargetJvm = target;
-    }
-    return cachedHeap;
   }
 
   private void sleep() {

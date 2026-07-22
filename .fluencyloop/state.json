@@ -1,8 +1,8 @@
 {
-  "feature": "w-602-agent-self-telemetry-expose-resize-abort-rss-gc-pause",
-  "branch": "feature/w-602-agent-self-telemetry-expose-resize-abort-rss-gc-pause",
+  "feature": "w-603-gc-support-matrix-completion-clear-read-only-mode-for",
+  "branch": "feature/w-603-gc-support-matrix-completion-clear-read-only-mode-for",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-602-agent-self-telemetry-expose-resize-abort-rss-gc-pause/sessions/agentmetrics-registry-metrics-endpoint-intentwatcher-wiring.md",
+  "last_session": "docs/fluencyloop/features/w-603-gc-support-matrix-completion-clear-read-only-mode-for/sessions/intentwatcher-resolves-once-gc-supported-gauge.md",
   "base_ref": "main",
   "updated": "2026-07-22"
 }
