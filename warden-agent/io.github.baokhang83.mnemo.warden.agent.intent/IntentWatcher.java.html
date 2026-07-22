@@ -5,8 +5,8 @@ import io.github.baokhang83.mnemo.warden.agent.AgentLog;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import io.github.baokhang83.mnemo.warden.agent.cache.CacheHookLookup;
-import io.github.baokhang83.mnemo.warden.agent.heap.AttachedHeapController;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
+import io.github.baokhang83.mnemo.warden.agent.heap.TargetHeapControllerResolver;
 import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
@@ -41,6 +41,12 @@ import java.util.OptionalLong;
  * GrowSequence} themselves stay free of any metrics dependency (constitution &amp;sect;2). A metrics
  * sampling failure is isolated from the resize decision (constitution &amp;sect;12): it must never be
  * the reason a real resize/abort is skipped.
+ *
+ * &lt;p&gt;A target whose collector doesn't support Warden at all ({@link
+ * io.github.baokhang83.mnemo.warden.agent.heap.GcCapabilities#supported()} false, e.g. Serial/
+ * Parallel/Epsilon) is a permanent state for that attach, not a transient poll failure &amp;mdash; W-603
+ * resolves it once per target identity, logs it once, and records it on {@link AgentMetrics} so
+ * it's visible on {@code /metrics}, rather than re-attempting and re-logging every tick.
  */
 public final class IntentWatcher {
 
@@ -51,160 +57,153 @@ public final class IntentWatcher {
   private final Thread thread;
   private volatile boolean running;
 
-  // Touched only from the poll thread (`thread`, below): no synchronization needed. Caches the
-  // constructed HeapController per attached-target identity so the gauge sample on every tick
-  // doesn't redo RssReader's bounded-depth cgroup filesystem walk (constitution §4).
-  private AttachedJvm cachedTargetJvm;
-  private HeapController cachedHeap;
+  // Touched only from the poll thread (`thread`, below): no synchronization needed.
+  private final TargetHeapControllerResolver heapResolver;
 
   public IntentWatcher(
-<span class="nc" id="L61">      AgentConfig config, AttachSupervisor attachSupervisor, PodIntentReader intentReader, AgentMetrics metrics) {</span>
-<span class="nc" id="L62">    this.config = config;</span>
-<span class="nc" id="L63">    this.attachSupervisor = attachSupervisor;</span>
-<span class="nc" id="L64">    this.intentReader = intentReader;</span>
-<span class="nc" id="L65">    this.metrics = metrics;</span>
-<span class="nc" id="L66">    this.thread = new Thread(this::run, &quot;warden-intent-watcher&quot;);</span>
-<span class="nc" id="L67">    this.thread.setDaemon(true);</span>
-<span class="nc" id="L68">  }</span>
+<span class="nc" id="L64">      AgentConfig config, AttachSupervisor attachSupervisor, PodIntentReader intentReader, AgentMetrics metrics) {</span>
+<span class="nc" id="L65">    this.config = config;</span>
+<span class="nc" id="L66">    this.attachSupervisor = attachSupervisor;</span>
+<span class="nc" id="L67">    this.intentReader = intentReader;</span>
+<span class="nc" id="L68">    this.metrics = metrics;</span>
+<span class="nc" id="L69">    this.heapResolver = new TargetHeapControllerResolver(metrics);</span>
+<span class="nc" id="L70">    this.thread = new Thread(this::run, &quot;warden-intent-watcher&quot;);</span>
+<span class="nc" id="L71">    this.thread.setDaemon(true);</span>
+<span class="nc" id="L72">  }</span>
 
   public void start() {
-<span class="nc" id="L71">    running = true;</span>
-<span class="nc" id="L72">    thread.start();</span>
-<span class="nc" id="L73">  }</span>
+<span class="nc" id="L75">    running = true;</span>
+<span class="nc" id="L76">    thread.start();</span>
+<span class="nc" id="L77">  }</span>
 
   public void stop() {
-<span class="nc" id="L76">    running = false;</span>
-<span class="nc" id="L77">    thread.interrupt();</span>
+<span class="nc" id="L80">    running = false;</span>
+<span class="nc" id="L81">    thread.interrupt();</span>
     try {
-<span class="nc" id="L79">      thread.join(config.intentPollInterval().multipliedBy(2).toMillis());</span>
-<span class="nc" id="L80">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L81">      Thread.currentThread().interrupt();</span>
-<span class="nc" id="L82">    }</span>
-<span class="nc" id="L83">  }</span>
+<span class="nc" id="L83">      thread.join(config.intentPollInterval().multipliedBy(2).toMillis());</span>
+<span class="nc" id="L84">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L85">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L86">    }</span>
+<span class="nc" id="L87">  }</span>
 
   private void run() {
-<span class="nc bnc" id="L86" title="All 2 branches missed.">    while (running) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">    while (running) {</span>
       try {
-<span class="nc" id="L88">        pollOnce();</span>
-<span class="nc" id="L89">      } catch (Exception e) {</span>
-<span class="nc" id="L90">        AgentLog.info(&quot;intent poll failed, retrying next tick: &quot; + e.getMessage());</span>
-<span class="nc" id="L91">      }</span>
-<span class="nc" id="L92">      sleep();</span>
+<span class="nc" id="L92">        pollOnce();</span>
+<span class="nc" id="L93">      } catch (Exception e) {</span>
+<span class="nc" id="L94">        AgentLog.info(&quot;intent poll failed, retrying next tick: &quot; + e.getMessage());</span>
+<span class="nc" id="L95">      }</span>
+<span class="nc" id="L96">      sleep();</span>
     }
-<span class="nc" id="L94">  }</span>
+<span class="nc" id="L98">  }</span>
 
   private void pollOnce() throws Exception {
-<span class="nc" id="L97">    Optional&lt;AttachedJvm&gt; target = attachSupervisor.currentTarget();</span>
-<span class="nc bnc" id="L98" title="All 2 branches missed.">    if (target.isEmpty()) {</span>
-<span class="nc" id="L99">      return;</span>
+<span class="nc" id="L101">    Optional&lt;AttachedJvm&gt; target = attachSupervisor.currentTarget();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">    if (target.isEmpty()) {</span>
+<span class="nc" id="L103">      return;</span>
     }
-<span class="nc" id="L101">    AttachedJvm jvm = target.get();</span>
+<span class="nc" id="L105">    AttachedJvm jvm = target.get();</span>
 
-<span class="nc" id="L103">    OptionalLong rssBeforeThisTick = sampleMetrics(jvm);</span>
+<span class="nc" id="L107">    OptionalLong rssBeforeThisTick = sampleMetrics(jvm);</span>
 
-<span class="nc" id="L105">    PodState state = intentReader.read();</span>
-<span class="nc" id="L106">    Optional&lt;Intent&gt; intent = state.intent();</span>
-<span class="nc" id="L107">    OptionalLong currentLimitBytes = state.currentLimitBytes();</span>
-<span class="nc bnc" id="L108" title="All 4 branches missed.">    if (intent.isEmpty() || currentLimitBytes.isEmpty()) {</span>
-<span class="nc" id="L109">      return;</span>
-    }
-
-<span class="nc" id="L112">    long desiredLimit = intent.get().limitBytes();</span>
-<span class="nc" id="L113">    long currentLimit = currentLimitBytes.getAsLong();</span>
-<span class="nc bnc" id="L114" title="All 2 branches missed.">    if (desiredLimit == currentLimit) {</span>
-<span class="nc" id="L115">      return;</span>
+<span class="nc" id="L109">    PodState state = intentReader.read();</span>
+<span class="nc" id="L110">    Optional&lt;Intent&gt; intent = state.intent();</span>
+<span class="nc" id="L111">    OptionalLong currentLimitBytes = state.currentLimitBytes();</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">    if (intent.isEmpty() || currentLimitBytes.isEmpty()) {</span>
+<span class="nc" id="L113">      return;</span>
     }
 
-<span class="nc" id="L118">    HeapController heap = heapControllerFor(jvm);</span>
-<span class="nc" id="L119">    ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
-<span class="nc" id="L120">    Map&lt;String, CacheHook&gt; cacheHooks = CacheHookLookup.lookupAll(jvm);</span>
-<span class="nc" id="L121">    long requestBytes = intent.get().requestBytes();</span>
+<span class="nc" id="L116">    long desiredLimit = intent.get().limitBytes();</span>
+<span class="nc" id="L117">    long currentLimit = currentLimitBytes.getAsLong();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">    if (desiredLimit == currentLimit) {</span>
+<span class="nc" id="L119">      return;</span>
+    }
 
-<span class="nc bnc" id="L123" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
-<span class="nc" id="L124">      ShrinkSequence sequence =</span>
+<span class="nc" id="L122">    Optional&lt;HeapController&gt; heapOpt = heapResolver.resolve(jvm);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">    if (heapOpt.isEmpty()) {</span>
+<span class="nc" id="L124">      return; // target's collector is unsupported; agent is read-only for it (W-603)</span>
+    }
+<span class="nc" id="L126">    HeapController heap = heapOpt.get();</span>
+<span class="nc" id="L127">    ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
+<span class="nc" id="L128">    Map&lt;String, CacheHook&gt; cacheHooks = CacheHookLookup.lookupAll(jvm);</span>
+<span class="nc" id="L129">    long requestBytes = intent.get().requestBytes();</span>
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
+<span class="nc" id="L132">      ShrinkSequence sequence =</span>
           new ShrinkSequence(
               heap,
               resizeClient,
               cacheHooks,
-<span class="nc" id="L129">              config.podName(),</span>
-<span class="nc" id="L130">              config.targetContainerName(),</span>
-<span class="nc" id="L131">              config.gcTimeout(),</span>
-<span class="nc" id="L132">              config.resizeTimeout());</span>
-<span class="nc" id="L133">      ShrinkOutcome outcome = sequence.shrinkTo(requestBytes, desiredLimit);</span>
-<span class="nc" id="L134">      AgentLog.info(&quot;intent-driven shrink: &quot; + outcome);</span>
-<span class="nc" id="L135">      recordShrinkOutcome(outcome, rssBeforeThisTick);</span>
-<span class="nc" id="L136">    } else {</span>
-<span class="nc" id="L137">      GrowSequence sequence =</span>
+<span class="nc" id="L137">              config.podName(),</span>
+<span class="nc" id="L138">              config.targetContainerName(),</span>
+<span class="nc" id="L139">              config.gcTimeout(),</span>
+<span class="nc" id="L140">              config.resizeTimeout());</span>
+<span class="nc" id="L141">      ShrinkOutcome outcome = sequence.shrinkTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L142">      AgentLog.info(&quot;intent-driven shrink: &quot; + outcome);</span>
+<span class="nc" id="L143">      recordShrinkOutcome(outcome, rssBeforeThisTick);</span>
+<span class="nc" id="L144">    } else {</span>
+<span class="nc" id="L145">      GrowSequence sequence =</span>
           new GrowSequence(
-<span class="nc" id="L139">              heap, resizeClient, cacheHooks, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
-<span class="nc" id="L140">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
-<span class="nc" id="L141">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
-<span class="nc" id="L142">      metrics.incrementResize(&quot;grow&quot;);</span>
+<span class="nc" id="L147">              heap, resizeClient, cacheHooks, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
+<span class="nc" id="L148">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L149">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
+<span class="nc" id="L150">      metrics.incrementResize(&quot;grow&quot;);</span>
     }
-<span class="nc" id="L144">  }</span>
+<span class="nc" id="L152">  }</span>
 
   private void recordShrinkOutcome(ShrinkOutcome outcome, OptionalLong rssBeforeThisTick) {
-<span class="nc bnc" id="L147" title="All 2 branches missed.">    switch (outcome) {</span>
-<span class="nc" id="L148">      case ShrinkOutcome.Completed completed -&gt; {</span>
-<span class="nc" id="L149">        metrics.incrementResize(&quot;shrink&quot;);</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (rssBeforeThisTick.isPresent()) {</span>
-<span class="nc" id="L151">          metrics.addBytesReclaimed(rssBeforeThisTick.getAsLong() - completed.finalRssBytes());</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">    switch (outcome) {</span>
+<span class="nc" id="L156">      case ShrinkOutcome.Completed completed -&gt; {</span>
+<span class="nc" id="L157">        metrics.incrementResize(&quot;shrink&quot;);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (rssBeforeThisTick.isPresent()) {</span>
+<span class="nc" id="L159">          metrics.addBytesReclaimed(rssBeforeThisTick.getAsLong() - completed.finalRssBytes());</span>
         }
       }
-<span class="nc" id="L154">      case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; metrics.incrementAborted();</span>
+<span class="nc" id="L162">      case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; metrics.incrementAborted();</span>
     }
-<span class="nc" id="L156">  }</span>
+<span class="nc" id="L164">  }</span>
 
   /**
    * Samples the target's current RSS and cumulative GC stats into {@link #metrics}. Isolated from
    * the resize decision (constitution &amp;sect;12): a sampling failure is logged and swallowed here,
-   * never allowed to stop an intent-driven resize/abort from being evaluated this tick.
+   * never allowed to stop an intent-driven resize/abort from being evaluated this tick. A no-op
+   * (not a failure) when the target's collector is unsupported &amp;mdash; {@link TargetHeapControllerResolver#resolve}
+   * already logged and recorded that once.
    *
    * @return the sampled RSS, if sampling succeeded &amp;mdash; reused as the &quot;before&quot; baseline for a
    *     shrink's bytes-reclaimed counter, so a shrink never triggers a second RSS read for it.
    */
   private OptionalLong sampleMetrics(AttachedJvm jvm) {
     try {
-<span class="nc" id="L168">      long rss = heapControllerFor(jvm).currentRss();</span>
-<span class="nc" id="L169">      metrics.setRss(rss);</span>
+<span class="nc" id="L178">      Optional&lt;HeapController&gt; heap = heapResolver.resolve(jvm);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">      if (heap.isEmpty()) {</span>
+<span class="nc" id="L180">        return OptionalLong.empty();</span>
+      }
+<span class="nc" id="L182">      long rss = heap.get().currentRss();</span>
+<span class="nc" id="L183">      metrics.setRss(rss);</span>
 
-<span class="nc" id="L171">      List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
-<span class="nc" id="L172">          ManagementFactory.getPlatformMXBeans(jvm.mbeanConnection(), GarbageCollectorMXBean.class);</span>
-<span class="nc bnc" id="L173" title="All 2 branches missed.">      for (GarbageCollectorMXBean bean : gcBeans) {</span>
-<span class="nc" id="L174">        long count = bean.getCollectionCount();</span>
-<span class="nc" id="L175">        long time = bean.getCollectionTime();</span>
-<span class="nc bnc" id="L176" title="All 4 branches missed.">        if (count &gt;= 0 &amp;&amp; time &gt;= 0) {</span>
-<span class="nc" id="L177">          metrics.setGcStats(bean.getName(), count, time);</span>
+<span class="nc" id="L185">      List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
+<span class="nc" id="L186">          ManagementFactory.getPlatformMXBeans(jvm.mbeanConnection(), GarbageCollectorMXBean.class);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">      for (GarbageCollectorMXBean bean : gcBeans) {</span>
+<span class="nc" id="L188">        long count = bean.getCollectionCount();</span>
+<span class="nc" id="L189">        long time = bean.getCollectionTime();</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (count &gt;= 0 &amp;&amp; time &gt;= 0) {</span>
+<span class="nc" id="L191">          metrics.setGcStats(bean.getName(), count, time);</span>
         }
-<span class="nc" id="L179">      }</span>
-<span class="nc" id="L180">      return OptionalLong.of(rss);</span>
-<span class="nc" id="L181">    } catch (Exception e) {</span>
-<span class="nc" id="L182">      AgentLog.info(&quot;metrics sampling failed, continuing: &quot; + e.getMessage());</span>
-<span class="nc" id="L183">      return OptionalLong.empty();</span>
+<span class="nc" id="L193">      }</span>
+<span class="nc" id="L194">      return OptionalLong.of(rss);</span>
+<span class="nc" id="L195">    } catch (Exception e) {</span>
+<span class="nc" id="L196">      AgentLog.info(&quot;metrics sampling failed, continuing: &quot; + e.getMessage());</span>
+<span class="nc" id="L197">      return OptionalLong.empty();</span>
     }
-  }
-
-  /**
-   * A {@link HeapController} construction resolves the target's cgroup directory via a
-   * bounded-depth filesystem walk ({@code RssReader.resolveCgroupRoot}) &amp;mdash; expensive enough
-   * that redoing it every poll tick just to sample a gauge would violate the agent's own
-   * lean-footprint principle (constitution &amp;sect;4). Cached per attached target identity and
-   * rebuilt only when {@link AttachSupervisor} hands back a new {@link AttachedJvm} (a reattach).
-   */
-  private HeapController heapControllerFor(AttachedJvm target) throws IOException {
-<span class="nc bnc" id="L195" title="All 4 branches missed.">    if (cachedHeap == null || cachedTargetJvm != target) {</span>
-<span class="nc" id="L196">      cachedHeap = AttachedHeapController.forTarget(target);</span>
-<span class="nc" id="L197">      cachedTargetJvm = target;</span>
-    }
-<span class="nc" id="L199">    return cachedHeap;</span>
   }
 
   private void sleep() {
     try {
-<span class="nc" id="L204">      Thread.sleep(config.intentPollInterval().toMillis());</span>
-<span class="nc" id="L205">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L206">      Thread.currentThread().interrupt();</span>
-<span class="nc" id="L207">    }</span>
-<span class="nc" id="L208">  }</span>
+<span class="nc" id="L203">      Thread.sleep(config.intentPollInterval().toMillis());</span>
+<span class="nc" id="L204">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L205">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L206">    }</span>
+<span class="nc" id="L207">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

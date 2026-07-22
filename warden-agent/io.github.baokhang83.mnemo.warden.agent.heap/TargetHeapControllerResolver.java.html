@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TargetHeapControllerResolver.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.heap</a> &gt; <span class="el_source">TargetHeapControllerResolver.java</span></div><h1>TargetHeapControllerResolver.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.heap;
+
+import io.github.baokhang83.mnemo.warden.agent.AgentLog;
+import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+
+/**
+ * Resolves an attached target's {@link HeapController} once per attach and caches the verdict
+ * &amp;mdash; including a permanently-unsupported collector &amp;mdash; keyed on {@link AttachedJvm}
+ * reference identity.
+ *
+ * &lt;p&gt;Construction resolves the target's cgroup directory via a bounded-depth filesystem walk
+ * ({@code RssReader.resolveCgroupRoot}) &amp;mdash; expensive enough that redoing it every poll tick
+ * just to sample a gauge would violate the agent's lean-footprint principle (constitution
+ * &amp;sect;4). An unsupported collector ({@link UnsupportedCollectorException} on construction) is a
+ * permanent fact about the attach, not a transient failure, so it is resolved and logged exactly
+ * once here &amp;mdash; not re-attempted and re-logged on every tick &amp;mdash; and recorded on {@link
+ * AgentMetrics} so it's visible on {@code /metrics} (W-603).
+ *
+ * &lt;p&gt;Lives in this package (rather than alongside its one caller, {@code IntentWatcher}) so it
+ * can reach {@link AttachedHeapController}'s package-private {@code forTarget(AttachedJvm, Path)}
+ * seam &amp;mdash; the same one {@code AttachedHeapControllerTest} uses to point cgroup resolution at
+ * a real {@code /sys/fs/cgroup} on CI, which runs the target directly on the runner rather than in
+ * a pod with the {@code hostPath} mount.
+ */
+public final class TargetHeapControllerResolver {
+
+  private final AgentMetrics metrics;
+
+  private AttachedJvm cachedTargetJvm;
+<span class="fc" id="L34">  private Optional&lt;HeapController&gt; cachedHeap = Optional.empty();</span>
+
+<span class="fc" id="L36">  public TargetHeapControllerResolver(AgentMetrics metrics) {</span>
+<span class="fc" id="L37">    this.metrics = metrics;</span>
+<span class="fc" id="L38">  }</span>
+
+  /**
+   * @return the target's {@link HeapController}, or empty if its collector doesn't support Warden
+   *     at all
+   */
+  public Optional&lt;HeapController&gt; resolve(AttachedJvm target) throws IOException {
+<span class="nc" id="L45">    return resolve(target, Path.of(RssReader.HOST_CGROUP_ROOT));</span>
+  }
+
+  /**
+   * Package-private seam so tests (and CI) can point cgroup resolution at a real {@code
+   * /sys/fs/cgroup} instead of the deployment-only {@link RssReader#HOST_CGROUP_ROOT} &amp;mdash;
+   * mirrors exactly how {@code AttachedHeapControllerTest} exercises {@link
+   * AttachedHeapController} itself.
+   */
+  Optional&lt;HeapController&gt; resolve(AttachedJvm target, Path hostCgroupRoot) throws IOException {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">    if (cachedTargetJvm != target) {</span>
+<span class="fc" id="L56">      cachedTargetJvm = target;</span>
+      try {
+<span class="fc" id="L58">        HeapController heap = AttachedHeapController.forTarget(target, hostCgroupRoot);</span>
+<span class="fc" id="L59">        cachedHeap = Optional.of(heap);</span>
+<span class="fc" id="L60">        metrics.setGcSupported(heap.capabilities().collector().toString(), true);</span>
+<span class="fc" id="L61">      } catch (UnsupportedCollectorException e) {</span>
+<span class="fc" id="L62">        cachedHeap = Optional.empty();</span>
+<span class="fc" id="L63">        metrics.setGcSupported(e.actual().toString(), false);</span>
+<span class="fc" id="L64">        AgentLog.info(</span>
+<span class="fc" id="L65">            &quot;target's collector (&quot; + e.actual() + &quot;) does not support Warden resize operations;&quot;</span>
+                + &quot; agent is read-only for this target&quot;);
+<span class="fc" id="L67">      }</span>
+    }
+<span class="fc" id="L69">    return cachedHeap;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
