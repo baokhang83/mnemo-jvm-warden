@@ -2,6 +2,7 @@
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -14,59 +15,66 @@ import java.nio.charset.StandardCharsets;
  *   &lt;li&gt;{@code /healthz} always answers {@code 200} &amp;mdash; liveness: the process is up.
  *   &lt;li&gt;{@code /readyz} answers {@code 200} when {@link HealthState#ready()} and {@code 503}
  *       otherwise.
+ *   &lt;li&gt;{@code /metrics} answers {@code 200} with {@link AgentMetrics#render()}'s Prometheus text
+ *       exposition (W-602) &amp;mdash; one listener, not a second port, for the same reason there's
+ *       only ever been one for the probes (constitution &amp;sect;4).
  * &lt;/ul&gt;
  */
 public final class HealthServer {
 
   private final int requestedPort;
   private final HealthState health;
+  private final AgentMetrics metrics;
   private HttpServer server;
 
   /**
    * @param port TCP port to bind, or {@code 0} to let the OS pick an ephemeral one (tests)
    * @param health readiness source for {@code /readyz}
+   * @param metrics source for {@code /metrics}
    */
-<span class="fc" id="L29">  public HealthServer(int port, HealthState health) {</span>
-<span class="fc" id="L30">    this.requestedPort = port;</span>
-<span class="fc" id="L31">    this.health = health;</span>
-<span class="fc" id="L32">  }</span>
+<span class="fc" id="L35">  public HealthServer(int port, HealthState health, AgentMetrics metrics) {</span>
+<span class="fc" id="L36">    this.requestedPort = port;</span>
+<span class="fc" id="L37">    this.health = health;</span>
+<span class="fc" id="L38">    this.metrics = metrics;</span>
+<span class="fc" id="L39">  }</span>
 
   /** Binds the port and starts serving. */
   public void start() throws IOException {
-<span class="fc" id="L36">    HttpServer s = HttpServer.create(new InetSocketAddress(requestedPort), 0);</span>
-<span class="fc" id="L37">    s.createContext(&quot;/healthz&quot;, exchange -&gt; respond(exchange, 200, &quot;OK&quot;));</span>
-<span class="fc" id="L38">    s.createContext(</span>
+<span class="fc" id="L43">    HttpServer s = HttpServer.create(new InetSocketAddress(requestedPort), 0);</span>
+<span class="fc" id="L44">    s.createContext(&quot;/healthz&quot;, exchange -&gt; respond(exchange, 200, &quot;OK&quot;));</span>
+<span class="fc" id="L45">    s.createContext(</span>
         &quot;/readyz&quot;,
         exchange -&gt; {
-<span class="fc" id="L41">          boolean ready = health.ready();</span>
-<span class="fc bfc" id="L42" title="All 4 branches covered.">          respond(exchange, ready ? 200 : 503, ready ? &quot;READY&quot; : &quot;NOT READY&quot;);</span>
-<span class="fc" id="L43">        });</span>
-<span class="fc" id="L44">    s.setExecutor(null); // default executor: adequate for low-rate probe traffic</span>
-<span class="fc" id="L45">    s.start();</span>
-<span class="fc" id="L46">    this.server = s;</span>
-<span class="fc" id="L47">    AgentLog.info(&quot;health server listening on :&quot; + boundPort() + &quot; (/healthz, /readyz)&quot;);</span>
-<span class="fc" id="L48">  }</span>
+<span class="fc" id="L48">          boolean ready = health.ready();</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">          respond(exchange, ready ? 200 : 503, ready ? &quot;READY&quot; : &quot;NOT READY&quot;);</span>
+<span class="fc" id="L50">        });</span>
+<span class="fc" id="L51">    s.createContext(&quot;/metrics&quot;, exchange -&gt; respond(exchange, 200, metrics.render()));</span>
+<span class="fc" id="L52">    s.setExecutor(null); // default executor: adequate for low-rate probe traffic</span>
+<span class="fc" id="L53">    s.start();</span>
+<span class="fc" id="L54">    this.server = s;</span>
+<span class="fc" id="L55">    AgentLog.info(&quot;health server listening on :&quot; + boundPort() + &quot; (/healthz, /readyz, /metrics)&quot;);</span>
+<span class="fc" id="L56">  }</span>
 
   /** The actually bound port &amp;mdash; resolves an ephemeral {@code 0} to the real port. */
   public int boundPort() {
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">    return server == null ? requestedPort : server.getAddress().getPort();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">    return server == null ? requestedPort : server.getAddress().getPort();</span>
   }
 
   /** Stops serving immediately. Safe to call if never started. */
   public void stop() {
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">    if (server != null) {</span>
-<span class="fc" id="L58">      server.stop(0);</span>
-<span class="fc" id="L59">      AgentLog.info(&quot;health server stopped&quot;);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">    if (server != null) {</span>
+<span class="fc" id="L66">      server.stop(0);</span>
+<span class="fc" id="L67">      AgentLog.info(&quot;health server stopped&quot;);</span>
     }
-<span class="fc" id="L61">  }</span>
+<span class="fc" id="L69">  }</span>
 
   private static void respond(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L64">    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L65">    exchange.getResponseHeaders().add(&quot;Content-Type&quot;, &quot;text/plain; charset=utf-8&quot;);</span>
-<span class="fc" id="L66">    exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L67">    try (OutputStream os = exchange.getResponseBody()) {</span>
-<span class="fc" id="L68">      os.write(bytes);</span>
+<span class="fc" id="L72">    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L73">    exchange.getResponseHeaders().add(&quot;Content-Type&quot;, &quot;text/plain; charset=utf-8&quot;);</span>
+<span class="fc" id="L74">    exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L75">    try (OutputStream os = exchange.getResponseBody()) {</span>
+<span class="fc" id="L76">      os.write(bytes);</span>
     }
-<span class="fc" id="L70">  }</span>
+<span class="fc" id="L78">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AgentMetrics.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.metrics</a> &gt; <span class="el_source">AgentMetrics.java</span></div><h1>AgentMetrics.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.metrics;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
+
+/**
+ * What Warden did, in Prometheus text exposition format &amp;mdash; resizes, aborts, bytes reclaimed,
+ * the target's current RSS, and the target's cumulative GC pause time (W-602).
+ *
+ * &lt;p&gt;Deliberately not a generic metrics-registry library: {@code warden-agent} has zero runtime
+ * dependencies by design (see its {@code pom.xml}), and this covers exactly the fixed, known set
+ * of metrics the ticket names, not an arbitrary future one (constitution &amp;sect;1). The per-collector
+ * GC fields are the one dynamic part &amp;mdash; the target's collector bean names (e.g. {@code &quot;G1
+ * Young Generation&quot;}) aren't known until a target is attached.
+ *
+ * &lt;p&gt;Thread-safe: {@link #render()} runs on the health server's HTTP handler thread while {@code
+ * IntentWatcher}'s poll thread concurrently updates counters and gauges.
+ */
+<span class="fc" id="L21">public final class AgentMetrics {</span>
+
+<span class="fc" id="L23">  private final LongAdder growResizes = new LongAdder();</span>
+<span class="fc" id="L24">  private final LongAdder shrinkResizes = new LongAdder();</span>
+<span class="fc" id="L25">  private final LongAdder aborts = new LongAdder();</span>
+<span class="fc" id="L26">  private final LongAdder bytesReclaimed = new LongAdder();</span>
+<span class="fc" id="L27">  private final AtomicLong rssWorkingSetBytes = new AtomicLong();</span>
+<span class="fc" id="L28">  private final Map&lt;String, GcStats&gt; gcStatsByCollector = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L30">  private record GcStats(long collectionCount, long collectionTimeMillis) {}</span>
+
+  /** Records a completed resize. {@code direction} is {@code &quot;grow&quot;} or {@code &quot;shrink&quot;}. */
+  public void incrementResize(String direction) {
+<span class="fc bfc" id="L34" title="All 3 branches covered.">    switch (direction) {</span>
+<span class="fc" id="L35">      case &quot;grow&quot; -&gt; growResizes.increment();</span>
+<span class="fc" id="L36">      case &quot;shrink&quot; -&gt; shrinkResizes.increment();</span>
+<span class="fc" id="L37">      default -&gt; throw new IllegalArgumentException(&quot;unknown resize direction: &quot; + direction);</span>
+    }
+<span class="fc" id="L39">  }</span>
+
+  /** Records a shrink aborted by the RSS verification gate. */
+  public void incrementAborted() {
+<span class="fc" id="L43">    aborts.increment();</span>
+<span class="fc" id="L44">  }</span>
+
+  /** Adds to the cumulative bytes-reclaimed counter. Negative/zero deltas are dropped: a counter never goes down. */
+  public void addBytesReclaimed(long bytes) {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    if (bytes &gt; 0) {</span>
+<span class="fc" id="L49">      bytesReclaimed.add(bytes);</span>
+    }
+<span class="fc" id="L51">  }</span>
+
+  /** Sets the target's last observed working-set RSS, in bytes. */
+  public void setRss(long workingSetBytes) {
+<span class="fc" id="L55">    rssWorkingSetBytes.set(workingSetBytes);</span>
+<span class="fc" id="L56">  }</span>
+
+  /** Sets the target's cumulative GC stats for one collector bean (e.g. {@code &quot;G1 Young Generation&quot;}). */
+  public void setGcStats(String collectorName, long collectionCount, long collectionTimeMillis) {
+<span class="fc" id="L60">    gcStatsByCollector.put(collectorName, new GcStats(collectionCount, collectionTimeMillis));</span>
+<span class="fc" id="L61">  }</span>
+
+  /** Renders the current state in Prometheus text exposition format (version 0.0.4). */
+  public String render() {
+<span class="fc" id="L65">    StringBuilder out = new StringBuilder();</span>
+
+<span class="fc" id="L67">    out.append(&quot;# HELP warden_resizes_total Resizes completed, by direction.\n&quot;);</span>
+<span class="fc" id="L68">    out.append(&quot;# TYPE warden_resizes_total counter\n&quot;);</span>
+<span class="fc" id="L69">    out.append(&quot;warden_resizes_total{direction=\&quot;grow\&quot;} &quot;).append(growResizes.sum()).append('\n');</span>
+<span class="fc" id="L70">    out.append(&quot;warden_resizes_total{direction=\&quot;shrink\&quot;} &quot;).append(shrinkResizes.sum()).append('\n');</span>
+
+<span class="fc" id="L72">    out.append(&quot;# HELP warden_aborts_total Shrinks aborted by the RSS verification gate.\n&quot;);</span>
+<span class="fc" id="L73">    out.append(&quot;# TYPE warden_aborts_total counter\n&quot;);</span>
+<span class="fc" id="L74">    out.append(&quot;warden_aborts_total &quot;).append(aborts.sum()).append('\n');</span>
+
+<span class="fc" id="L76">    out.append(&quot;# HELP warden_bytes_reclaimed_total Cumulative bytes reclaimed by completed shrinks.\n&quot;);</span>
+<span class="fc" id="L77">    out.append(&quot;# TYPE warden_bytes_reclaimed_total counter\n&quot;);</span>
+<span class="fc" id="L78">    out.append(&quot;warden_bytes_reclaimed_total &quot;).append(bytesReclaimed.sum()).append('\n');</span>
+
+<span class="fc" id="L80">    out.append(&quot;# HELP warden_target_rss_working_set_bytes Target's last observed working-set RSS.\n&quot;);</span>
+<span class="fc" id="L81">    out.append(&quot;# TYPE warden_target_rss_working_set_bytes gauge\n&quot;);</span>
+<span class="fc" id="L82">    out.append(&quot;warden_target_rss_working_set_bytes &quot;).append(rssWorkingSetBytes.get()).append('\n');</span>
+
+<span class="fc" id="L84">    out.append(&quot;# HELP warden_target_gc_collections_total Target's cumulative GC collection count, by collector bean.\n&quot;);</span>
+<span class="fc" id="L85">    out.append(&quot;# TYPE warden_target_gc_collections_total counter\n&quot;);</span>
+<span class="fc" id="L86">    gcStatsByCollector.forEach(</span>
+        (collector, stats) -&gt;
+<span class="fc" id="L88">            out.append(&quot;warden_target_gc_collections_total{collector=\&quot;&quot;)</span>
+<span class="fc" id="L89">                .append(escape(collector))</span>
+<span class="fc" id="L90">                .append(&quot;\&quot;} &quot;)</span>
+<span class="fc" id="L91">                .append(stats.collectionCount())</span>
+<span class="fc" id="L92">                .append('\n'));</span>
+
+<span class="fc" id="L94">    out.append(</span>
+        &quot;# HELP warden_target_gc_collection_time_seconds_total Target's cumulative GC collection time, by collector bean.\n&quot;);
+<span class="fc" id="L96">    out.append(&quot;# TYPE warden_target_gc_collection_time_seconds_total counter\n&quot;);</span>
+<span class="fc" id="L97">    gcStatsByCollector.forEach(</span>
+        (collector, stats) -&gt;
+<span class="fc" id="L99">            out.append(&quot;warden_target_gc_collection_time_seconds_total{collector=\&quot;&quot;)</span>
+<span class="fc" id="L100">                .append(escape(collector))</span>
+<span class="fc" id="L101">                .append(&quot;\&quot;} &quot;)</span>
+<span class="fc" id="L102">                .append(stats.collectionTimeMillis() / 1000.0)</span>
+<span class="fc" id="L103">                .append('\n'));</span>
+
+<span class="fc" id="L105">    return out.toString();</span>
+  }
+
+  private static String escape(String label) {
+<span class="fc" id="L109">    return label.replace(&quot;\\&quot;, &quot;\\\\&quot;).replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

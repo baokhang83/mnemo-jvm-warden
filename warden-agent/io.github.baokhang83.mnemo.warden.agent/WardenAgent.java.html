@@ -3,6 +3,7 @@
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
 import io.github.baokhang83.mnemo.warden.agent.intent.IntentWatcher;
 import io.github.baokhang83.mnemo.warden.agent.intent.PodIntentReader;
+import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -18,35 +19,36 @@ public final class WardenAgent {
   private WardenAgent() {}
 
   public static void main(String[] args) throws Exception {
-<span class="nc" id="L21">    AgentConfig config = AgentConfig.fromEnv();</span>
-<span class="nc" id="L22">    AgentLog.info(&quot;starting (health port &quot; + config.healthPort() + &quot;, pod &quot; + config.podName() + &quot;)&quot;);</span>
+<span class="nc" id="L22">    AgentConfig config = AgentConfig.fromEnv();</span>
+<span class="nc" id="L23">    AgentLog.info(&quot;starting (health port &quot; + config.healthPort() + &quot;, pod &quot; + config.podName() + &quot;)&quot;);</span>
 
-<span class="nc" id="L24">    HealthState health = new HealthState();</span>
-<span class="nc" id="L25">    HealthServer server = new HealthServer(config.healthPort(), health);</span>
-<span class="nc" id="L26">    server.start();</span>
+<span class="nc" id="L25">    HealthState health = new HealthState();</span>
+<span class="nc" id="L26">    AgentMetrics metrics = new AgentMetrics();</span>
+<span class="nc" id="L27">    HealthServer server = new HealthServer(config.healthPort(), health, metrics);</span>
+<span class="nc" id="L28">    server.start();</span>
 
-<span class="nc" id="L28">    AttachSupervisor attachSupervisor = new AttachSupervisor(health);</span>
-<span class="nc" id="L29">    attachSupervisor.start();</span>
-<span class="nc" id="L30">    AgentLog.info(&quot;attach supervisor started; waiting for target JVM&quot;);</span>
+<span class="nc" id="L30">    AttachSupervisor attachSupervisor = new AttachSupervisor(health);</span>
+<span class="nc" id="L31">    attachSupervisor.start();</span>
+<span class="nc" id="L32">    AgentLog.info(&quot;attach supervisor started; waiting for target JVM&quot;);</span>
 
-<span class="nc" id="L32">    PodIntentReader intentReader = PodIntentReader.forInClusterAgent(config.podName(), config.targetContainerName());</span>
-<span class="nc" id="L33">    IntentWatcher intentWatcher = new IntentWatcher(config, attachSupervisor, intentReader);</span>
-<span class="nc" id="L34">    intentWatcher.start();</span>
-<span class="nc" id="L35">    AgentLog.info(&quot;intent watcher started; polling own pod every &quot; + config.intentPollInterval());</span>
+<span class="nc" id="L34">    PodIntentReader intentReader = PodIntentReader.forInClusterAgent(config.podName(), config.targetContainerName());</span>
+<span class="nc" id="L35">    IntentWatcher intentWatcher = new IntentWatcher(config, attachSupervisor, intentReader, metrics);</span>
+<span class="nc" id="L36">    intentWatcher.start();</span>
+<span class="nc" id="L37">    AgentLog.info(&quot;intent watcher started; polling own pod every &quot; + config.intentPollInterval());</span>
 
-<span class="nc" id="L37">    Runtime.getRuntime()</span>
-<span class="nc" id="L38">        .addShutdownHook(</span>
+<span class="nc" id="L39">    Runtime.getRuntime()</span>
+<span class="nc" id="L40">        .addShutdownHook(</span>
             new Thread(
                 () -&gt; {
-<span class="nc" id="L41">                  AgentLog.info(&quot;shutting down&quot;);</span>
-<span class="nc" id="L42">                  intentWatcher.stop();</span>
-<span class="nc" id="L43">                  attachSupervisor.stop();</span>
-<span class="nc" id="L44">                  server.stop();</span>
-<span class="nc" id="L45">                },</span>
+<span class="nc" id="L43">                  AgentLog.info(&quot;shutting down&quot;);</span>
+<span class="nc" id="L44">                  intentWatcher.stop();</span>
+<span class="nc" id="L45">                  attachSupervisor.stop();</span>
+<span class="nc" id="L46">                  server.stop();</span>
+<span class="nc" id="L47">                },</span>
                 &quot;warden-shutdown&quot;));
 
     // Park the main thread until the JVM is terminated (SIGTERM runs the hook above).
-<span class="nc" id="L49">    new CountDownLatch(1).await();</span>
-<span class="nc" id="L50">  }</span>
+<span class="nc" id="L51">    new CountDownLatch(1).await();</span>
+<span class="nc" id="L52">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
