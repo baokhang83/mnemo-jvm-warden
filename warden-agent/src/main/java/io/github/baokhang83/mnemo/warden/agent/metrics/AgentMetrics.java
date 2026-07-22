@@ -7,7 +7,8 @@ import java.util.concurrent.atomic.LongAdder;
 
 /**
  * What Warden did, in Prometheus text exposition format &mdash; resizes, aborts, bytes reclaimed,
- * the target's current RSS, and the target's cumulative GC pause time (W-602).
+ * the target's current RSS, the target's cumulative GC pause time (W-602), and whether the
+ * target's collector is one Warden can resize at all (W-603).
  *
  * <p>Deliberately not a generic metrics-registry library: {@code warden-agent} has zero runtime
  * dependencies by design (see its {@code pom.xml}), and this covers exactly the fixed, known set
@@ -26,8 +27,11 @@ public final class AgentMetrics {
   private final LongAdder bytesReclaimed = new LongAdder();
   private final AtomicLong rssWorkingSetBytes = new AtomicLong();
   private final Map<String, GcStats> gcStatsByCollector = new ConcurrentHashMap<>();
+  private volatile GcSupportState gcSupportState;
 
   private record GcStats(long collectionCount, long collectionTimeMillis) {}
+
+  private record GcSupportState(String collector, boolean supported) {}
 
   /** Records a completed resize. {@code direction} is {@code "grow"} or {@code "shrink"}. */
   public void incrementResize(String direction) {
@@ -58,6 +62,14 @@ public final class AgentMetrics {
   /** Sets the target's cumulative GC stats for one collector bean (e.g. {@code "G1 Young Generation"}). */
   public void setGcStats(String collectorName, long collectionCount, long collectionTimeMillis) {
     gcStatsByCollector.put(collectorName, new GcStats(collectionCount, collectionTimeMillis));
+  }
+
+  /**
+   * Sets whether Warden can resize the currently attached target's collector (W-603) &mdash; {@code
+   * false} means the agent is read-only for it (e.g. Serial/Parallel/Epsilon, which can't uncommit).
+   */
+  public void setGcSupported(String collector, boolean supported) {
+    gcSupportState = new GcSupportState(collector, supported);
   }
 
   /** Renders the current state in Prometheus text exposition format (version 0.0.4). */
@@ -101,6 +113,18 @@ public final class AgentMetrics {
                 .append("\"} ")
                 .append(stats.collectionTimeMillis() / 1000.0)
                 .append('\n'));
+
+    GcSupportState supportState = gcSupportState;
+    if (supportState != null) {
+      out.append(
+          "# HELP warden_gc_supported Whether Warden can resize the attached target's collector (1) or is read-only for it (0).\n");
+      out.append("# TYPE warden_gc_supported gauge\n");
+      out.append("warden_gc_supported{collector=\"")
+          .append(escape(supportState.collector()))
+          .append("\"} ")
+          .append(supportState.supported() ? 1 : 0)
+          .append('\n');
+    }
 
     return out.toString();
   }

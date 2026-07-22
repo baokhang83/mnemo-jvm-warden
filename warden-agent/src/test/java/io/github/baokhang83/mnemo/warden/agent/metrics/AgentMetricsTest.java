@@ -107,4 +107,41 @@ class AgentMetricsTest {
 
     assertTrue(metrics.render().contains("collector=\"weird \\\"quoted\\\" \\\\ name\""));
   }
+
+  @Test
+  void gcSupportedGaugeIsAbsentBeforeAnyTargetIsResolved() {
+    AgentMetrics metrics = new AgentMetrics();
+
+    assertTrue(!metrics.render().contains("warden_gc_supported"));
+  }
+
+  @Test
+  void gcSupportedGaugeRendersOneWhenSupported() {
+    AgentMetrics metrics = new AgentMetrics();
+
+    metrics.setGcSupported("ZGC", true);
+
+    assertTrue(metrics.render().contains("warden_gc_supported{collector=\"ZGC\"} 1"));
+  }
+
+  @Test
+  void gcSupportedGaugeRendersZeroWhenNotSupported() {
+    AgentMetrics metrics = new AgentMetrics();
+
+    metrics.setGcSupported("OTHER", false);
+
+    assertTrue(metrics.render().contains("warden_gc_supported{collector=\"OTHER\"} 0"));
+  }
+
+  @Test
+  void gcSupportedGaugeReflectsLastSetValue() {
+    AgentMetrics metrics = new AgentMetrics();
+
+    metrics.setGcSupported("OTHER", false);
+    metrics.setGcSupported("ZGC", true);
+
+    String rendered = metrics.render();
+    assertTrue(rendered.contains("warden_gc_supported{collector=\"ZGC\"} 1"));
+    assertEquals(1, rendered.lines().filter(l -> l.startsWith("warden_gc_supported{")).count());
+  }
 }
