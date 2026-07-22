@@ -73,9 +73,17 @@ Delete this comment and the examples below once real content lands.
 
 ## Decision: extract TargetHeapControllerResolver out of IntentWatcher for testability
 
-- **where:** `warden-agent/src/main/java/io/github/baokhang83/mnemo/warden/agent/intent/TargetHeapControllerResolver.java`
+- **where:** `warden-agent/src/main/java/io/github/baokhang83/mnemo/warden/agent/heap/TargetHeapControllerResolver.java`
 - **why:** IntentWatcher itself has no testable seam (AttachSupervisor's known-target constructor is package-private to a different package, PodResizeClient.forInClusterAgent() is a static in-cluster call) so the resolve-once/gate-unsupported logic was untestable in place; pulling it into its own class lets a real-JVM test (SpawnedJvm/TargetAttacher) exercise it directly, the same style as the existing AttachedHeapControllerTest one layer down
 - **alternative:** leave the logic inline in IntentWatcher and only cover it via AgentMetricsTest's gauge assertions — rejected: would leave the actual resolve-once/cache/one-log behavior completely unverified, only its side effect on the metrics object
 - **design:** ../design.md#class-diagram
 - **constitution:** §3
+- **trust:** ⚠ not independently verified
+
+## Decision: put TargetHeapControllerResolver in the heap package, not intent
+
+- **where:** `warden-agent/src/main/java/io/github/baokhang83/mnemo/warden/agent/heap/TargetHeapControllerResolver.java`
+- **why:** the initial placement in the intent package could only call AttachedHeapController's public single-arg forTarget(), which always resolves cgroups via the deployment-only HOST_CGROUP_ROOT; CI runs the target directly on the runner (no hostPath mount), so that path threw CgroupNotFoundException in TargetHeapControllerResolverTest. Moving the class into heap lets it reach forTarget's package-private (target, Path) overload, the exact seam AttachedHeapControllerTest already uses to point at a real /sys/fs/cgroup on CI
+- **alternative:** widen AttachedHeapController.forTarget(target, Path) to public so intent-package code (and any external caller) could override the cgroup root — rejected: leaks a deployment-internal detail into the public API for every caller, not just the one test that needs it
+- **design:** ../design.md#class-diagram
 - **trust:** ⚠ not independently verified
