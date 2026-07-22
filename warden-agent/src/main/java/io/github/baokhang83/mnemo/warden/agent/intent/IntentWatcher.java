@@ -91,10 +91,10 @@ public final class IntentWatcher {
 
     HeapController heap = AttachedHeapController.forTarget(target.get());
     ResizePort resizeClient = PodResizeClient.forInClusterAgent();
+    Map<String, CacheHook> cacheHooks = CacheHookLookup.lookupAll(target.get());
     long requestBytes = intent.get().requestBytes();
 
     if (desiredLimit < currentLimit) {
-      Map<String, CacheHook> cacheHooks = CacheHookLookup.lookupAll(target.get());
       ShrinkSequence sequence =
           new ShrinkSequence(
               heap,
@@ -108,7 +108,8 @@ public final class IntentWatcher {
       AgentLog.info("intent-driven shrink: " + outcome);
     } else {
       GrowSequence sequence =
-          new GrowSequence(heap, resizeClient, config.podName(), config.targetContainerName(), config.resizeTimeout());
+          new GrowSequence(
+              heap, resizeClient, cacheHooks, config.podName(), config.targetContainerName(), config.resizeTimeout());
       var outcome = sequence.growTo(requestBytes, desiredLimit);
       AgentLog.info("intent-driven grow: " + outcome);
     }
