@@ -3,13 +3,16 @@ package io.github.baokhang83.mnemo.warden.agent.harness;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import io.github.baokhang83.mnemo.warden.agent.attach.TargetAttacher;
 import io.github.baokhang83.mnemo.warden.agent.attach.TargetLocator;
+import io.github.baokhang83.mnemo.warden.agent.cache.CacheHookLookup;
 import io.github.baokhang83.mnemo.warden.agent.heap.AttachedHeapController;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
 import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkOutcome;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -75,8 +78,9 @@ public final class ShrinkTrialDriver {
     try (AttachedJvm target = TargetAttacher.attach(targetPid.get())) {
       HeapController heap = AttachedHeapController.forTarget(target);
       ResizePort resizeClient = PodResizeClient.forInClusterAgent();
+      Map<String, CacheHook> cacheHooks = CacheHookLookup.lookupAll(target);
       ShrinkSequence sequence =
-          new ShrinkSequence(heap, resizeClient, podName, containerName, gcTimeout, resizeTimeout);
+          new ShrinkSequence(heap, resizeClient, cacheHooks, podName, containerName, gcTimeout, resizeTimeout);
 
       ShrinkOutcome outcome = sequence.shrinkTo(requestBytes, limitBytes);
       switch (outcome) {

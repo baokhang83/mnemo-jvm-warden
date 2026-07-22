@@ -1,8 +1,8 @@
 {
-  "feature": "w-501-cachehook-spi-app-owner-cache-coordination-during-resi",
-  "branch": "feature/w-501-cachehook-spi-app-owner-cache-coordination-during-resi",
+  "feature": "w-502-flush-evictable-only-on-shrink-shrinksequence-calls-ca",
+  "branch": "feature/w-502-flush-evictable-only-on-shrink-shrinksequence-calls-ca",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-501-cachehook-spi-app-owner-cache-coordination-during-resi/sessions/build-the-cachehook-spi-warden-cache-api-module-cachehookloo.md",
+  "last_session": "docs/fluencyloop/features/w-502-flush-evictable-only-on-shrink-shrinksequence-calls-ca/sessions/wire-cachehook-flushevictable-into-shrinksequence.md",
   "base_ref": "main",
   "updated": "2026-07-22"
 }

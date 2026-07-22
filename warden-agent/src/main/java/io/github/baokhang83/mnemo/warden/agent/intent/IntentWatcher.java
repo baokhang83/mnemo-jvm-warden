@@ -4,12 +4,15 @@ import io.github.baokhang83.mnemo.warden.agent.AgentConfig;
 import io.github.baokhang83.mnemo.warden.agent.AgentLog;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
+import io.github.baokhang83.mnemo.warden.agent.cache.CacheHookLookup;
 import io.github.baokhang83.mnemo.warden.agent.heap.AttachedHeapController;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
 import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
 import io.github.baokhang83.mnemo.warden.agent.sequence.GrowSequence;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 
@@ -91,9 +94,16 @@ public final class IntentWatcher {
     long requestBytes = intent.get().requestBytes();
 
     if (desiredLimit < currentLimit) {
+      Map<String, CacheHook> cacheHooks = CacheHookLookup.lookupAll(target.get());
       ShrinkSequence sequence =
           new ShrinkSequence(
-              heap, resizeClient, config.podName(), config.targetContainerName(), config.gcTimeout(), config.resizeTimeout());
+              heap,
+              resizeClient,
+              cacheHooks,
+              config.podName(),
+              config.targetContainerName(),
+              config.gcTimeout(),
+              config.resizeTimeout());
       var outcome = sequence.shrinkTo(requestBytes, desiredLimit);
       AgentLog.info("intent-driven shrink: " + outcome);
     } else {
