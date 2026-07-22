@@ -19,6 +19,7 @@
   -->
   <modules>
     <module>warden-crd-model</module>
+    <module>warden-cache-api</module>
     <module>warden-controller</module>
     <module>warden-agent</module>
     <module>examples</module>

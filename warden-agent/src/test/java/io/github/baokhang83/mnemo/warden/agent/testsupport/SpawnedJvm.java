@@ -85,6 +85,15 @@ public final class SpawnedJvm implements Closeable {
         jvmArgs);
   }
 
+  /**
+   * Spawns a JVM running the given single-file source, exactly as authored (with {@code %s} as
+   * the class-name placeholder {@code spawn} fills in) &mdash; for fixtures {@link #sleeper} and
+   * {@link #garbageChurner} don't cover, e.g. a target that registers its own MBean.
+   */
+  public static SpawnedJvm withSource(String sourceTemplate, String... jvmArgs) throws IOException {
+    return spawn(sourceTemplate, jvmArgs);
+  }
+
   private static SpawnedJvm spawn(String sourceTemplate, String... jvmArgs) throws IOException {
     Path source = Files.createTempFile("SpawnedJvmTarget", ".java");
     Files.writeString(
