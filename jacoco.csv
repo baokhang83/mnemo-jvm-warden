@@ -39,13 +39,13 @@ coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,ShrinkOut
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,ShrinkOutcome.AbortedVerificationFailed,0,9,0,0,0,1,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,ShrinkSequence,0,92,0,4,0,24,0,5,0,3
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,GrowOutcome,0,6,0,0,0,1,0,1,0,1
-coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,GrowSequence,0,38,0,0,0,10,0,2,0,2
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,GrowSequence,0,70,0,2,0,19,0,4,0,3
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,HealthState,0,23,0,0,0,7,0,4,0,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,HealthServer,3,103,2,6,0,26,2,9,0,7
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,WardenAgent,75,0,0,0,21,0,2,0,2,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentLog,0,7,0,0,0,2,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentConfig,3,141,4,12,1,30,5,10,1,6
-coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,IntentWatcher,189,0,12,0,59,0,12,0,6,0
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,IntentWatcher,190,0,12,0,59,0,12,0,6,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,PodState,9,0,0,0,1,0,1,0,1,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,Intent,0,9,0,0,0,1,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,PodIntentReader,103,109,9,15,26,26,13,6,5,2

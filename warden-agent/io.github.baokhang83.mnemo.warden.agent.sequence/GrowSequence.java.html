@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GrowSequence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.sequence</a> &gt; <span class="el_source">GrowSequence.java</span></div><h1>GrowSequence.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.sequence;
 
+import io.github.baokhang83.mnemo.warden.agent.AgentLog;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Map;
 
 /**
- * The mirror image of {@link ShrinkSequence}'s handshake: cgroup up &amp;rarr; raise SoftMax
- * (constitution &amp;sect;5: &quot;grow &amp;rarr; resize &amp;rarr; raise&quot;). Depends only on the {@link
- * HeapController} and {@link ResizePort} ports, never a concrete GC driver or the Kubernetes
- * client (&amp;sect;2), for the same reason {@code ShrinkSequence} does.
+ * The mirror image of {@link ShrinkSequence}'s handshake: cgroup up &amp;rarr; raise SoftMax &amp;rarr;
+ * pre-warm app caches (W-503) (constitution &amp;sect;5: &quot;grow &amp;rarr; resize &amp;rarr; raise&quot;). Depends
+ * only on the {@link HeapController} and {@link ResizePort} ports, never a concrete GC driver or
+ * the Kubernetes client (&amp;sect;2), for the same reason {@code ShrinkSequence} does. {@code
+ * cacheHooks}, like {@code ShrinkSequence}'s, is a plain {@link Map} of app-registered {@link
+ * CacheHook}s, not a port &amp;mdash; nothing platform-specific to abstract away.
  *
  * &lt;p&gt;There is no verification gate here, unlike shrink. Raising {@code SoftMax} after the
  * cgroup limit is already up cannot allocate into space the cgroup hasn't granted, so the
@@ -21,6 +26,7 @@ public final class GrowSequence {
 
   private final HeapController heap;
   private final ResizePort resizeClient;
+  private final Map&lt;String, CacheHook&gt; cacheHooks;
   private final String podName;
   private final String containerName;
   private final Duration resizeTimeout;
@@ -28,25 +34,46 @@ public final class GrowSequence {
   public GrowSequence(
       HeapController heap,
       ResizePort resizeClient,
+      Map&lt;String, CacheHook&gt; cacheHooks,
       String podName,
       String containerName,
-<span class="fc" id="L33">      Duration resizeTimeout) {</span>
-<span class="fc" id="L34">    this.heap = heap;</span>
-<span class="fc" id="L35">    this.resizeClient = resizeClient;</span>
-<span class="fc" id="L36">    this.podName = podName;</span>
-<span class="fc" id="L37">    this.containerName = containerName;</span>
-<span class="fc" id="L38">    this.resizeTimeout = resizeTimeout;</span>
-<span class="fc" id="L39">  }</span>
+<span class="fc" id="L40">      Duration resizeTimeout) {</span>
+<span class="fc" id="L41">    this.heap = heap;</span>
+<span class="fc" id="L42">    this.resizeClient = resizeClient;</span>
+<span class="fc" id="L43">    this.cacheHooks = cacheHooks;</span>
+<span class="fc" id="L44">    this.podName = podName;</span>
+<span class="fc" id="L45">    this.containerName = containerName;</span>
+<span class="fc" id="L46">    this.resizeTimeout = resizeTimeout;</span>
+<span class="fc" id="L47">  }</span>
 
   /**
    * Grows the target to {@code requestBytes}/{@code limitBytes}: resizes the cgroup first, then
-   * raises {@code SoftMax} to match, once the kubelet has confirmed the extra room actually
-   * exists.
+   * raises {@code SoftMax} to match once the kubelet has confirmed the extra room actually
+   * exists, then pre-warms every registered app cache now that both the cgroup and the heap
+   * ceiling already reflect the new size.
    */
   public GrowOutcome growTo(long requestBytes, long limitBytes) throws IOException, InterruptedException {
-<span class="fc" id="L47">    resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);</span>
-<span class="fc" id="L48">    heap.setSoftMax(limitBytes);</span>
-<span class="fc" id="L49">    return new GrowOutcome(limitBytes);</span>
+<span class="fc" id="L56">    resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);</span>
+<span class="fc" id="L57">    heap.setSoftMax(limitBytes);</span>
+<span class="fc" id="L58">    preWarmCaches();</span>
+<span class="fc" id="L59">    return new GrowOutcome(limitBytes);</span>
   }
+
+  /**
+   * Gives every registered app cache a chance to repopulate now that there's room for it on both
+   * axes (cgroup, SoftMax). A single hook's failure is isolated to that hook (constitution §12),
+   * the same isolation {@code ShrinkSequence} applies to {@code flushEvictable()}: an app owner's
+   * cache is untrusted, third-party code from this sequence's point of view, and must not be able
+   * to fail a grow that has already succeeded by throwing.
+   */
+  private void preWarmCaches() {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">    for (Map.Entry&lt;String, CacheHook&gt; entry : cacheHooks.entrySet()) {</span>
+      try {
+<span class="fc" id="L72">        entry.getValue().preWarm();</span>
+<span class="fc" id="L73">      } catch (RuntimeException e) {</span>
+<span class="fc" id="L74">        AgentLog.info(&quot;cache hook '&quot; + entry.getKey() + &quot;' preWarm() failed, continuing: &quot; + e.getMessage());</span>
+<span class="fc" id="L75">      }</span>
+<span class="fc" id="L76">    }</span>
+<span class="fc" id="L77">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

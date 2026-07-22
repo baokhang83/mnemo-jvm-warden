@@ -91,10 +91,10 @@ public final class IntentWatcher {
 
 <span class="nc" id="L92">    HeapController heap = AttachedHeapController.forTarget(target.get());</span>
 <span class="nc" id="L93">    ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
-<span class="nc" id="L94">    long requestBytes = intent.get().requestBytes();</span>
+<span class="nc" id="L94">    Map&lt;String, CacheHook&gt; cacheHooks = CacheHookLookup.lookupAll(target.get());</span>
+<span class="nc" id="L95">    long requestBytes = intent.get().requestBytes();</span>
 
-<span class="nc bnc" id="L96" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
-<span class="nc" id="L97">      Map&lt;String, CacheHook&gt; cacheHooks = CacheHookLookup.lookupAll(target.get());</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
 <span class="nc" id="L98">      ShrinkSequence sequence =</span>
           new ShrinkSequence(
               heap,
@@ -108,18 +108,19 @@ public final class IntentWatcher {
 <span class="nc" id="L108">      AgentLog.info(&quot;intent-driven shrink: &quot; + outcome);</span>
 <span class="nc" id="L109">    } else {</span>
 <span class="nc" id="L110">      GrowSequence sequence =</span>
-<span class="nc" id="L111">          new GrowSequence(heap, resizeClient, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
-<span class="nc" id="L112">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
-<span class="nc" id="L113">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
+          new GrowSequence(
+<span class="nc" id="L112">              heap, resizeClient, cacheHooks, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
+<span class="nc" id="L113">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L114">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
     }
-<span class="nc" id="L115">  }</span>
+<span class="nc" id="L116">  }</span>
 
   private void sleep() {
     try {
-<span class="nc" id="L119">      Thread.sleep(config.intentPollInterval().toMillis());</span>
-<span class="nc" id="L120">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L121">      Thread.currentThread().interrupt();</span>
-<span class="nc" id="L122">    }</span>
-<span class="nc" id="L123">  }</span>
+<span class="nc" id="L120">      Thread.sleep(config.intentPollInterval().toMillis());</span>
+<span class="nc" id="L121">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L122">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L123">    }</span>
+<span class="nc" id="L124">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
