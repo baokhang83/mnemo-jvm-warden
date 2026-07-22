@@ -1,8 +1,8 @@
 {
-  "feature": "w-601-helm-chart-helm-install-deploys-the-controller-gives-o",
-  "branch": "feature/w-601-helm-chart-helm-install-deploys-the-controller-gives-o",
+  "feature": "w-602-agent-self-telemetry-expose-resize-abort-rss-gc-pause",
+  "branch": "feature/w-602-agent-self-telemetry-expose-resize-abort-rss-gc-pause",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-601-helm-chart-helm-install-deploys-the-controller-gives-o/sessions/chart-skeleton-controller-deployment-rbac-values-and-the-war.md",
+  "last_session": "docs/fluencyloop/features/w-602-agent-self-telemetry-expose-resize-abort-rss-gc-pause/sessions/agentmetrics-registry-metrics-endpoint-intentwatcher-wiring.md",
   "base_ref": "main",
   "updated": "2026-07-22"
 }

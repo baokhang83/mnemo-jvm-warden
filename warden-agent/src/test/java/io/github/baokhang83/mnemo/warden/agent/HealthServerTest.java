@@ -1,7 +1,9 @@
 package io.github.baokhang83.mnemo.warden.agent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -13,13 +15,15 @@ import org.junit.jupiter.api.Test;
 class HealthServerTest {
 
   private HealthState health;
+  private AgentMetrics metrics;
   private HealthServer server;
   private HttpClient client;
 
   @BeforeEach
   void startServer() throws Exception {
     health = new HealthState();
-    server = new HealthServer(0, health); // ephemeral port
+    metrics = new AgentMetrics();
+    server = new HealthServer(0, health, metrics); // ephemeral port
     server.start();
     client = HttpClient.newHttpClient();
   }
@@ -29,13 +33,14 @@ class HealthServerTest {
     server.stop();
   }
 
+  private HttpResponse<String> get(String path) throws Exception {
+    return client.send(
+        HttpRequest.newBuilder(URI.create("http://localhost:" + server.boundPort() + path)).build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
   private int statusOf(String path) throws Exception {
-    HttpResponse<String> response =
-        client.send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + server.boundPort() + path))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
-    return response.statusCode();
+    return get(path).statusCode();
   }
 
   @Test
@@ -50,5 +55,15 @@ class HealthServerTest {
     assertEquals(200, statusOf("/readyz"));
     health.markNotReady();
     assertEquals(503, statusOf("/readyz"), "readiness can be withdrawn (e.g. on shutdown)");
+  }
+
+  @Test
+  void metricsServesTheRegistrysCurrentRender() throws Exception {
+    metrics.incrementResize("grow");
+
+    HttpResponse<String> response = get("/metrics");
+
+    assertEquals(200, response.statusCode());
+    assertTrue(response.body().contains("warden_resizes_total{direction=\"grow\"} 1"));
   }
 }

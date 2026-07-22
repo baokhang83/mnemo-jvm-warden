@@ -2,6 +2,7 @@ package io.github.baokhang83.mnemo.warden.agent;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -14,21 +15,27 @@ import java.nio.charset.StandardCharsets;
  *   <li>{@code /healthz} always answers {@code 200} &mdash; liveness: the process is up.
  *   <li>{@code /readyz} answers {@code 200} when {@link HealthState#ready()} and {@code 503}
  *       otherwise.
+ *   <li>{@code /metrics} answers {@code 200} with {@link AgentMetrics#render()}'s Prometheus text
+ *       exposition (W-602) &mdash; one listener, not a second port, for the same reason there's
+ *       only ever been one for the probes (constitution &sect;4).
  * </ul>
  */
 public final class HealthServer {
 
   private final int requestedPort;
   private final HealthState health;
+  private final AgentMetrics metrics;
   private HttpServer server;
 
   /**
    * @param port TCP port to bind, or {@code 0} to let the OS pick an ephemeral one (tests)
    * @param health readiness source for {@code /readyz}
+   * @param metrics source for {@code /metrics}
    */
-  public HealthServer(int port, HealthState health) {
+  public HealthServer(int port, HealthState health, AgentMetrics metrics) {
     this.requestedPort = port;
     this.health = health;
+    this.metrics = metrics;
   }
 
   /** Binds the port and starts serving. */
@@ -41,10 +48,11 @@ public final class HealthServer {
           boolean ready = health.ready();
           respond(exchange, ready ? 200 : 503, ready ? "READY" : "NOT READY");
         });
+    s.createContext("/metrics", exchange -> respond(exchange, 200, metrics.render()));
     s.setExecutor(null); // default executor: adequate for low-rate probe traffic
     s.start();
     this.server = s;
-    AgentLog.info("health server listening on :" + boundPort() + " (/healthz, /readyz)");
+    AgentLog.info("health server listening on :" + boundPort() + " (/healthz, /readyz, /metrics)");
   }
 
   /** The actually bound port &mdash; resolves an ephemeral {@code 0} to the real port. */
