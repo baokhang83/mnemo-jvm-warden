@@ -6,6 +6,7 @@ import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import io.github.baokhang83.mnemo.warden.agent.cache.CacheHookLookup;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
+import io.github.baokhang83.mnemo.warden.agent.heap.TargetHeapControllerResolver;
 import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import io.github.baokhang83.mnemo.warden.agent.resize.PodResizeClient;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
