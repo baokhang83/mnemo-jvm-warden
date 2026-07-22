@@ -166,6 +166,88 @@ which now also supports in-place updates. The difference is that VPA is
 
 ---
 
+## Deploying with Helm
+
+Two charts, two different jobs — there's no published chart repo yet, so both are used from a
+local checkout of this repo (a `file://` dependency, or vendoring the directory) until one exists.
+
+### `charts/warden` — installs the controller
+
+```bash
+helm install warden charts/warden
+```
+
+This is the one-shot, cluster-wide install: it applies the `WardenPolicy` CRD (once — Helm's
+`crds/` directory is never touched again by `helm upgrade`, see `charts/warden/crds/`), a
+`ClusterRole`/`ClusterRoleBinding` scoped to exactly what the controller reads and writes (watch
+`WardenPolicy`, patch its `status`, read `Deployment`/`StatefulSet`, read/patch `Pod`
+annotations), and the controller `Deployment` itself (hardcoded to `replicas: 1` — there's no
+leader election yet, so a second replica would double-reconcile every policy).
+
+Values worth knowing (`charts/warden/values.yaml`):
+
+| key | what it controls |
+|---|---|
+| `controller.image.repository` / `.tag` | which controller image to run |
+| `controller.prometheusUrl` | where Prometheus lives, for guardrail metric evaluation (W-401) — leave empty if no policy uses a guardrail |
+| `controller.resources` | the controller Pod's own request/limit |
+
+### `charts/warden-sidecar` — the reusable sidecar template
+
+There is no admission webhook. "Injecting" the sidecar means an **operator's own app chart**
+includes a Helm named template that renders the same native-sidecar shape as
+`deploy/example-sidecar.yaml`, parameterized instead of hand-copied. It's a Helm **library
+chart** (`type: library`) on purpose: depending on it can never deploy a second controller
+alongside your app, because a library chart is structurally forbidden from rendering any
+resources of its own.
+
+In your own app chart's `Chart.yaml`:
+
+```yaml
+dependencies:
+  - name: warden-sidecar
+    version: 0.1.0
+    repository: "file:///path/to/mnemo-jvm-warden/charts/warden-sidecar"
+```
+
+In your own `values.yaml`, a `warden:` block shaped like `charts/warden/values.yaml`'s
+`sidecar:` section (`targetContainerName` and `resources` are required, with no default — see
+that file's comments for why):
+
+```yaml
+warden:
+  enabled: true
+  image:
+    repository: ghcr.io/baokhang83/mnemo-jvm-warden
+    tag: latest
+  targetContainerName: app   # the sibling container Warden resizes
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { memory: 256Mi }
+```
+
+And in your own Pod template:
+
+```yaml
+spec:
+  shareProcessNamespace: true   # lets the sidecar see the target JVM's PID (W-102)
+  volumes:
+    {{- include "warden.sidecar.volumes" . | nindent 4 }}
+  initContainers:
+    {{- if .Values.warden.enabled }}
+    {{- include "warden.sidecar" (dict "cfg" .Values.warden) | nindent 4 }}
+    {{- end }}
+  containers:
+    - name: app   # must match warden.targetContainerName above
+      # ... your app container, with the JMX flags deploy/example-sidecar.yaml documents
+```
+
+`warden.sidecar` renders only the `initContainer` entry; `shareProcessNamespace` and the
+host-cgroup volume are set by your own chart rather than injected, so your chart stays in full
+control of its own Pod spec end to end.
+
+---
+
 ## Status
 
 🚧 **Early design / pre-alpha.** This repository currently defines the concept

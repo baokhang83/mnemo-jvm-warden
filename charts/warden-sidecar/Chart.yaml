@@ -1,0 +1,13 @@
+apiVersion: v2
+name: warden-sidecar
+description: >-
+  Reusable `warden.sidecar` named template (the native-sidecar pattern from
+  deploy/example-sidecar.yaml, parameterized) for an operator's own app chart to include.
+  A library chart: it renders no resources of its own, so depending on it never deploys a
+  second Warden controller alongside your app.
+type: library
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/baokhang83/mnemo-jvm-warden
+sources:
+  - https://github.com/baokhang83/mnemo-jvm-warden

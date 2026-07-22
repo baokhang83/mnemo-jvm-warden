@@ -1,8 +1,8 @@
 {
-  "feature": "w-504-mnemo-cache-reference-adapter-seasonalcachehook-wraps",
-  "branch": "feature/w-504-mnemo-cache-reference-adapter-seasonalcachehook-wraps",
+  "feature": "w-601-helm-chart-helm-install-deploys-the-controller-gives-o",
+  "branch": "feature/w-601-helm-chart-helm-install-deploys-the-controller-gives-o",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-504-mnemo-cache-reference-adapter-seasonalcachehook-wraps/sessions/build-the-seasonalcachehook-adapter-querycacheapp-demo-and-u.md",
+  "last_session": "docs/fluencyloop/features/w-601-helm-chart-helm-install-deploys-the-controller-gives-o/sessions/chart-skeleton-controller-deployment-rbac-values-and-the-war.md",
   "base_ref": "main",
   "updated": "2026-07-22"
 }
