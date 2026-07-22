@@ -1,8 +1,8 @@
 {
-  "feature": "w-603-gc-support-matrix-completion-clear-read-only-mode-for",
-  "branch": "feature/w-603-gc-support-matrix-completion-clear-read-only-mode-for",
+  "feature": "w-604-docs-configuration-reference-runbook-full-wardenpolicy",
+  "branch": "feature/w-604-docs-configuration-reference-runbook-full-wardenpolicy",
   "stage": "build",
-  "last_session": "docs/fluencyloop/features/w-603-gc-support-matrix-completion-clear-read-only-mode-for/sessions/intentwatcher-resolves-once-gc-supported-gauge.md",
+  "last_session": "docs/fluencyloop/features/w-604-docs-configuration-reference-runbook-full-wardenpolicy/sessions/write-docs-configuration-md-full-wardenpolicy-field-referenc.md",
   "base_ref": "main",
   "updated": "2026-07-22"
 }
