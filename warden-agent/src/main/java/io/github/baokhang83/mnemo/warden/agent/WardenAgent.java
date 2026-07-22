@@ -3,6 +3,7 @@ package io.github.baokhang83.mnemo.warden.agent;
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
 import io.github.baokhang83.mnemo.warden.agent.intent.IntentWatcher;
 import io.github.baokhang83.mnemo.warden.agent.intent.PodIntentReader;
+import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -22,7 +23,8 @@ public final class WardenAgent {
     AgentLog.info("starting (health port " + config.healthPort() + ", pod " + config.podName() + ")");
 
     HealthState health = new HealthState();
-    HealthServer server = new HealthServer(config.healthPort(), health);
+    AgentMetrics metrics = new AgentMetrics();
+    HealthServer server = new HealthServer(config.healthPort(), health, metrics);
     server.start();
 
     AttachSupervisor attachSupervisor = new AttachSupervisor(health);
@@ -30,7 +32,7 @@ public final class WardenAgent {
     AgentLog.info("attach supervisor started; waiting for target JVM");
 
     PodIntentReader intentReader = PodIntentReader.forInClusterAgent(config.podName(), config.targetContainerName());
-    IntentWatcher intentWatcher = new IntentWatcher(config, attachSupervisor, intentReader);
+    IntentWatcher intentWatcher = new IntentWatcher(config, attachSupervisor, intentReader, metrics);
     intentWatcher.start();
     AgentLog.info("intent watcher started; polling own pod every " + config.intentPollInterval());
 
