@@ -246,6 +246,37 @@ spec:
 host-cgroup volume are set by your own chart rather than injected, so your chart stays in full
 control of its own Pod spec end to end.
 
+### Configuring a policy
+
+Neither chart above makes Warden *do* anything on its own — it acts only once a `WardenPolicy`
+exists for the target workload:
+
+```yaml
+apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: my-app-policy
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-app
+  timezone: Europe/Paris
+  profiles:
+    off-peak: { request: 512Mi, limit: 768Mi }
+    peak: { request: 2Gi, limit: 3Gi }
+  schedule:
+    - { cron: "0 22 * * *", profile: off-peak }
+    - { cron: "0 7 * * *", profile: peak }
+```
+
+Apply it with `kubectl apply -f`, same as any other custom resource. For every field
+(`leadTime`, `blackout`, `guardrail`), the sidecar/controller environment variables, and the
+full set of Helm values, see **[docs/configuration.md](docs/configuration.md)** — it also has
+an operator runbook for the failure modes you'll actually hit (read-only mode on an
+unsupported collector, a shrink aborted by the RSS verification gate, cgroup mount issues, and
+more).
+
 ---
 
 ## Status
