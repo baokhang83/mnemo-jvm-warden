@@ -7,9 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.baokhang83.mnemo.warden.agent.heap.GcCapabilities;
 import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
 import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import io.github.baokhang83.mnemo.warden.cache.CacheStats;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -29,7 +33,7 @@ class ShrinkSequenceTest {
     FakeHeapController heap = new FakeHeapController(100L * 1024 * 1024);
     FakeResizePort resizeClient = new FakeResizePort();
     ShrinkSequence sequence =
-        new ShrinkSequence(heap, resizeClient, "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
+        new ShrinkSequence(heap, resizeClient, Map.of(), "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
 
     ShrinkOutcome outcome = sequence.shrinkTo(150L * 1024 * 1024, 200L * 1024 * 1024);
 
@@ -53,7 +57,7 @@ class ShrinkSequenceTest {
     FakeHeapController heap = new FakeHeapController(250L * 1024 * 1024);
     FakeResizePort resizeClient = new FakeResizePort();
     ShrinkSequence sequence =
-        new ShrinkSequence(heap, resizeClient, "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
+        new ShrinkSequence(heap, resizeClient, Map.of(), "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
 
     ShrinkOutcome outcome = sequence.shrinkTo(150L * 1024 * 1024, 200L * 1024 * 1024);
 
@@ -72,12 +76,77 @@ class ShrinkSequenceTest {
     FakeHeapController heap = new FakeHeapController(200L * 1024 * 1024);
     FakeResizePort resizeClient = new FakeResizePort();
     ShrinkSequence sequence =
-        new ShrinkSequence(heap, resizeClient, "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
+        new ShrinkSequence(heap, resizeClient, Map.of(), "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
 
     ShrinkOutcome outcome = sequence.shrinkTo(150L * 1024 * 1024, 200L * 1024 * 1024);
 
     assertInstanceOf(ShrinkOutcome.AbortedVerificationFailed.class, outcome);
     assertTrue(resizeClient.calls.isEmpty());
+  }
+
+  @Test
+  void flushesEveryRegisteredCacheHookBeforeTheDeepGc() throws Exception {
+    FakeHeapController heap = new FakeHeapController(100L * 1024 * 1024);
+    FakeResizePort resizeClient = new FakeResizePort();
+    FakeCacheHook sessionCache = new FakeCacheHook();
+    FakeCacheHook queryCache = new FakeCacheHook();
+    Map<String, CacheHook> cacheHooks = new LinkedHashMap<>();
+    cacheHooks.put("sessionCache", sessionCache);
+    cacheHooks.put("queryCache", queryCache);
+    ShrinkSequence sequence =
+        new ShrinkSequence(heap, resizeClient, cacheHooks, "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
+
+    sequence.shrinkTo(150L * 1024 * 1024, 200L * 1024 * 1024);
+
+    assertTrue(sessionCache.flushed, "every registered hook must be flushed");
+    assertTrue(queryCache.flushed, "every registered hook must be flushed");
+    assertEquals(
+        List.of("setSoftMax", "deepGcAndUncommit", "currentRss"),
+        heap.calls,
+        "flush must happen between setSoftMax and deepGcAndUncommit, off the HeapController path");
+  }
+
+  @Test
+  void aHookThatThrowsDoesNotStopTheOthersOrAbortTheShrink() throws Exception {
+    FakeHeapController heap = new FakeHeapController(100L * 1024 * 1024);
+    FakeResizePort resizeClient = new FakeResizePort();
+    FakeCacheHook brokenCache = new FakeCacheHook();
+    brokenCache.throwOnFlush = true;
+    FakeCacheHook healthyCache = new FakeCacheHook();
+    Map<String, CacheHook> cacheHooks = new LinkedHashMap<>();
+    cacheHooks.put("brokenCache", brokenCache);
+    cacheHooks.put("healthyCache", healthyCache);
+    ShrinkSequence sequence =
+        new ShrinkSequence(heap, resizeClient, cacheHooks, "my-pod", "app", GC_TIMEOUT, RESIZE_TIMEOUT);
+
+    ShrinkOutcome outcome = sequence.shrinkTo(150L * 1024 * 1024, 200L * 1024 * 1024);
+
+    assertInstanceOf(ShrinkOutcome.Completed.class, outcome);
+    assertTrue(healthyCache.flushed, "a sibling hook's throw must not stop this hook from being flushed");
+    assertEquals(1, resizeClient.calls.size(), "one broken cache hook must not abort the shrink — §12");
+  }
+
+  private static final class FakeCacheHook implements CacheHook {
+    boolean flushed;
+    boolean throwOnFlush;
+
+    @Override
+    public void flushEvictable() {
+      if (throwOnFlush) {
+        throw new IllegalStateException("boom");
+      }
+      flushed = true;
+    }
+
+    @Override
+    public void preWarm() {
+      throw new UnsupportedOperationException("ShrinkSequence must not call preWarm — that's W-503");
+    }
+
+    @Override
+    public CacheStats stats() {
+      throw new UnsupportedOperationException("ShrinkSequence has no need to read cache stats");
+    }
   }
 
   private static final class FakeHeapController implements HeapController {
