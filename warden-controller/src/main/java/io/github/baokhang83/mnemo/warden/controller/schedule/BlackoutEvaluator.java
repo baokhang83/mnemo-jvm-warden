@@ -12,7 +12,8 @@ import java.time.Instant;
  * not a recurring local time, so unlike {@link ScheduleEvaluator} there's no DST question here
  * to get right (see the design doc).
  *
- * <p>{@link WardenPolicyReconciler} gates on this once, before calling {@link ScheduleEvaluator}
+ * <p>{@link io.github.baokhang83.mnemo.warden.controller.WardenPolicyReconciler} gates on this
+ * once, before calling {@link ScheduleEvaluator}
  * at all: when blacked out, {@code status.currentProfile} is left untouched for this reconcile
  * rather than routed to some blackout-specific profile &mdash; {@link BlackoutWindow} has no
  * such field, and "do not touch" means leave whatever is currently active alone.
