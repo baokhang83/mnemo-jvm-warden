@@ -1,0 +1,39 @@
+name: publish-charts
+
+# Packages every chart under charts/ (warden, warden-sidecar) and publishes them as an
+# installable Helm repo: `helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/`.
+# chart-releaser is idempotent per chart version, so pushes that don't bump a Chart.yaml
+# version are no-ops — this can safely run on every push to main, decoupled from app releases
+# (publish.yml/publish-maven.yml), rather than only firing alongside a GitHub Release.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'charts/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release-charts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        with:
+          charts_dir: charts
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
