@@ -27,6 +27,8 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: false
 
       - name: Configure Maven settings
         uses: whelk-io/maven-settings-xml-action@v21
@@ -53,4 +55,4 @@ jobs:
       - name: Deploy to Maven Central
         run: mvn -B -ntp deploy -Prelease
         env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
