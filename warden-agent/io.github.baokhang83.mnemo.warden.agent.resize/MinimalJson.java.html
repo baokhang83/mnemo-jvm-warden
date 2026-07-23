@@ -23,8 +23,8 @@ import java.util.Map;
  * &lt;p&gt;Every character read goes through {@link #peek()}/{@link #next()}, which check bounds and
  * throw {@link IllegalArgumentException} on truncated input &amp;mdash; not raw {@code
  * String.charAt}, which would let an unchecked {@code StringIndexOutOfBoundsException} escape
- * instead (caught by a test feeding truncated JSON, e.g. {@code &quot;{\&quot;a\&quot;:1&quot;} with no closing
- * brace).
+ * instead (caught by a test feeding truncated JSON &amp;mdash; an object literal missing its
+ * closing brace).
  *
  * &lt;p&gt;Public, not package-private: {@code io.github.baokhang83.mnemo.warden.agent.intent}
  * (W-306) reads the same API server response shape (a pod's annotations and container status)

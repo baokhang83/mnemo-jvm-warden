@@ -12,7 +12,8 @@ import java.time.Instant;
  * not a recurring local time, so unlike {@link ScheduleEvaluator} there's no DST question here
  * to get right (see the design doc).
  *
- * &lt;p&gt;{@link WardenPolicyReconciler} gates on this once, before calling {@link ScheduleEvaluator}
+ * &lt;p&gt;{@link io.github.baokhang83.mnemo.warden.controller.WardenPolicyReconciler} gates on this
+ * once, before calling {@link ScheduleEvaluator}
  * at all: when blacked out, {@code status.currentProfile} is left untouched for this reconcile
  * rather than routed to some blackout-specific profile &amp;mdash; {@link BlackoutWindow} has no
  * such field, and &quot;do not touch&quot; means leave whatever is currently active alone.
@@ -22,17 +23,17 @@ public final class BlackoutEvaluator {
   private BlackoutEvaluator() {}
 
   public static boolean isBlackedOut(WardenPolicySpec spec, Instant now) {
-<span class="fc bfc" id="L25" title="All 2 branches covered.">    if (spec.getBlackout() == null) {</span>
-<span class="fc" id="L26">      return false;</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">    if (spec.getBlackout() == null) {</span>
+<span class="fc" id="L27">      return false;</span>
     }
-<span class="fc bfc" id="L28" title="All 2 branches covered.">    for (BlackoutWindow window : spec.getBlackout()) {</span>
-<span class="fc" id="L29">      Instant start = Instant.parse(window.getStart());</span>
-<span class="fc" id="L30">      Instant end = Instant.parse(window.getEnd());</span>
-<span class="fc bfc" id="L31" title="All 4 branches covered.">      if (!now.isBefore(start) &amp;&amp; !now.isAfter(end)) {</span>
-<span class="fc" id="L32">        return true;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    for (BlackoutWindow window : spec.getBlackout()) {</span>
+<span class="fc" id="L30">      Instant start = Instant.parse(window.getStart());</span>
+<span class="fc" id="L31">      Instant end = Instant.parse(window.getEnd());</span>
+<span class="fc bfc" id="L32" title="All 4 branches covered.">      if (!now.isBefore(start) &amp;&amp; !now.isAfter(end)) {</span>
+<span class="fc" id="L33">        return true;</span>
       }
-<span class="fc" id="L34">    }</span>
-<span class="fc" id="L35">    return false;</span>
+<span class="fc" id="L35">    }</span>
+<span class="fc" id="L36">    return false;</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

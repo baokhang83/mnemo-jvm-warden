@@ -21,8 +21,9 @@ import javax.net.ssl.TrustManagerFactory;
  * &lt;p&gt;Verified against a real pod: {@code KUBERNETES_SERVICE_HOST}/{@code
  * KUBERNETES_SERVICE_PORT} are injected by the kubelet into every pod's environment, and the
  * bound service-account token, its namespace, and the cluster CA certificate are projected at
- * {@value #SERVICE_ACCOUNT_DIR} by the default {@code kube-api-access-*} volume &amp;mdash; no
- * explicit {@code volumeMounts} needed in the pod spec.
+ * {@code /var/run/secrets/kubernetes.io/serviceaccount} (see {@link #SERVICE_ACCOUNT_DIR}) by
+ * the default {@code kube-api-access-*} volume &amp;mdash; no explicit {@code volumeMounts} needed
+ * in the pod spec.
  *
  * &lt;p&gt;{@link #bearerToken()} re-reads the token file on every call rather than caching it: bound
  * service-account tokens are time-limited (an hour, by default &amp;mdash; confirmed via a real
@@ -33,7 +34,7 @@ import javax.net.ssl.TrustManagerFactory;
  */
 public final class InClusterApiServer {
 
-<span class="fc" id="L36">  private static final Path SERVICE_ACCOUNT_DIR = Path.of(&quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;);</span>
+<span class="fc" id="L37">  private static final Path SERVICE_ACCOUNT_DIR = Path.of(&quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;);</span>
   private static final String ENV_HOST = &quot;KUBERNETES_SERVICE_HOST&quot;;
   private static final String ENV_PORT = &quot;KUBERNETES_SERVICE_PORT&quot;;
 
@@ -43,17 +44,17 @@ public final class InClusterApiServer {
   private final Path tokenFile;
   private final SSLContext trust;
 
-<span class="fc" id="L46">  InClusterApiServer(String host, int port, String namespace, Path tokenFile, SSLContext trust) {</span>
-<span class="fc" id="L47">    this.host = host;</span>
-<span class="fc" id="L48">    this.port = port;</span>
-<span class="fc" id="L49">    this.namespace = namespace;</span>
-<span class="fc" id="L50">    this.tokenFile = tokenFile;</span>
-<span class="fc" id="L51">    this.trust = trust;</span>
-<span class="fc" id="L52">  }</span>
+<span class="fc" id="L47">  InClusterApiServer(String host, int port, String namespace, Path tokenFile, SSLContext trust) {</span>
+<span class="fc" id="L48">    this.host = host;</span>
+<span class="fc" id="L49">    this.port = port;</span>
+<span class="fc" id="L50">    this.namespace = namespace;</span>
+<span class="fc" id="L51">    this.tokenFile = tokenFile;</span>
+<span class="fc" id="L52">    this.trust = trust;</span>
+<span class="fc" id="L53">  }</span>
 
   /** Reads the standard in-cluster environment and mounted service-account volume. */
   public static InClusterApiServer discover() throws IOException, GeneralSecurityException {
-<span class="nc" id="L56">    return discover(System::getenv, SERVICE_ACCOUNT_DIR);</span>
+<span class="nc" id="L57">    return discover(System::getenv, SERVICE_ACCOUNT_DIR);</span>
   }
 
   /**
@@ -63,60 +64,60 @@ public final class InClusterApiServer {
    */
   static InClusterApiServer discover(Function&lt;String, String&gt; env, Path serviceAccountDir)
       throws IOException, GeneralSecurityException {
-<span class="fc" id="L66">    String host = requireEnv(env, ENV_HOST);</span>
-<span class="fc" id="L67">    int port = Integer.parseInt(requireEnv(env, ENV_PORT));</span>
-<span class="fc" id="L68">    String namespace = Files.readString(serviceAccountDir.resolve(&quot;namespace&quot;)).trim();</span>
-<span class="fc" id="L69">    Path tokenFile = serviceAccountDir.resolve(&quot;token&quot;);</span>
-<span class="fc" id="L70">    SSLContext trust = trustingClusterCa(serviceAccountDir.resolve(&quot;ca.crt&quot;));</span>
-<span class="fc" id="L71">    return new InClusterApiServer(host, port, namespace, tokenFile, trust);</span>
+<span class="fc" id="L67">    String host = requireEnv(env, ENV_HOST);</span>
+<span class="fc" id="L68">    int port = Integer.parseInt(requireEnv(env, ENV_PORT));</span>
+<span class="fc" id="L69">    String namespace = Files.readString(serviceAccountDir.resolve(&quot;namespace&quot;)).trim();</span>
+<span class="fc" id="L70">    Path tokenFile = serviceAccountDir.resolve(&quot;token&quot;);</span>
+<span class="fc" id="L71">    SSLContext trust = trustingClusterCa(serviceAccountDir.resolve(&quot;ca.crt&quot;));</span>
+<span class="fc" id="L72">    return new InClusterApiServer(host, port, namespace, tokenFile, trust);</span>
   }
 
   /** The namespace this pod runs in. */
   public String namespace() {
-<span class="fc" id="L76">    return namespace;</span>
+<span class="fc" id="L77">    return namespace;</span>
   }
 
   /** The API server's base URI, e.g. {@code https://10.96.0.1:443}. */
   public URI baseUri() {
-<span class="fc" id="L81">    return URI.create(&quot;https://&quot; + host + &quot;:&quot; + port);</span>
+<span class="fc" id="L82">    return URI.create(&quot;https://&quot; + host + &quot;:&quot; + port);</span>
   }
 
   /** The current bearer token, read fresh from disk (see class javadoc on why it isn't cached). */
   public String bearerToken() throws IOException {
-<span class="fc" id="L86">    return Files.readString(tokenFile).trim();</span>
+<span class="fc" id="L87">    return Files.readString(tokenFile).trim();</span>
   }
 
   /** An {@link SSLContext} that trusts only the cluster's own CA, not the JDK's public trust store. */
   public SSLContext sslContext() {
-<span class="fc" id="L91">    return trust;</span>
+<span class="fc" id="L92">    return trust;</span>
   }
 
   private static String requireEnv(Function&lt;String, String&gt; env, String name) {
-<span class="fc" id="L95">    String value = env.apply(name);</span>
-<span class="pc bpc" id="L96" title="1 of 4 branches missed.">    if (value == null || value.isBlank()) {</span>
-<span class="fc" id="L97">      throw new IllegalStateException(name + &quot; is not set; is this process running in a pod?&quot;);</span>
+<span class="fc" id="L96">    String value = env.apply(name);</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">    if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L98">      throw new IllegalStateException(name + &quot; is not set; is this process running in a pod?&quot;);</span>
     }
-<span class="fc" id="L99">    return value;</span>
+<span class="fc" id="L100">    return value;</span>
   }
 
   private static SSLContext trustingClusterCa(Path caCertFile) throws IOException, GeneralSecurityException {
-<span class="fc" id="L103">    CertificateFactory certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+<span class="fc" id="L104">    CertificateFactory certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
     X509Certificate caCert;
-<span class="fc" id="L105">    try (InputStream in = Files.newInputStream(caCertFile)) {</span>
-<span class="fc" id="L106">      caCert = (X509Certificate) certificateFactory.generateCertificate(in);</span>
+<span class="fc" id="L106">    try (InputStream in = Files.newInputStream(caCertFile)) {</span>
+<span class="fc" id="L107">      caCert = (X509Certificate) certificateFactory.generateCertificate(in);</span>
     }
 
-<span class="fc" id="L109">    KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
-<span class="fc" id="L110">    trustStore.load(null, null);</span>
-<span class="fc" id="L111">    trustStore.setCertificateEntry(&quot;cluster-ca&quot;, caCert);</span>
+<span class="fc" id="L110">    KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="fc" id="L111">    trustStore.load(null, null);</span>
+<span class="fc" id="L112">    trustStore.setCertificateEntry(&quot;cluster-ca&quot;, caCert);</span>
 
     TrustManagerFactory trustManagerFactory =
-<span class="fc" id="L114">        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());</span>
-<span class="fc" id="L115">    trustManagerFactory.init(trustStore);</span>
+<span class="fc" id="L115">        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());</span>
+<span class="fc" id="L116">    trustManagerFactory.init(trustStore);</span>
 
-<span class="fc" id="L117">    SSLContext sslContext = SSLContext.getInstance(&quot;TLS&quot;);</span>
-<span class="fc" id="L118">    sslContext.init(null, trustManagerFactory.getTrustManagers(), null);</span>
-<span class="fc" id="L119">    return sslContext;</span>
+<span class="fc" id="L118">    SSLContext sslContext = SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="fc" id="L119">    sslContext.init(null, trustManagerFactory.getTrustManagers(), null);</span>
+<span class="fc" id="L120">    return sslContext;</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
