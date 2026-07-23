@@ -21,8 +21,9 @@ import javax.net.ssl.TrustManagerFactory;
  * <p>Verified against a real pod: {@code KUBERNETES_SERVICE_HOST}/{@code
  * KUBERNETES_SERVICE_PORT} are injected by the kubelet into every pod's environment, and the
  * bound service-account token, its namespace, and the cluster CA certificate are projected at
- * {@value #SERVICE_ACCOUNT_DIR} by the default {@code kube-api-access-*} volume &mdash; no
- * explicit {@code volumeMounts} needed in the pod spec.
+ * {@code /var/run/secrets/kubernetes.io/serviceaccount} (see {@link #SERVICE_ACCOUNT_DIR}) by
+ * the default {@code kube-api-access-*} volume &mdash; no explicit {@code volumeMounts} needed
+ * in the pod spec.
  *
  * <p>{@link #bearerToken()} re-reads the token file on every call rather than caching it: bound
  * service-account tokens are time-limited (an hour, by default &mdash; confirmed via a real
