@@ -4,12 +4,13 @@ This project is configured to publish artifacts to [Maven Central Repository](ht
 
 ## Prerequisites
 
-### 1. Maven Central Account (OSSRH)
+### 1. Maven Central Account (Central Portal)
 
-- Create an account at [Sonatype OSSRH](https://central.sonatype.com/publish)
+- Create an account at [Sonatype Central Portal](https://central.sonatype.com/publish)
 - Request access to the `io.github.baokhang83.mnemo` namespace
   - You may need to verify ownership of the GitHub organization/repository
-- Once approved, you'll receive a username and token
+- Once approved, generate a **User Token** from your account (View Account → Generate User Token)
+  - This is *not* your account login/password — it's a separate token username/password pair used for API auth
 
 ### 2. GPG Key Setup
 
@@ -40,18 +41,18 @@ Add the following secrets to your GitHub repository settings (Settings → Secre
 
 | Secret Name | Value | Notes |
 |---|---|---|
-| `OSSRH_USERNAME` | Your Sonatype OSSRH username | From OSSRH account setup |
-| `OSSRH_TOKEN` | Your Sonatype OSSRH token | From OSSRH account setup |
+| `OSSRH_USERNAME` | Your Central Portal user token username | Generated in Central Portal → Generate User Token |
+| `OSSRH_TOKEN` | Your Central Portal user token password | Generated in Central Portal → Generate User Token |
 | `GPG_PRIVATE_KEY` | Base64-encoded GPG private key | Generated in GPG key setup |
 | `GPG_PASSPHRASE` | Your GPG key passphrase | From GPG key generation |
 
 ## Maven Configuration
 
 The pom.xml has been updated with:
-- Distribution management pointing to Sonatype OSSRH
 - Source and Javadoc JAR generation
 - GPG signing configuration
-- Nexus staging plugin for automated release management
+- `central-publishing-maven-plugin` (Central Portal Publisher API) for automated release management
+  - `nexus-staging-maven-plugin` doesn't work here — it targets the legacy OSSRH host, which 404s for namespaces provisioned on the new Central Portal
 
 ## Releasing a Version
 
@@ -77,8 +78,8 @@ The workflow will automatically trigger when the tag is pushed and:
 1. Build the project with all tests
 2. Generate source and Javadoc JARs
 3. Sign artifacts with GPG
-4. Deploy to Maven Central staging repository
-5. Automatically release from staging (via nexus-staging-maven-plugin)
+4. Bundle and upload to the Central Portal Publisher API
+5. Automatically publish once validation passes (via central-publishing-maven-plugin, `autoPublish=true`)
 
 ### Step 3: Verify Publication
 
@@ -108,13 +109,13 @@ git push origin main
 
 ### Authentication Failed (401/403)
 
-- Verify OSSRH credentials are correct
-- Check that your OSSRH account has access to the namespace
-- Ensure the token hasn't expired
+- Verify `OSSRH_USERNAME`/`OSSRH_TOKEN` are a **Central Portal user token** pair, not your account login
+- Check that your Central Portal account has access to the namespace
+- Ensure the token hasn't expired/been revoked
 
-### Staging Repository Won't Close
+### Deployment Fails Validation
 
-- Check the Sonatype OSSRH portal for validation errors
+- Check the Central Portal (central.sonatype.com → Publishing) for validation errors on the deployment
 - Common issues: missing source JARs, missing Javadoc, unsigned artifacts
 - All are handled automatically in the release workflow
 
@@ -126,7 +127,7 @@ git push origin main
 
 ## References
 
-- [Sonatype OSSRH Guide](https://central.sonatype.org/publish/publish-guide/)
+- [Central Portal Publishing Guide](https://central.sonatype.org/publish/publish-portal-maven/)
 - [Maven GPG Plugin](https://maven.apache.org/plugins/maven-gpg-plugin/)
 - [Maven Release Plugin](https://maven.apache.org/plugins/maven-release-plugin/)
-- [Nexus Staging Maven Plugin](https://github.com/sonatype/nexus-maven-plugins/tree/master/staging/maven-plugin)
+- [Central Publishing Maven Plugin](https://central.sonatype.org/publish/publish-portal-maven/)

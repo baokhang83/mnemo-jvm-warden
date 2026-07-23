@@ -36,17 +36,6 @@
     <tag>HEAD</tag>
   </scm>
 
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://central.sonatype.com/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://central.sonatype.com/content/repositories/releases</url>
-    </repository>
-  </distributionManagement>
-
   <!--
     Aggregator + parent. It builds the modules below in dependency order and owns the two
     things a skeleton should centralise: the Java target and dependency versions. Child
@@ -72,7 +61,11 @@
     <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
     <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
     <maven-release-plugin.version>3.0.1</maven-release-plugin.version>
-    <nexus-staging-maven-plugin.version>1.7.0</nexus-staging-maven-plugin.version>
+    <!-- Verified against Maven Central (not guessed): 0.11.0 is latest. nexus-staging-maven-plugin
+         only works with the legacy OSSRH host and 404s against the new Sonatype Central Portal,
+         which this namespace is provisioned on — central-publishing-maven-plugin is the plugin
+         Sonatype ships for the Central Portal Publisher API. -->
+    <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
     <!-- Verified against Maven Central (not guessed): 3.6.2 is latest. Only warden-controller
          needs this — unlike warden-agent (zero runtime deps), it pulls in a real dependency
          graph (fabric8 kubernetes-client, operator-framework, cron-utils), so a plain jar with
@@ -206,9 +199,9 @@
           <version>${maven-release-plugin.version}</version>
         </plugin>
         <plugin>
-          <groupId>org.sonatype.plugins</groupId>
-          <artifactId>nexus-staging-maven-plugin</artifactId>
-          <version>${nexus-staging-maven-plugin.version}</version>
+          <groupId>org.sonatype.central</groupId>
+          <artifactId>central-publishing-maven-plugin</artifactId>
+          <version>${central-publishing-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -279,13 +272,13 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
         <extensions>true</extensions>
         <configuration>
-          <serverId>ossrh</serverId>
-          <nexusUrl>https://central.sonatype.com/</nexusUrl>
-          <autoReleaseAfterClose>true</autoReleaseAfterClose>
+          <publishingServerId>ossrh</publishingServerId>
+          <autoPublish>true</autoPublish>
+          <waitUntil>published</waitUntil>
         </configuration>
       </plugin>
     </plugins>
