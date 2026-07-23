@@ -4,7 +4,7 @@ description: >-
   Mnemo Warden — a JVM-aware vertical right-sizing controller, plus a reusable
   native-sidecar template for target workloads.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "0.1.0"
 home: https://github.com/baokhang83/mnemo-jvm-warden
 sources:
