@@ -32,17 +32,25 @@
     <plugins>
       <!-- The agent has zero runtime deps (all JDK), so a plain jar with a Main-Class
            manifest is directly runnable via `java -jar` — no shade/uber-jar needed. -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifest>
-              <mainClass>io.github.baokhang83.mnemo.warden.agent.WardenAgent</mainClass>
-            </manifest>
-          </archive>
-        </configuration>
-      </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <executions>
+            <execution>
+              <phase>package</phase>
+              <goals>
+                <goal>shade</goal>
+              </goals>
+              <configuration>
+                <transformers>
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                    <mainClass>io.github.baokhang83.mnemo.warden.agent.WardenAgent</mainClass>
+                  </transformer>
+                </transformers>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
     </plugins>
   </build>
 </project>
