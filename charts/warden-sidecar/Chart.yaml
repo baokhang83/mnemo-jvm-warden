@@ -6,7 +6,7 @@ description: >-
   A library chart: it renders no resources of its own, so depending on it never deploys a
   second Warden controller alongside your app.
 type: library
-version: 0.1.0
+version: 0.1.1
 appVersion: "0.1.0"
 home: https://github.com/baokhang83/mnemo-jvm-warden
 sources:
