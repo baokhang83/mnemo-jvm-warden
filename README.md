@@ -168,13 +168,21 @@ which now also supports in-place updates. The difference is that VPA is
 
 ## Deploying with Helm
 
-Two charts, two different jobs — there's no published chart repo yet, so both are used from a
-local checkout of this repo (a `file://` dependency, or vendoring the directory) until one exists.
+Two charts, two different jobs. Both are published to a Helm repo hosted on GitHub Pages, so no
+local checkout is needed:
+
+```bash
+helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/
+helm repo update
+```
+
+(You can still install straight from a local checkout — `helm install warden charts/warden` —
+if you're working on the charts themselves.)
 
 ### `charts/warden` — installs the controller
 
 ```bash
-helm install warden charts/warden
+helm install warden warden/warden
 ```
 
 This is the one-shot, cluster-wide install: it applies the `WardenPolicy` CRD (once — Helm's
@@ -190,7 +198,7 @@ Values worth knowing (`charts/warden/values.yaml`):
 |---|---|
 | `controller.image.repository` / `.tag` | which controller image to run |
 | `controller.prometheusUrl` | where Prometheus lives, for guardrail metric evaluation (W-401) — leave empty if no policy uses a guardrail |
-| `controller.resources` | the controller Pod's own request/limit |
+| `controller.resources` | the controller Pod's own request/limit (defaults to 256Mi request / 512Mi limit — the controller is a JVM with a heavy dependency graph, so its non-heap memory needs real headroom; 256Mi was too tight and OOMKilled it under load) |
 
 ### `charts/warden-sidecar` — the reusable sidecar template
 
@@ -206,8 +214,8 @@ In your own app chart's `Chart.yaml`:
 ```yaml
 dependencies:
   - name: warden-sidecar
-    version: 0.1.0
-    repository: "file:///path/to/mnemo-jvm-warden/charts/warden-sidecar"
+    version: "0.1.4"   # match the published chart version (see `helm search repo warden`)
+    repository: "https://baokhang83.github.io/mnemo-jvm-warden/"
 ```
 
 In your own `values.yaml`, a `warden:` block shaped like `charts/warden/values.yaml`'s
@@ -281,13 +289,16 @@ more).
 
 ## Status
 
-🚧 **Early design / pre-alpha.** This repository currently defines the concept
-and architecture. APIs, agent packaging, and supported GC matrix are still in
-flux — issues and design discussion welcome.
+🧪 **Beta.** The controller, agent, CRD, and both Helm charts are built, released, and
+installable (published container images on GHCR, charts on the Helm repo above, libraries on
+Maven Central), and the full schedule → shrink/grow → verify flow works end to end against a real
+cluster. It has not yet been battle-tested under production load, and APIs may still change —
+issues and feedback welcome.
 
-## Requirements (target)
+## Requirements
 
-- Kubernetes **1.33+** (in-place Pod resize is beta / on by default)
+- Kubernetes **1.35+** (in-place Pod resize is GA; on earlier versions it needs the
+  `InPlacePodVerticalScaling` feature gate)
 - A JVM with runtime-tunable heap commit: **ZGC**, **Shenandoah**, or **G1**
   with periodic GC enabled
 - Cluster Autoscaler (or equivalent node consolidation) to realize cost savings
