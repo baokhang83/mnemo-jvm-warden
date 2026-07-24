@@ -13,7 +13,12 @@
   <artifactId>examples</artifactId>
   <name>examples</name>
   <description>Sample target-JVM workload for W-005; also hosts the mnemo-cache CacheHook reference adapter (W-504).</description>
-
+         
+  <properties>
+         <maven.deploy.skip>true</maven.deploy.skip>
+         <skipPublishing>true</skipPublishing>
+  </properties>
+         
   <dependencies>
     <dependency>
       <groupId>io.github.baokhang83.mnemo</groupId>
