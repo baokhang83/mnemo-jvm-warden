@@ -304,6 +304,10 @@ issues and feedback welcome.
 - Cluster Autoscaler (or equivalent node consolidation) to realize cost savings
   from reduced requests
 
+## Press
+
+[How to shrink/grow on Schedule the memory of a Fleet of JVMs](https://medium.com/@baokhang/how-to-shrink-grow-on-schedule-the-memory-of-a-fleet-of-jvms-8bbd3d4b3539)
+
 ## License
 
 [Apache License 2.0](./LICENSE)
