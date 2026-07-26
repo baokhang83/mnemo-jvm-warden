@@ -13,7 +13,12 @@
   <artifactId>coverage</artifactId>
   <name>coverage</name>
   <description>Aggregates JaCoCo coverage across the other modules into one report. No product code.</description>
-
+         
+  <properties>
+         <maven.deploy.skip>true</maven.deploy.skip>
+         <skipPublishing>true</skipPublishing>
+  </properties>
+         
   <!--
     report-aggregate reads the exec data of THIS module's dependencies, so every measured module
     is listed here. Built last (after all of them) so their jacoco.exec files already exist.

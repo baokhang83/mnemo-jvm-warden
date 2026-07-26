@@ -31,4 +31,21 @@ WORKDIR /app
 COPY --from=builder /build/warden-controller/target/warden-controller-*.jar /app/warden-controller.jar
 
 USER warden
-ENTRYPOINT ["java", "-jar", "/app/warden-controller.jar"]
+
+# Container-aware JVM memory flags. Unlike warden-agent (near-zero deps), the controller loads a
+# heavy graph — fabric8 kubernetes-client, java-operator-sdk, Netty, Jackson, cron-utils — so its
+# real RSS is heap PLUS large metaspace and Netty off-heap direct buffers. A plain `java -jar`
+# with no flags defaults -Xmx to ~25% of the cgroup limit and leaves metaspace/direct memory
+# UNBOUNDED, so under reconcile load (listing fleet pods, patching annotations) total RSS grows
+# past the limit and the cgroup OOMKills the process. These flags bound each contributor so the
+# container defends its own ceiling instead of relying on a generously oversized limit:
+#   MaxRAMPercentage=60   - use the cgroup limit deliberately for heap (not the timid 25% default)
+#   MaxMetaspaceSize=128m - cap class-metadata growth from the large dependency graph
+#   MaxDirectMemorySize   - bound Netty's off-heap I/O buffers (the contributor a heap cap misses)
+#   ExitOnOutOfMemoryError - fail fast + let Kubernetes restart cleanly rather than limp along
+ENTRYPOINT ["java", \
+  "-XX:MaxRAMPercentage=60", \
+  "-XX:MaxMetaspaceSize=128m", \
+  "-XX:MaxDirectMemorySize=64m", \
+  "-XX:+ExitOnOutOfMemoryError", \
+  "-jar", "/app/warden-controller.jar"]

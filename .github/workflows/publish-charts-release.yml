@@ -1,0 +1,63 @@
+name: publish-charts-release
+
+# Release-driven chart publishing: on an app release tag (v1.2.3), stamp BOTH charts to the
+# release version and publish them, so every app release produces matching warden-<v> and
+# warden-sidecar-<v> chart releases with no manual Chart.yaml bump ("one version everywhere").
+#
+# This is a SEPARATE file from publish-charts.yml on purpose. That workflow handles chart-only
+# iteration (push to charts/** between releases); this one handles releases. Splitting them keeps
+# each trigger unambiguous — combining a `paths` filter with a `tags` filter in one push trigger
+# has murky semantics (path filters can suppress tag events), so they're kept apart.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Chart version to publish (no leading v), e.g. 0.1.4'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release-charts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      # Derive the version: from the tag on a push (v0.1.4 -> 0.1.4), or from the manual input.
+      # Stamp both chart `version` and `appVersion` so the published chart versions match the
+      # app release. chart-releaser then packages them and creates warden-<v> / warden-sidecar-<v>
+      # GitHub releases + updates the gh-pages index. chart-releaser refuses to overwrite an
+      # existing release tag, so a given version can only be published once — pick a version not
+      # already released (existing chart releases at the time of writing: warden up to 0.1.3,
+      # warden-sidecar up to 0.1.2, so start this flow at v0.1.4 or later).
+      - name: Stamp chart versions
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          echo "Publishing charts as version: $VERSION"
+          for chart in charts/warden charts/warden-sidecar; do
+            sed -i -E "s/^version:.*/version: ${VERSION}/" "$chart/Chart.yaml"
+            sed -i -E "s/^appVersion:.*/appVersion: \"${VERSION}\"/" "$chart/Chart.yaml"
+          done
+          grep -H -E '^(version|appVersion):' charts/*/Chart.yaml
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        with:
+          charts_dir: charts
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

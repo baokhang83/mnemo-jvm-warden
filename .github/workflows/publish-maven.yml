@@ -22,6 +22,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # Stamp the project version from the release tag so the poms and the tag can never drift.
+      # The tag looks like v0.1.3; ${GITHUB_REF_NAME#v} strips the leading v -> 0.1.3.
+      # versions:set updates the parent pom AND every child module's <parent> version in one shot,
+      # so a release always publishes artifacts whose version matches the tag — the fix for the
+      # recurring "Component ... @0.1.0 already exists" failure caused by the poms sitting at a
+      # stale 0.1.0 while tags advanced.
+      - name: Set version from tag
+        run: mvn -B -ntp versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
+
       - name: Import GPG key
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
