@@ -293,6 +293,14 @@ flux — issues and design discussion welcome.
 - Cluster Autoscaler (or equivalent node consolidation) to realize cost savings
   from reduced requests
 
+## Security
+
+Warden runs with real privileges inside your cluster (RBAC, JMX, a host
+cgroup mount). See **[SECURITY.md](SECURITY.md)** for how to report a
+vulnerability, **[docs/threat-model.md](docs/threat-model.md)** for the full
+trust-boundary analysis, and **[docs/hardening.md](docs/hardening.md)** for
+an operator checklist before going to production.
+
 ## License
 
 [Apache License 2.0](./LICENSE)
