@@ -330,3 +330,25 @@ or reach a `ClusterIP` directly, this port-forwards Prometheus's `Service` to `l
 the same way any out-of-cluster tool would reach it — then points `WARDEN_PROMETHEUS_URL` at the
 forwarded port. Confirms `status.currentMetricValue` reaches `1.0`. Manual-run only for now,
 matching every other check in this directory.
+
+## `verify-rbac-boundaries.sh` — the shipped RBAC grants exactly what's documented, and nothing else (W-804)
+
+Verifies, against a real cluster, that `docs/rbac-mapping.md`'s two tables are accurate: installs
+the Helm chart's `ClusterRole`/`ServiceAccount` (`warden-controller`) and the sidecar's
+`Role`/`ServiceAccount` (`warden-example`, from `example-sidecar.yaml`), then runs a matrix of
+`kubectl auth can-i --as=<service-account>` checks — every documented verb/resource pair must be
+allowed, and a representative set of undocumented ones (`secrets`, `pods/exec`, workload
+`delete`, any `nodes` verb) must be denied for both. Also proves the sidecar Role's
+`resourceNames` scoping actually excludes a different pod, independent of
+`verify-cross-pod-resize-denied.sh`'s admission-policy check (that one covers the
+`Deployment`/`StatefulSet` `ClusterRole` shape, where RBAC itself doesn't scope by name).
+
+```bash
+deploy/verify-rbac-boundaries.sh              # spins up + tears down its own kind cluster
+deploy/verify-rbac-boundaries.sh --keep        # leaves the cluster + resources up for inspection
+deploy/verify-rbac-boundaries.sh --cluster N   # reuse an existing kind cluster named N
+```
+
+Requires `kind`, `kubectl`, and `helm` locally. Manual-run only for now, matching every other
+check in this directory. Prints `PASS`/`FAIL` for each of the 24 checks and exits non-zero on any
+failure.

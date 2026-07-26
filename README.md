@@ -304,6 +304,14 @@ issues and feedback welcome.
 - Cluster Autoscaler (or equivalent node consolidation) to realize cost savings
   from reduced requests
 
+## Security
+
+Warden runs with real privileges inside your cluster (RBAC, JMX, a host
+cgroup mount). See **[SECURITY.md](SECURITY.md)** for how to report a
+vulnerability, **[docs/threat-model.md](docs/threat-model.md)** for the full
+trust-boundary analysis, and **[docs/hardening.md](docs/hardening.md)** for
+an operator checklist before going to production.
+
 ## Press
 
 [Automatically Shrink and Grow JVM Memory in Kubernetes](https://medium.com/@baokhang/how-to-shrink-grow-on-schedule-the-memory-of-a-fleet-of-jvms-8bbd3d4b3539)
