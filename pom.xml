@@ -88,7 +88,7 @@
          (confirmed via `mvn dependency:tree`, not guessed) — declared explicitly so
          warden-controller doesn't rely on an undeclared transitive dependency for its own
          Prometheus response parsing (W-401). -->
-    <jackson.version>2.19.0</jackson.version>
+    <jackson.version>2.21.7</jackson.version>
     <!-- Verified against Maven Central (not guessed): 0.1.0 is mnemo-cache's latest published
          release; examples/ wraps its real SeasonalCache as a CacheHook reference adapter
          (W-504), not a fake. Caffeine's version matches what mnemo-cache itself builds
