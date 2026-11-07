@@ -3,6 +3,20 @@ entries:
   warden:
   - apiVersion: v2
     appVersion: 0.1.0
+    created: "2026-11-07T14:40:08.058150791Z"
+    description: Mnemo Warden — a JVM-aware vertical right-sizing controller, plus
+      a reusable native-sidecar template for target workloads.
+    digest: bc7dbbe99c6fe84ba45a6dbf2d69225087fbf09fc00d2887da131f6b06662585
+    home: https://github.com/baokhang83/mnemo-jvm-warden
+    name: warden
+    sources:
+    - https://github.com/baokhang83/mnemo-jvm-warden
+    type: application
+    urls:
+    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.7/warden-0.1.7.tgz
+    version: 0.1.7
+  - apiVersion: v2
+    appVersion: 0.1.0
     created: "2026-11-07T10:07:22.206203995Z"
     description: Mnemo Warden — a JVM-aware vertical right-sizing controller, plus
       a reusable native-sidecar template for target workloads.
@@ -104,4 +118,4 @@ entries:
     urls:
     - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.1.2/warden-sidecar-0.1.2.tgz
     version: 0.1.2
-generated: "2026-11-07T10:07:22.206219648Z"
+generated: "2026-11-07T14:40:08.058168578Z"
