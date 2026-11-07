@@ -7,6 +7,7 @@ WORKDIR /build
 # Same reactor-narrowing trick as the agent's Dockerfile: every module POM so the reactor loads,
 # then only the controller's sources (plus warden-crd-model's, its one internal dependency).
 COPY pom.xml ./
+COPY warden-protocol/pom.xml warden-protocol/pom.xml
 COPY warden-crd-model/pom.xml warden-crd-model/pom.xml
 COPY warden-cache-api/pom.xml warden-cache-api/pom.xml
 COPY warden-controller/pom.xml warden-controller/pom.xml
@@ -15,6 +16,8 @@ COPY examples/pom.xml examples/pom.xml
 COPY coverage/pom.xml coverage/pom.xml
 COPY warden-crd-model/src warden-crd-model/src
 COPY warden-controller/src warden-controller/src
+
+COPY warden-protocol/src warden-protocol/src
 
 RUN mvn -q -B -pl warden-controller -am -DskipTests package
 

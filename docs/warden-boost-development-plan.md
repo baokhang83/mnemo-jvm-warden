@@ -318,3 +318,9 @@ heap target below the container limit. B2–B10 implement and verify this contra
 Boost definitions, request/status models, generated CRDs, and schema validation are
 implemented. See [schema configuration and verification](warden-boost-schema.md).
 No runtime grant/reconcile behavior is introduced in B2.
+
+## B3 correlated transport
+
+The shared versioned protocol, per-pod emitter/evidence reader, and agent confirmation
+path are implemented. See [correlated transport and verification](warden-boost-protocol.md).
+B4/B5 still own floor resolution and durable request/grant reconciliation.

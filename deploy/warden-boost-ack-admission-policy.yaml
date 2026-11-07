@@ -1,0 +1,79 @@
+# Optional B3 transport guard for the dedicated ServiceAccount name warden-boost-agent.
+# Install with matching RBAC before granting pods/patch. Not enabled by Helm in B3.
+# A bound pod token is required. Keep that token mounted only in the trusted agent.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: warden-boost-ack-only
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: dedicated-agent
+      expression: "request.userInfo.username == 'system:serviceaccount:' + request.namespace + ':warden-boost-agent'"
+  validations:
+    - expression: >-
+        has(request.userInfo.extra) &&
+        'authentication.kubernetes.io/pod-name' in request.userInfo.extra &&
+        'authentication.kubernetes.io/pod-uid' in request.userInfo.extra &&
+        request.userInfo.extra['authentication.kubernetes.io/pod-name'][0] == object.metadata.name &&
+        request.userInfo.extra['authentication.kubernetes.io/pod-uid'][0] == object.metadata.uid
+      message: "Boost acknowledgement tokens may patch only their bound pod identity"
+    - expression: >-
+        object.spec == oldObject.spec && object.status == oldObject.status &&
+        object.metadata.?labels == oldObject.metadata.?labels &&
+        object.metadata.?ownerReferences == oldObject.metadata.?ownerReferences &&
+        object.metadata.?finalizers == oldObject.metadata.?finalizers &&
+        has(object.metadata.annotations) && has(oldObject.metadata.annotations) &&
+        object.metadata.annotations.all(k, k == 'warden.mnemo.io/resize-ack' ||
+          (k in oldObject.metadata.annotations && object.metadata.annotations[k] == oldObject.metadata.annotations[k])) &&
+        oldObject.metadata.annotations.all(k, k == 'warden.mnemo.io/resize-ack' ||
+          (k in object.metadata.annotations && object.metadata.annotations[k] == oldObject.metadata.annotations[k])) &&
+        'warden.mnemo.io/resize-ack' in object.metadata.annotations &&
+        size(object.metadata.annotations['warden.mnemo.io/resize-ack']) <= 8192
+      message: "Boost agents may change only the bounded resize-ack annotation"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: warden-boost-ack-only
+spec:
+  policyName: warden-boost-ack-only
+  validationActions: ["Deny"]
+---
+# Prevent unrelated ServiceAccounts (including the controller) from forging agent evidence.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: warden-boost-ack-writer
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: acknowledgement-changed
+      expression: >-
+        (has(object.metadata.annotations) && 'warden.mnemo.io/resize-ack' in object.metadata.annotations
+          ? object.metadata.annotations['warden.mnemo.io/resize-ack'] : '') !=
+        (has(oldObject.metadata.annotations) && 'warden.mnemo.io/resize-ack' in oldObject.metadata.annotations
+          ? oldObject.metadata.annotations['warden.mnemo.io/resize-ack'] : '')
+  validations:
+    - expression: "request.userInfo.username == 'system:serviceaccount:' + request.namespace + ':warden-boost-agent'"
+      message: "Only the dedicated Boost agent identity may write resize acknowledgements"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: warden-boost-ack-writer
+spec:
+  policyName: warden-boost-ack-writer
+  validationActions: ["Deny"]

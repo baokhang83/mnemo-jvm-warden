@@ -4,6 +4,7 @@ import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -23,16 +24,19 @@ public final class AttachedHeapController implements HeapController {
 
   private static final String OPERATION = "M2 shrink sequence";
 
+  private final MemoryMXBean memory;
+
   private final SoftMax softMax; // null on G1 — capabilities.supportsSoftMax() is false there
   private final DeepGc deepGc;
   private final RssReader rssReader;
   private final GcCapabilities capabilities;
 
-  private AttachedHeapController(SoftMax softMax, DeepGc deepGc, RssReader rssReader, GcCapabilities capabilities) {
+  private AttachedHeapController(SoftMax softMax, DeepGc deepGc, RssReader rssReader, GcCapabilities capabilities, MemoryMXBean memory) {
     this.softMax = softMax;
     this.deepGc = deepGc;
     this.rssReader = rssReader;
     this.capabilities = capabilities;
+    this.memory = memory;
   }
 
   /** @throws UnsupportedCollectorException if the target's collector cannot uncommit at all */
@@ -58,7 +62,8 @@ public final class AttachedHeapController implements HeapController {
     DeepGc deepGc = DeepGc.forTarget(target);
     Path cgroupRoot = RssReader.resolveCgroupRoot(target.pid(), hostCgroupRoot);
     RssReader rssReader = RssReader.forTarget(target.pid(), cgroupRoot, target.mbeanConnection());
-    return new AttachedHeapController(softMax, deepGc, rssReader, capabilities);
+    var memory = ManagementFactory.getPlatformMXBean(target.mbeanConnection(), MemoryMXBean.class);
+    return new AttachedHeapController(softMax, deepGc, rssReader, capabilities, memory);
   }
 
   @Override
@@ -77,6 +82,15 @@ public final class AttachedHeapController implements HeapController {
   public void deepGcAndUncommit(Duration timeout) throws IOException, InterruptedException {
     deepGc.runAndAwaitUncommit(timeout);
   }
+
+  @Override
+  public long softMaxBytes() {
+    if (softMax == null) throw new UnsupportedOperationException("collector has no soft max");
+    return softMax.softMaxHeapSize();
+  }
+
+  @Override
+  public long maxHeapBytes() { return memory.getHeapMemoryUsage().getMax(); }
 
   @Override
   public GcCapabilities capabilities() {

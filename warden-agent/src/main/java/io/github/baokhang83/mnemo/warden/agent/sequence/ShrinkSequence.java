@@ -60,7 +60,13 @@ public final class ShrinkSequence {
    * &mdash; the cgroup limit is only ever lowered on a verified precondition (§5).
    */
   public ShrinkOutcome shrinkTo(long requestBytes, long limitBytes) throws IOException, InterruptedException {
-    heap.setSoftMax(limitBytes);
+    return shrinkTo(requestBytes, limitBytes, limitBytes);
+  }
+
+  /** Explicit heap target for correlated transitions; legacy callers retain their mapping. */
+  public ShrinkOutcome shrinkTo(long requestBytes, long limitBytes, long heapBytes) throws IOException, InterruptedException {
+    if (heapBytes <= 0 || heapBytes > limitBytes) throw new IllegalArgumentException("invalid heap target");
+    heap.setSoftMax(heapBytes);
     flushEvictableCaches();
     heap.deepGcAndUncommit(gcTimeout);
 

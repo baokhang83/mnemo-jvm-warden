@@ -8,6 +8,7 @@ WORKDIR /build
 # Building with -pl warden-agent -am compiles just the agent and its upstream (the parent),
 # not the other modules, so their sources are not needed here.
 COPY pom.xml ./
+COPY warden-protocol/pom.xml warden-protocol/pom.xml
 COPY warden-crd-model/pom.xml warden-crd-model/pom.xml
 COPY warden-cache-api/pom.xml warden-cache-api/pom.xml
 COPY warden-controller/pom.xml warden-controller/pom.xml
@@ -16,6 +17,8 @@ COPY examples/pom.xml examples/pom.xml
 COPY coverage/pom.xml coverage/pom.xml
 COPY warden-cache-api/src warden-cache-api/src
 COPY warden-agent/src warden-agent/src
+
+COPY warden-protocol/src warden-protocol/src
 
 RUN mvn -q -B -pl warden-agent -am -DskipTests package
 

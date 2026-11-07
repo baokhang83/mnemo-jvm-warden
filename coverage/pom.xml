@@ -26,6 +26,11 @@
   <dependencies>
     <dependency>
       <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>warden-protocol</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
       <artifactId>warden-crd-model</artifactId>
       <version>${project.version}</version>
     </dependency>

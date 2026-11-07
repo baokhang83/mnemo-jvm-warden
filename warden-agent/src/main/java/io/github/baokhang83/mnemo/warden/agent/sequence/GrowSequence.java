@@ -53,8 +53,14 @@ public final class GrowSequence {
    * ceiling already reflect the new size.
    */
   public GrowOutcome growTo(long requestBytes, long limitBytes) throws IOException, InterruptedException {
+    return growTo(requestBytes, limitBytes, limitBytes);
+  }
+
+  /** Explicit heap target for correlated transitions; legacy callers retain their mapping. */
+  public GrowOutcome growTo(long requestBytes, long limitBytes, long heapBytes) throws IOException, InterruptedException {
+    if (heapBytes <= 0 || heapBytes > limitBytes) throw new IllegalArgumentException("invalid heap target");
     resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);
-    heap.setSoftMax(limitBytes);
+    heap.setSoftMax(heapBytes);
     preWarmCaches();
     return new GrowOutcome(limitBytes);
   }

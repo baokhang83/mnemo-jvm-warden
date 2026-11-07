@@ -3,12 +3,16 @@ package io.github.baokhang83.mnemo.warden.agent.intent;
 import io.github.baokhang83.mnemo.warden.agent.resize.InClusterApiServer;
 import io.github.baokhang83.mnemo.warden.agent.resize.K8sQuantity;
 import io.github.baokhang83.mnemo.warden.agent.resize.MinimalJson;
+import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +57,7 @@ public final class PodIntentReader {
   /** The current intent (if any annotation is present) and the container's actual live limit. */
   public PodState read() throws IOException, InterruptedException {
     String body = getPod();
-    return new PodState(extractIntent(body), extractCurrentLimitBytes(body, containerName));
+    return extractState(body, containerName);
   }
 
   /**
@@ -109,9 +113,64 @@ public final class PodIntentReader {
     return OptionalLong.empty();
   }
 
+  @SuppressWarnings("unchecked")
+  static PodState extractState(String json, String containerName) {
+    Map<String, Object> pod = (Map<String, Object>) MinimalJson.parse(json);
+    Map<String, Object> metadata = (Map<String, Object>) pod.get("metadata");
+    Map<String, Object> annotations = (Map<String, Object>) metadata.getOrDefault("annotations", Map.of());
+    Optional<ResizeIntent> correlated = Optional.ofNullable((String) annotations.get(ResizeIntent.ANNOTATION))
+        .map(ResizeIntent::decode); // Never fall back to legacy interpretation for malformed v1 intent.
+    if (correlated.isPresent()) {
+      Intent legacy = extractIntent(json).orElseThrow(() -> new IllegalArgumentException("incomplete correlated intent"));
+      if (legacy.requestBytes() != correlated.get().requestBytes() || legacy.limitBytes() != correlated.get().limitBytes())
+        throw new IllegalArgumentException("conflicting legacy and correlated intent");
+    }
+    Map<String, Object> status = (Map<String, Object>) pod.getOrDefault("status", Map.of());
+    List<Map<String, Object>> containers = (List<Map<String, Object>>) status.getOrDefault("containerStatuses", List.of());
+    OptionalLong request = OptionalLong.empty();
+    String containerId = null;
+    for (Map<String, Object> container : containers) {
+      if (!containerName.equals(container.get("name"))) continue;
+      Map<String, Object> state = (Map<String, Object>) container.getOrDefault("state", Map.of());
+      if (!state.containsKey("running")) break;
+      containerId = (String) container.get("containerID");
+      Map<String, Object> resources = (Map<String, Object>) container.getOrDefault("resources", Map.of());
+      Map<String, Object> requests = (Map<String, Object>) resources.getOrDefault("requests", Map.of());
+      if (requests.get("memory") instanceof String value) request = OptionalLong.of(K8sQuantity.parseBytes(value));
+      break;
+    }
+    return new PodState(extractIntent(json), extractCurrentLimitBytes(json, containerName), request,
+        (String) metadata.get("uid"), containerId, (String) metadata.get("resourceVersion"), correlated,
+        (String) annotations.get(ResizeIntent.ACK_ANNOTATION));
+  }
+
+  /** Fences the evidence write against any pod/intent/status change since this observation. */
+  public void acknowledge(PodState observed, ResizeAcknowledgement acknowledgement)
+      throws IOException, InterruptedException {
+    if (observed.correlatedIntent().isEmpty()
+        || !observed.correlatedIntent().get().equals(acknowledgement.intent())
+        || !acknowledgement.intent().podUid().equals(observed.podUid())
+        || !acknowledgement.intent().containerId().equals(observed.containerId()))
+      throw new IOException("acknowledgement identity no longer matches");
+    if (acknowledgement.applied() && !acknowledgement.confirms(acknowledgement.intent(),
+        observed.podUid(), observed.containerId(), observed.currentRequestBytes().orElse(-1),
+        observed.currentLimitBytes().orElse(-1))) throw new IOException("allocation changed before acknowledgement");
+    String body = "[{\"op\":\"test\",\"path\":\"/metadata/resourceVersion\",\"value\":"
+        + JsonString.quote(observed.resourceVersion())
+        + "},{\"op\":\"test\",\"path\":\"/metadata/uid\",\"value\":" + JsonString.quote(observed.podUid())
+        + "},{\"op\":\"add\",\"path\":\"/metadata/annotations/warden.mnemo.io~1resize-ack\",\"value\":"
+        + JsonString.quote(acknowledgement.encode()) + "}]";
+    HttpRequest request = HttpRequest.newBuilder(podUri()).timeout(Duration.ofSeconds(10))
+        .header("Authorization", "Bearer " + apiServer.bearerToken())
+        .header("Content-Type", "application/json-patch+json")
+        .method("PATCH", HttpRequest.BodyPublishers.ofString(body)).build();
+    var response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+    if (response.statusCode() != 200) throw new IOException("acknowledgement PATCH failed: HTTP " + response.statusCode());
+  }
+
   private String getPod() throws IOException, InterruptedException {
     HttpRequest request =
-        HttpRequest.newBuilder(podUri())
+        HttpRequest.newBuilder(podUri()).timeout(Duration.ofSeconds(10))
             .header("Authorization", "Bearer " + apiServer.bearerToken())
             .GET()
             .build();
