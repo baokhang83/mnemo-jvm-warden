@@ -32,6 +32,7 @@ class BoostTargetResolverTest {
 
   @Test void absentObservationFailsClosedWhenGuardConfigured() {
     assertEquals(Reason.OBSERVATION_REQUIRED, resolve(false, m(100, 200), none, none, none, true, true).reason());
+    assertEquals(Reason.OBSERVATION_REQUIRED, resolve(false, m(100, 200), none, none, none, false, true).reason());
     assertEquals(m(100, 200), resolve(false, m(100, 200), none, none, none, false, false).target());
     assertEquals(Reason.NO_TARGET, resolve(false, none, none, none, none, true, true).reason());
   }

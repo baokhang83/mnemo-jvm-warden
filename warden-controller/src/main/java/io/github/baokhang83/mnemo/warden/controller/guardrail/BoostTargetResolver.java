@@ -44,7 +44,7 @@ public final class BoostTargetResolver {
     if (emergency.isPresent()) candidate = Optional.of(candidate.map(m -> m.max(emergency.get())).orElse(emergency.get()));
     if (admittedFloor.isPresent()) candidate = Optional.of(candidate.map(m -> m.max(admittedFloor.get())).orElse(admittedFloor.get()));
     if (candidate.isEmpty()) return new Decision(Optional.empty(), Reason.NO_TARGET);
-    if (shrinkGuardConfigured && observed.isEmpty())
+    if ((shrinkGuardConfigured || shrinkVetoed) && observed.isEmpty())
       return new Decision(Optional.empty(), Reason.OBSERVATION_REQUIRED);
     if (shrinkVetoed && observed.isPresent() && candidate.get().reduces(observed.get()))
       return new Decision(Optional.empty(), Reason.SHRINK_VETOED);
