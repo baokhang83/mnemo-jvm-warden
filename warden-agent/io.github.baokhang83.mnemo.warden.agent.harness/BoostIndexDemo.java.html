@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BoostIndexDemo.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.harness</a> &gt; <span class="el_source">BoostIndexDemo.java</span></div><h1>BoostIndexDemo.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.harness;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/** Disposable B7 workload: a queryable index with controllable rebuild and retained live heap. */
+public final class BoostIndexDemo {
+<span class="nc" id="L17">  private static final AtomicBoolean RUNNING = new AtomicBoolean();</span>
+<span class="nc" id="L18">  private static volatile List&lt;String&gt; index = List.of(&quot;initial&quot;);</span>
+<span class="nc" id="L19">  private static volatile List&lt;byte[]&gt; retained = List.of();</span>
+<span class="nc" id="L20">  private static volatile CountDownLatch workGate = new CountDownLatch(0);</span>
+  private static volatile long runs;
+  private static volatile long preparedRuns;
+  private static volatile long scanPasses;
+  private static volatile long checksum;
+  private static volatile long elapsedMillis;
+  private static volatile long buildMillis;
+<span class="nc" id="L27">  private static volatile String metricValue = &quot;0&quot;;</span>
+  private BoostIndexDemo() {}
+
+  public static void main(String[] args) throws IOException {
+<span class="nc" id="L31">    var server = HttpServer.create(new InetSocketAddress(8089), 0);</span>
+<span class="nc" id="L32">    server.setExecutor(Executors.newCachedThreadPool());</span>
+<span class="nc" id="L33">    server.createContext(&quot;/status&quot;, x -&gt; reply(x, 200, status()));</span>
+<span class="nc" id="L34">    server.createContext(&quot;/api/v1/query&quot;, x -&gt; reply(x, 200,</span>
+        &quot;{\&quot;status\&quot;:\&quot;success\&quot;,\&quot;data\&quot;:{\&quot;resultType\&quot;:\&quot;vector\&quot;,\&quot;result\&quot;:[{\&quot;value\&quot;:[0,\&quot;&quot; + metricValue + &quot;\&quot;]}]}}&quot;));
+<span class="nc" id="L36">    server.createContext(&quot;/metric/high&quot;, x -&gt; { metricValue = &quot;99&quot;; reply(x, 200, &quot;{}&quot;); });</span>
+<span class="nc" id="L37">    server.createContext(&quot;/metric/low&quot;, x -&gt; { metricValue = &quot;0&quot;; reply(x, 200, &quot;{}&quot;); });</span>
+<span class="nc" id="L38">    server.createContext(&quot;/query&quot;, x -&gt; reply(x, 200, &quot;{\&quot;entries\&quot;:&quot; + index.size() + &quot;}&quot;));</span>
+<span class="nc" id="L39">    server.createContext(&quot;/rebuild&quot;, x -&gt; {</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">      if (!&quot;POST&quot;.equals(x.getRequestMethod())) { reply(x, 405, &quot;{}&quot;); return; }</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">      if (!RUNNING.compareAndSet(false, true)) { reply(x, 409, &quot;{}&quot;); return; }</span>
+<span class="nc" id="L42">      workGate = new CountDownLatch(1);</span>
+<span class="nc" id="L43">      Thread.ofPlatform().name(&quot;index-rebuild&quot;).start(BoostIndexDemo::rebuild);</span>
+<span class="nc" id="L44">      reply(x, 202, &quot;{\&quot;started\&quot;:true}&quot;);</span>
+<span class="nc" id="L45">    });</span>
+<span class="nc" id="L46">    server.createContext(&quot;/finish&quot;, x -&gt; { workGate.countDown(); reply(x, 200, &quot;{}&quot;); });</span>
+<span class="nc" id="L47">    server.createContext(&quot;/retain&quot;, x -&gt; {</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">      if (RUNNING.get()) { reply(x, 409, &quot;{}&quot;); return; }</span>
+      try {
+<span class="nc" id="L50">        var chunks = new ArrayList&lt;byte[]&gt;();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        for (int i = 0; i &lt; 320; i++) {</span>
+<span class="nc" id="L52">          byte[] chunk = new byte[1024 * 1024];</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">          for (int p = 0; p &lt; chunk.length; p += 4096) chunk[p] = (byte) (i + p);</span>
+<span class="nc" id="L54">          chunks.add(chunk);</span>
+        }
+<span class="nc" id="L56">        retained = chunks;</span>
+<span class="nc" id="L57">        reply(x, 200, &quot;{\&quot;retainedMiB\&quot;:320}&quot;);</span>
+<span class="nc" id="L58">      } catch (OutOfMemoryError e) { reply(x, 503, &quot;{\&quot;error\&quot;:\&quot;allocation failed\&quot;}&quot;); }</span>
+<span class="nc" id="L59">    });</span>
+<span class="nc" id="L60">    server.createContext(&quot;/clear&quot;, x -&gt; { retained = List.of(); reply(x, 200, &quot;{}&quot;); });</span>
+<span class="nc" id="L61">    server.start();</span>
+<span class="nc" id="L62">    System.out.println(&quot;boost-index-demo ready&quot;);</span>
+<span class="nc" id="L63">  }</span>
+
+  private static void rebuild() {
+<span class="nc" id="L66">    long started = System.nanoTime();</span>
+    try {
+<span class="nc" id="L68">      var entries = new ArrayList&lt;String&gt;(120_000);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">      for (int i = 119_999; i &gt;= 0; i--) entries.add(&quot;document-&quot; + i);</span>
+<span class="nc" id="L70">      Collections.sort(entries);</span>
+<span class="nc" id="L71">      index = List.copyOf(entries);</span>
+<span class="nc" id="L72">      buildMillis = (System.nanoTime() - started) / 1_000_000;</span>
+<span class="nc" id="L73">      preparedRuns++;</span>
+      // Continue scanning the new index while queries run until the test ends the work.
+<span class="nc bnc" id="L75" title="All 2 branches missed.">      while (!workGate.await(5, java.util.concurrent.TimeUnit.MILLISECONDS)) {</span>
+<span class="nc" id="L76">        long value = 0;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (String entry : index) value += entry.hashCode();</span>
+<span class="nc" id="L78">        checksum = value;</span>
+<span class="nc" id="L79">        scanPasses++;</span>
+<span class="nc" id="L80">      }</span>
+<span class="nc" id="L81">      elapsedMillis = (System.nanoTime() - started) / 1_000_000;</span>
+<span class="nc" id="L82">      runs++;</span>
+<span class="nc" id="L83">    } catch (InterruptedException e) { Thread.currentThread().interrupt(); }</span>
+<span class="nc" id="L84">    finally { RUNNING.set(false); }</span>
+<span class="nc" id="L85">  }</span>
+
+  private static String status() {
+<span class="nc" id="L88">    var heap = java.lang.management.ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();</span>
+<span class="nc" id="L89">    long softMax = -1;</span>
+    try {
+<span class="nc" id="L91">      var diagnostic = java.lang.management.ManagementFactory.getPlatformMXBean(com.sun.management.HotSpotDiagnosticMXBean.class);</span>
+<span class="nc" id="L92">      softMax = Long.parseLong(diagnostic.getVMOption(&quot;SoftMaxHeapSize&quot;).getValue());</span>
+<span class="nc" id="L93">    } catch (RuntimeException ignored) { }</span>
+<span class="nc" id="L94">    long rss = -1;</span>
+<span class="nc" id="L95">    try (var lines = java.nio.file.Files.lines(java.nio.file.Path.of(&quot;/proc/self/status&quot;))) {</span>
+<span class="nc" id="L96">      rss = lines.filter(line -&gt; line.startsWith(&quot;VmRSS:&quot;)).mapToLong(line -&gt;</span>
+<span class="nc" id="L97">          Long.parseLong(line.substring(6).trim().split(&quot;\\s+&quot;)[0]) * 1024).findFirst().orElse(-1);</span>
+<span class="nc" id="L98">    } catch (IOException | RuntimeException ignored) { }</span>
+<span class="nc" id="L99">    return &quot;{\&quot;javaVersion\&quot;:\&quot;&quot; + System.getProperty(&quot;java.version&quot;) + &quot;\&quot;,\&quot;running\&quot;:&quot; + RUNNING.get() + &quot;,\&quot;runs\&quot;:&quot; + runs + &quot;,\&quot;entries\&quot;:&quot; + index.size()</span>
+        + &quot;,\&quot;preparedRuns\&quot;:&quot; + preparedRuns + &quot;,\&quot;scanPasses\&quot;:&quot; + scanPasses
+        + &quot;,\&quot;checksum\&quot;:&quot; + checksum + &quot;,\&quot;buildMillis\&quot;:&quot; + buildMillis
+<span class="nc" id="L102">        + &quot;,\&quot;elapsedMillis\&quot;:&quot; + elapsedMillis + &quot;,\&quot;retainedMiB\&quot;:&quot; + retained.size()</span>
+<span class="nc" id="L103">        + &quot;,\&quot;heapUsedBytes\&quot;:&quot; + heap.getUsed() + &quot;,\&quot;heapCommittedBytes\&quot;:&quot; + heap.getCommitted()</span>
+        + &quot;,\&quot;softMaxBytes\&quot;:&quot; + softMax + &quot;,\&quot;rssBytes\&quot;:&quot; + rss + &quot;}&quot;;
+  }
+  private static void reply(HttpExchange exchange, int code, String body) throws IOException {
+<span class="nc" id="L107">    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L108">    exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json&quot;);</span>
+<span class="nc" id="L109">    exchange.sendResponseHeaders(code, bytes.length);</span>
+<span class="nc" id="L110">    try (var out = exchange.getResponseBody()) { out.write(bytes); }</span>
+<span class="nc" id="L111">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
