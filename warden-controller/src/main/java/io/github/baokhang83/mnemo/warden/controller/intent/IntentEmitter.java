@@ -97,7 +97,7 @@ public final class IntentEmitter {
         .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(observed.getMetadata().getResourceVersion()))
         .append("},{\"op\":\"test\",\"path\":\"/metadata/uid\",\"value\":")
         .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(observed.getMetadata().getUid())).append("}");
-    if (observed.getMetadata().getAnnotations() == null) {
+    if (observed.getMetadata().getAnnotations() == null || observed.getMetadata().getAnnotations().isEmpty()) {
       patch.append(",{\"op\":\"add\",\"path\":\"/metadata/annotations\",\"value\":{}} ");
     }
     appendAnnotation(patch, ANNOTATION_REQUEST_BYTES, request);

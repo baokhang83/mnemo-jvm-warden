@@ -2,7 +2,9 @@ package io.github.baokhang83.mnemo.warden.controller.intent;
 
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.PodBuilder;
+import io.fabric8.kubernetes.client.dsl.base.PatchContext;
+import io.fabric8.kubernetes.client.dsl.base.PatchType;
+import io.github.baokhang83.mnemo.warden.protocol.JsonString;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
@@ -16,14 +18,31 @@ public final class CorrelatedIntentEmitter {
 
   /** Caller supplies a durable transition ID; retries must not generate a new identity. */
   public static void emit(KubernetesClient client, String namespace, String podName, ResizeIntent intent) {
-    client.pods().inNamespace(namespace).withName(podName).edit(pod -> {
-      if (currentContainer(pod, intent).isEmpty())
-        throw new IllegalArgumentException("correlated target identity changed");
-      return new PodBuilder(pod).editMetadata()
-          .addToAnnotations(IntentEmitter.ANNOTATION_REQUEST_BYTES, Long.toString(intent.requestBytes()))
-          .addToAnnotations(IntentEmitter.ANNOTATION_LIMIT_BYTES, Long.toString(intent.limitBytes()))
-          .addToAnnotations(ResizeIntent.ANNOTATION, intent.encode()).endMetadata().build();
-    });
+    var resource = client.pods().inNamespace(namespace).withName(podName);
+    Pod pod = resource.get();
+    if (currentContainer(pod, intent).isEmpty() || pod.getMetadata().getResourceVersion() == null)
+      throw new IllegalArgumentException("correlated target identity changed");
+    resource.patch(PatchContext.of(PatchType.JSON), patch(pod, intent));
+  }
+
+  /** Atomic UID and resourceVersion tests fence replacement and concurrent intent changes. */
+  static String patch(Pod observed, ResizeIntent intent) {
+    StringBuilder json = new StringBuilder("[{\"op\":\"test\",\"path\":\"/metadata/uid\",\"value\":")
+        .append(JsonString.quote(intent.podUid()))
+        .append("},{\"op\":\"test\",\"path\":\"/metadata/resourceVersion\",\"value\":")
+        .append(JsonString.quote(observed.getMetadata().getResourceVersion())).append("}");
+    if (observed.getMetadata().getAnnotations() == null || observed.getMetadata().getAnnotations().isEmpty())
+      json.append(",{\"op\":\"add\",\"path\":\"/metadata/annotations\",\"value\":{}}");
+    add(json, IntentEmitter.ANNOTATION_REQUEST_BYTES, Long.toString(intent.requestBytes()));
+    add(json, IntentEmitter.ANNOTATION_LIMIT_BYTES, Long.toString(intent.limitBytes()));
+    add(json, ResizeIntent.ANNOTATION, intent.encode());
+    return json.append("]").toString();
+  }
+
+  private static void add(StringBuilder json, String key, String value) {
+    json.append(",{\"op\":\"add\",\"path\":")
+        .append(JsonString.quote("/metadata/annotations/" + key.replace("~", "~0").replace("/", "~1")))
+        .append(",\"value\":").append(JsonString.quote(value)).append("}");
   }
 
   /** Requires live allocation plus evidence for the current intent, never desired pod spec. */

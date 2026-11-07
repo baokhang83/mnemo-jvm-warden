@@ -1,5 +1,6 @@
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter;
+import io.github.baokhang83.mnemo.warden.controller.intent.CorrelatedIntentEmitter;
 import io.github.baokhang83.mnemo.warden.crd.ResourceProfile;
 import io.github.baokhang83.mnemo.warden.crd.TargetRef;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
@@ -14,11 +15,7 @@ public class BoostFloorProbe {
       var status = pod.getStatus().getContainerStatuses().getFirst();
       var intent = new ResizeIntent("initial", "request", pod.getMetadata().getUid(), "app",
           status.getContainerID(), 67108864L, 268435456L, 33554432L);
-      resource.edit(p -> new io.fabric8.kubernetes.api.model.PodBuilder(p).editMetadata()
-          .addToAnnotations(ResizeIntent.ANNOTATION, intent.encode())
-          .addToAnnotations(IntentEmitter.ANNOTATION_REQUEST_BYTES, "67108864")
-          .addToAnnotations(IntentEmitter.ANNOTATION_LIMIT_BYTES, "268435456")
-          .endMetadata().build());
+      CorrelatedIntentEmitter.emit(client, namespace, name, intent);
       var ref = new TargetRef(); ref.setKind("Pod"); ref.setName(name);
       var peak = new ResourceProfile(); peak.setRequest("96Mi"); peak.setLimit("320Mi");
       IntentEmitter.emit(client, namespace, ref, peak);
