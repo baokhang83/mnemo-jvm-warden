@@ -14,9 +14,12 @@ import io.github.baokhang83.mnemo.warden.agent.sequence.GrowSequence;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkOutcome;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
 import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -107,6 +110,21 @@ public final class IntentWatcher {
     OptionalLong rssBeforeThisTick = sampleMetrics(jvm);
 
     PodState state = intentReader.read();
+    if (state.correlatedIntent().isPresent()) {
+      try {
+        applyCorrelated(jvm, state);
+      } catch (InterruptedException e) {
+        throw e;
+      } catch (Exception e) {
+        try {
+          publishFailure(state);
+        } catch (IOException publicationFailure) {
+          AgentLog.info("could not publish failure evidence; retrying next tick");
+        }
+        throw e;
+      }
+      return;
+    }
     Optional<Intent> intent = state.intent();
     OptionalLong currentLimitBytes = state.currentLimitBytes();
     if (intent.isEmpty() || currentLimitBytes.isEmpty()) {
@@ -149,6 +167,43 @@ public final class IntentWatcher {
       AgentLog.info("intent-driven grow: " + outcome);
       metrics.incrementResize("grow");
     }
+  }
+
+  private void applyCorrelated(AttachedJvm jvm, PodState state) throws Exception {
+    var intent = state.correlatedIntent().orElseThrow();
+    CorrelatedResize.requireCurrent(intent, state);
+    if (!config.targetContainerName().equals(intent.containerName()))
+      throw new IOException("correlated intent targets a different container");
+    Optional<HeapController> resolved = heapResolver.resolve(jvm);
+    if (resolved.isEmpty()) throw new IOException("UnsupportedRuntime");
+    var heap = resolved.get();
+    if (state.acknowledgement() != null) {
+      try {
+        var ack = ResizeAcknowledgement.decode(state.acknowledgement());
+        if (ack.confirms(intent, state.podUid(), state.containerId(),
+            state.currentRequestBytes().orElse(-1), state.currentLimitBytes().orElse(-1))
+            && heap.softMaxBytes() == intent.heapBytes()) return;
+      } catch (IllegalArgumentException ignored) {
+        // Invalid evidence is never accepted; replace it only after current preparation succeeds.
+      }
+    }
+    var acknowledgement = CorrelatedResize.execute(intent, config.podName(), heap,
+        PodResizeClient.forInClusterAgent(intent),
+        CacheHookLookup.lookupAll(jvm), config.gcTimeout(), config.resizeTimeout(),
+        intentReader::read, Clock.systemUTC());
+    // Failure to publish does not undo preparation. The next tick observes and retries safely.
+    PodState fresh = intentReader.read();
+    CorrelatedResize.requireCurrent(intent, fresh);
+    intentReader.acknowledge(fresh, acknowledgement);
+  }
+
+  private void publishFailure(PodState attempted) throws IOException, InterruptedException {
+    var intent = attempted.correlatedIntent().orElseThrow();
+    PodState fresh = intentReader.read();
+    CorrelatedResize.requireCurrent(intent, fresh); // A failure for an old instance is also stale.
+    intentReader.acknowledge(fresh, new ResizeAcknowledgement(
+        intent, false, "PreparationFailed", fresh.currentRequestBytes().orElse(0),
+        fresh.currentLimitBytes().orElse(0), 0, Instant.now()));
   }
 
   private void recordShrinkOutcome(ShrinkOutcome outcome, OptionalLong rssBeforeThisTick) {

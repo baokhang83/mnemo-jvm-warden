@@ -1,5 +1,7 @@
 package io.github.baokhang83.mnemo.warden.agent.resize;
 
+import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -39,6 +41,9 @@ public final class PodResizeClient implements ResizePort {
 
   private final InClusterApiServer apiServer;
   private final HttpClient httpClient;
+  private String expectedPodUid;
+  private String expectedContainerId;
+  private ResizeIntent expectedIntent;
 
   PodResizeClient(InClusterApiServer apiServer, HttpClient httpClient) {
     this.apiServer = apiServer;
@@ -50,6 +55,16 @@ public final class PodResizeClient implements ResizePort {
     InClusterApiServer apiServer = InClusterApiServer.discover();
     HttpClient httpClient = HttpClient.newBuilder().sslContext(apiServer.sslContext()).build();
     return new PodResizeClient(apiServer, httpClient);
+  }
+
+  /** Builds an identity-bound client for a correlated application-container transition. */
+  public static PodResizeClient forInClusterAgent(ResizeIntent intent)
+      throws IOException, GeneralSecurityException {
+    PodResizeClient client = forInClusterAgent();
+    client.expectedPodUid = intent.podUid();
+    client.expectedContainerId = intent.containerId();
+    client.expectedIntent = intent;
+    return client;
   }
 
   /**
@@ -67,10 +82,20 @@ public final class PodResizeClient implements ResizePort {
 
   private void patch(String podName, String containerName, long requestBytes, long limitBytes)
       throws IOException, InterruptedException {
+    String payload = patchBody(containerName, requestBytes, limitBytes);
+    if (expectedPodUid != null) {
+      String observed = getPod(podName);
+      String version = requireIdentity(observed, containerName, expectedPodUid, expectedContainerId);
+      requireIntent(observed);
+      payload = "{\"metadata\":{\"uid\":"
+          + JsonString.quote(expectedPodUid)
+          + ",\"resourceVersion\":" + JsonString.quote(version)
+          + "}," + payload.substring(1);
+    }
     HttpRequest request =
         authorizedRequestBuilder(resizeUri(podName))
             .header("Content-Type", "application/strategic-merge-patch+json")
-            .method("PATCH", HttpRequest.BodyPublishers.ofString(patchBody(containerName, requestBytes, limitBytes)))
+            .method("PATCH", HttpRequest.BodyPublishers.ofString(payload))
             .build();
 
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -110,6 +135,10 @@ public final class PodResizeClient implements ResizePort {
   private boolean matchesDesired(String podName, String containerName, long requestBytes, long limitBytes)
       throws IOException, InterruptedException {
     String body = getPod(podName);
+    if (expectedPodUid != null) {
+      requireIdentity(body, containerName, expectedPodUid, expectedContainerId);
+      requireIntent(body);
+    }
     long[] observed = extractConfirmedMemory(body, containerName);
     return observed != null && observed[0] == requestBytes && observed[1] == limitBytes;
   }
@@ -152,6 +181,33 @@ public final class PodResizeClient implements ResizePort {
     return null;
   }
 
+  @SuppressWarnings("unchecked")
+  static String requireIdentity(String json, String container, String podUid, String containerId) throws IOException {
+    Map<String, Object> pod = (Map<String, Object>) MinimalJson.parse(json);
+    Map<String, Object> meta = (Map<String, Object>) pod.get("metadata");
+    Map<String, Object> status = (Map<String, Object>) pod.getOrDefault("status", Map.of());
+    var statuses = (List<Map<String, Object>>) status.getOrDefault("containerStatuses", List.of());
+    if (meta == null || !podUid.equals(meta.get("uid")) || meta.get("resourceVersion") == null)
+      throw new IOException("pod identity changed during resize");
+    for (Map<String, Object> value : statuses) {
+      if (container.equals(value.get("name")) && containerId.equals(value.get("containerID"))
+          && ((Map<String, Object>) value.getOrDefault("state", Map.of())).containsKey("running"))
+        return (String) meta.get("resourceVersion");
+    }
+    throw new IOException("container identity changed during resize");
+  }
+
+  @SuppressWarnings("unchecked")
+  private void requireIntent(String json) throws IOException {
+    Map<String, Object> pod = (Map<String, Object>) MinimalJson.parse(json);
+    Map<String, Object> metadata = (Map<String, Object>) pod.get("metadata");
+    Map<String, Object> annotations = (Map<String, Object>) metadata.getOrDefault("annotations", Map.of());
+    if (!expectedIntent.encode().equals(annotations.get(ResizeIntent.ANNOTATION))
+        || !Long.toString(expectedIntent.requestBytes()).equals(annotations.get("warden.mnemo.io/target-request-bytes"))
+        || !Long.toString(expectedIntent.limitBytes()).equals(annotations.get("warden.mnemo.io/target-limit-bytes")))
+      throw new IOException("intent changed during resize");
+  }
+
   private String getPod(String podName) throws IOException, InterruptedException {
     HttpRequest request = authorizedRequestBuilder(podUri(podName)).GET().build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -162,7 +218,7 @@ public final class PodResizeClient implements ResizePort {
   }
 
   private HttpRequest.Builder authorizedRequestBuilder(URI uri) throws IOException {
-    return HttpRequest.newBuilder(uri).header("Authorization", "Bearer " + apiServer.bearerToken());
+    return HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + apiServer.bearerToken());
   }
 
   private URI podUri(String podName) {

@@ -15,6 +15,11 @@
   <description>Cluster-scoped reconciler / scheduler. Reads WardenPolicy, so it depends on warden-crd-model.</description>
 
   <dependencies>
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>warden-protocol</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The one settled internal edge: the reconciler consumes the WardenPolicy types. -->
     <dependency>
       <groupId>io.github.baokhang83.mnemo</groupId>

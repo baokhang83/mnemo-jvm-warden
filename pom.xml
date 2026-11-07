@@ -42,6 +42,7 @@
     modules declare dependencies without versions (see dependencyManagement).
   -->
   <modules>
+    <module>warden-protocol</module>
     <module>warden-crd-model</module>
     <module>warden-cache-api</module>
     <module>warden-controller</module>

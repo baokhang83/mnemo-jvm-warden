@@ -31,6 +31,12 @@ public interface HeapController {
    */
   void deepGcAndUncommit(Duration timeout) throws IOException, InterruptedException;
 
+  /** Required by correlated Boost preparation; legacy controllers may not expose it. */
+  default long softMaxBytes() { throw new UnsupportedOperationException("soft max observation unavailable"); }
+
+  /** Fixed launch-time heap ceiling. */
+  default long maxHeapBytes() { throw new UnsupportedOperationException("heap maximum unavailable"); }
+
   /** What this controller's collector actually supports. */
   GcCapabilities capabilities();
 }
