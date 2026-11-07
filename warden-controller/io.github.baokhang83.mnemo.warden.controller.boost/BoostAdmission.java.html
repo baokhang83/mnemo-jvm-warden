@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BoostAdmission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.boost</a> &gt; <span class="el_source">BoostAdmission.java</span></div><h1>BoostAdmission.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.boost;
+
+import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.LabelSelector;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.github.baokhang83.mnemo.warden.controller.schedule.BlackoutEvaluator;
+import io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity;
+import io.github.baokhang83.mnemo.warden.crd.WardenBoost;
+import io.github.baokhang83.mnemo.warden.crd.WardenPolicy;
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Validates a new request and returns the values to persist before any resize is published. */
+public final class BoostAdmission {
+  /** Explicit, immutable-identity policy opt-in. Set by the workload operator. */
+  public static final String POLICY_UID_LABEL = &quot;warden.mnemo.io/policy-uid&quot;;
+<span class="fc" id="L20">  private static final Pattern PART = Pattern.compile(&quot;(\\d+(?:\\.\\d+)?)(ns|us|µs|ms|s|m|h)&quot;);</span>
+  private BoostAdmission() {}
+
+<span class="fc" id="L23">  public record Snapshot(String policyUid, long policyGeneration, String podUid, String containerId,</span>
+      long requestFloor, long limitFloor, long heapTarget, Instant acquisitionDeadline,
+      Duration maxDuration) {}
+
+  /** Throws on missing or unverified identity; caller translates the failure to status. */
+  public static Snapshot validate(KubernetesClient client, WardenBoost request, WardenPolicy policy,
+      Pod pod, Instant now) {
+<span class="fc" id="L30">    var meta = Objects.requireNonNull(request.getMetadata());</span>
+<span class="fc" id="L31">    var spec = Objects.requireNonNull(request.getSpec());</span>
+<span class="fc" id="L32">    var policyMeta = Objects.requireNonNull(policy.getMetadata());</span>
+<span class="fc" id="L33">    var policySpec = Objects.requireNonNull(policy.getSpec());</span>
+<span class="fc" id="L34">    var podMeta = Objects.requireNonNull(pod.getMetadata());</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">    if (!Objects.equals(meta.getNamespace(), policyMeta.getNamespace())</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        || !Objects.equals(meta.getNamespace(), podMeta.getNamespace())</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        || !Objects.equals(spec.getPolicyRef(), policyMeta.getName())</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        || spec.getPodRef() == null || !Objects.equals(spec.getPodRef().getName(), podMeta.getName())</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        || !Objects.equals(spec.getPodRef().getUid(), podMeta.getUid())</span>
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">        || policyMeta.getUid() == null || podMeta.getUid() == null)</span>
+<span class="fc" id="L41">      throw new IllegalArgumentException(&quot;IdentityMismatch&quot;);</span>
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">    if (podMeta.getLabels() == null || !policyMeta.getUid().equals(podMeta.getLabels().get(POLICY_UID_LABEL)))</span>
+<span class="fc" id="L43">      throw new IllegalArgumentException(&quot;TargetNotOptedIn&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">    if (!isTarget(client, policy, pod)) throw new IllegalArgumentException(&quot;PodNotInPolicyTarget&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">    if (podMeta.getAnnotations() != null</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        &amp;&amp; podMeta.getAnnotations().containsKey(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION))</span>
+<span class="nc" id="L47">      throw new IllegalArgumentException(&quot;ExistingCorrelatedIntent&quot;);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">    if (Boolean.TRUE.equals(spec.getCompletionRequested())) throw new IllegalArgumentException(&quot;AlreadyCompleted&quot;);</span>
+<span class="fc" id="L49">    var definitions = Objects.requireNonNull(policySpec.getBoosts(), &quot;NoBoostDefinitions&quot;);</span>
+<span class="fc" id="L50">    var definition = Objects.requireNonNull(definitions.get(spec.getBoost()), &quot;UnknownBoost&quot;);</span>
+<span class="fc" id="L51">    var profiles = Objects.requireNonNull(policySpec.getProfiles(), &quot;NoProfiles&quot;);</span>
+<span class="fc" id="L52">    var profile = Objects.requireNonNull(profiles.get(definition.getProfile()), &quot;UnknownProfile&quot;);</span>
+<span class="fc" id="L53">    long requestBytes = ResourceQuantity.parseBytes(profile.getRequest());</span>
+<span class="fc" id="L54">    long limitBytes = ResourceQuantity.parseBytes(profile.getLimit());</span>
+<span class="fc" id="L55">    long heapBytes = ResourceQuantity.parseBytes(definition.getHeapTarget());</span>
+<span class="pc bpc" id="L56" title="4 of 8 branches missed.">    if (requestBytes &lt;= 0 || requestBytes &gt; limitBytes || heapBytes &lt;= 0 || heapBytes &gt;= limitBytes)</span>
+<span class="nc" id="L57">      throw new IllegalArgumentException(&quot;InvalidFloor&quot;);</span>
+<span class="fc" id="L58">    Duration acquisition = duration(definition.getAcquisitionTimeout());</span>
+<span class="fc" id="L59">    Duration maximum = duration(definition.getMaxDuration());</span>
+<span class="fc" id="L60">    Instant deadline = Instant.parse(Objects.requireNonNull(meta.getCreationTimestamp())).plus(acquisition);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    if (!now.isBefore(deadline)) throw new IllegalArgumentException(&quot;AcquisitionTimeout&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">    if (BlackoutEvaluator.isBlackedOut(policySpec, now)) throw new IllegalArgumentException(&quot;Blackout&quot;);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">    if (pod.getStatus() == null || pod.getStatus().getContainerStatuses() == null)</span>
+<span class="nc" id="L64">      throw new IllegalArgumentException(&quot;ContainerNotRunning&quot;);</span>
+<span class="fc" id="L65">    var statuses = pod.getStatus().getContainerStatuses();</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">    var container = statuses.stream().filter(c -&gt; spec.getContainer().equals(c.getName())</span>
+<span class="pc bpc" id="L67" title="3 of 6 branches missed.">        &amp;&amp; c.getContainerID() != null &amp;&amp; c.getState() != null &amp;&amp; c.getState().getRunning() != null)</span>
+<span class="pc" id="L68">        .findFirst().orElseThrow(() -&gt; new IllegalArgumentException(&quot;ContainerNotRunning&quot;));</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">    if (container.getResources() == null || container.getResources().getRequests() == null</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        || container.getResources().getLimits() == null</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        || container.getResources().getRequests().get(&quot;memory&quot;) == null</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        || container.getResources().getLimits().get(&quot;memory&quot;) == null)</span>
+<span class="nc" id="L73">      throw new IllegalArgumentException(&quot;AppliedAllocationUnavailable&quot;);</span>
+<span class="fc" id="L74">    return new Snapshot(policyMeta.getUid(), Objects.requireNonNull(policyMeta.getGeneration()), podMeta.getUid(),</span>
+<span class="fc" id="L75">        container.getContainerID(), requestBytes, limitBytes, heapBytes, deadline, maximum);</span>
+  }
+
+  private static boolean isTarget(KubernetesClient client, WardenPolicy policy, Pod pod) {
+<span class="fc" id="L79">    var target = policy.getSpec().getTargetRef();</span>
+<span class="pc bpc" id="L80" title="3 of 6 branches missed.">    if (target == null || target.getKind() == null || target.getName() == null) return false;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">    if (&quot;Pod&quot;.equals(target.getKind())) return target.getName().equals(pod.getMetadata().getName());</span>
+<span class="nc" id="L82">    String namespace = policy.getMetadata().getNamespace();</span>
+    LabelSelector selector;
+<span class="nc bnc" id="L84" title="All 2 branches missed.">    if (&quot;Deployment&quot;.equals(target.getKind())) {</span>
+<span class="nc" id="L85">      var workload = client.apps().deployments().inNamespace(namespace).withName(target.getName()).get();</span>
+<span class="nc bnc" id="L86" title="All 4 branches missed.">      if (workload == null || workload.getSpec() == null) return false;</span>
+<span class="nc" id="L87">      selector = workload.getSpec().getSelector();</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">    } else if (&quot;StatefulSet&quot;.equals(target.getKind())) {</span>
+<span class="nc" id="L89">      var workload = client.apps().statefulSets().inNamespace(namespace).withName(target.getName()).get();</span>
+<span class="nc bnc" id="L90" title="All 4 branches missed.">      if (workload == null || workload.getSpec() == null) return false;</span>
+<span class="nc" id="L91">      selector = workload.getSpec().getSelector();</span>
+<span class="nc" id="L92">    } else return false;</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    if (selector == null) return false;</span>
+<span class="nc" id="L94">    return client.pods().inNamespace(namespace).withLabelSelector(selector).list().getItems().stream()</span>
+<span class="nc" id="L95">        .anyMatch(p -&gt; Objects.equals(p.getMetadata().getUid(), pod.getMetadata().getUid()));</span>
+  }
+
+  /** Parse Kubernetes CEL's Go-style positive duration as an exact number of nanoseconds. */
+  static Duration duration(String raw) {
+<span class="fc" id="L100">    var matcher = PART.matcher(Objects.requireNonNull(raw));</span>
+<span class="fc" id="L101">    BigDecimal nanos = BigDecimal.ZERO;</span>
+<span class="fc" id="L102">    int end = 0;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">    while (matcher.find()) {</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">      if (matcher.start() != end) throw new IllegalArgumentException(&quot;InvalidDuration&quot;);</span>
+<span class="pc bpc" id="L105" title="4 of 7 branches missed.">      long factor = switch (matcher.group(2)) {</span>
+<span class="nc" id="L106">        case &quot;ns&quot; -&gt; 1L; case &quot;us&quot;, &quot;µs&quot; -&gt; 1_000L; case &quot;ms&quot; -&gt; 1_000_000L;</span>
+<span class="fc" id="L107">        case &quot;s&quot; -&gt; 1_000_000_000L; case &quot;m&quot; -&gt; 60_000_000_000L;</span>
+<span class="pc" id="L108">        case &quot;h&quot; -&gt; 3_600_000_000_000L; default -&gt; throw new IllegalArgumentException(&quot;InvalidDuration&quot;);</span>
+      };
+<span class="fc" id="L110">      nanos = nanos.add(new BigDecimal(matcher.group(1)).multiply(BigDecimal.valueOf(factor)));</span>
+<span class="fc" id="L111">      end = matcher.end();</span>
+<span class="fc" id="L112">    }</span>
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">    if (end != raw.length() || end == 0) throw new IllegalArgumentException(&quot;InvalidDuration&quot;);</span>
+<span class="fc" id="L114">    long value = nanos.longValueExact();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">    if (value &lt;= 0) throw new IllegalArgumentException(&quot;InvalidDuration&quot;);</span>
+<span class="fc" id="L116">    return Duration.ofNanos(value);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

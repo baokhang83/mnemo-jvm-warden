@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BoostStatusStore.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.boost</a> &gt; <span class="el_source">BoostStatusStore.java</span></div><h1>BoostStatusStore.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.boost;
+
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.dsl.base.PatchContext;
+import io.fabric8.kubernetes.client.dsl.base.PatchType;
+import io.github.baokhang83.mnemo.warden.crd.WardenBoost;
+import io.github.baokhang83.mnemo.warden.crd.WardenBoostStatus;
+import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import java.util.Objects;
+
+/** Compare-and-set lifecycle state; never overwrite a concurrent intent or completion. */
+public final class BoostStatusStore {
+  private BoostStatusStore() {}
+
+  public static WardenBoost compareAndSet(KubernetesClient client, WardenBoost observed, WardenBoostStatus next) {
+<span class="nc" id="L16">    var metadata = Objects.requireNonNull(observed.getMetadata());</span>
+<span class="nc" id="L17">    String patch = &quot;[{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/uid\&quot;,\&quot;value\&quot;:&quot;</span>
+<span class="nc" id="L18">        + JsonString.quote(Objects.requireNonNull(metadata.getUid()))</span>
+        + &quot;},{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/resourceVersion\&quot;,\&quot;value\&quot;:&quot;
+<span class="nc" id="L20">        + JsonString.quote(Objects.requireNonNull(metadata.getResourceVersion()))</span>
+        + &quot;},{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:\&quot;/status\&quot;,\&quot;value\&quot;:&quot;
+<span class="nc" id="L22">        + client.getKubernetesSerialization().asJson(Objects.requireNonNull(next)) + &quot;}]&quot;;</span>
+<span class="nc" id="L23">    return client.resources(WardenBoost.class).inNamespace(metadata.getNamespace()).withName(metadata.getName())</span>
+<span class="nc" id="L24">        .subresource(&quot;status&quot;).patch(PatchContext.of(PatchType.JSON), patch);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

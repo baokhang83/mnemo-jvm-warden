@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BoostLifecycle.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.boost</a> &gt; <span class="el_source">BoostLifecycle.java</span></div><h1>BoostLifecycle.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.boost;
+
+import io.github.baokhang83.mnemo.warden.crd.BoostPhase;
+import java.time.Instant;
+import java.util.Objects;
+
+/** Pure lifecycle decisions. Authorization, claim and evidence must be checked by the caller. */
+public final class BoostLifecycle {
+  private BoostLifecycle() {}
+
+  public record Observation(BoostPhase phase, boolean targetPresent, boolean sameInstance,
+      boolean completionRequested, boolean blackout, boolean matchingEvidence, boolean releaseTargetConfirmed,
+      Instant acquisitionDeadline, Instant executionDeadline, Instant now) {
+<span class="fc" id="L14">    public Observation {</span>
+<span class="fc" id="L15">      Objects.requireNonNull(now, &quot;now&quot;);</span>
+<span class="fc" id="L16">    }</span>
+  }
+
+<span class="fc" id="L19">  public record Decision(BoostPhase phase, String reason, boolean keepFloor) {}</span>
+
+  public static Decision evaluate(Observation o) {
+<span class="fc" id="L22">    Objects.requireNonNull(o);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">    BoostPhase phase = o.phase() == null ? BoostPhase.Pending : o.phase();</span>
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">    if (phase == BoostPhase.Completed || phase == BoostPhase.Rejected)</span>
+<span class="nc" id="L25">      return new Decision(phase, &quot;Terminal&quot;, false);</span>
+<span class="pc bpc" id="L26" title="2 of 6 branches missed.">    if (phase != BoostPhase.Pending &amp;&amp; (!o.targetPresent() || !o.sameInstance()))</span>
+<span class="fc" id="L27">      return new Decision(BoostPhase.Orphaned, &quot;TargetInstanceChanged&quot;, o.targetPresent());</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">    if (phase == BoostPhase.Orphaned)</span>
+<span class="nc" id="L29">      return new Decision(phase, &quot;TargetInstanceChanged&quot;, o.targetPresent());</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">    if (phase == BoostPhase.Pending)</span>
+<span class="nc" id="L31">      return new Decision(phase, &quot;AwaitingAdmission&quot;, false);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">    if (phase == BoostPhase.Failed)</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">      return o.completionRequested() ? new Decision(BoostPhase.Releasing, &quot;CleanupRequested&quot;, true)</span>
+<span class="nc" id="L34">          : new Decision(phase, &quot;CleanupPending&quot;, true);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    if (phase == BoostPhase.Preparing) {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">      if (o.completionRequested()) return new Decision(BoostPhase.Releasing, &quot;Cancelled&quot;, true);</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">      if (o.acquisitionDeadline() == null || !o.now().isBefore(o.acquisitionDeadline()))</span>
+<span class="fc" id="L38">        return new Decision(BoostPhase.Failed, &quot;AcquisitionTimeout&quot;, true);</span>
+<span class="fc bfc" id="L39" title="All 4 branches covered.">      if (!o.blackout() &amp;&amp; o.matchingEvidence()) return new Decision(BoostPhase.Granted, &quot;Prepared&quot;, true);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">      return new Decision(phase, o.blackout() ? &quot;Blackout&quot; : &quot;AwaitingEvidence&quot;, true);</span>
+    }
+<span class="fc bfc" id="L42" title="All 4 branches covered.">    if (phase == BoostPhase.Granted || phase == BoostPhase.Expired) {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">      if (o.completionRequested()) return new Decision(BoostPhase.Releasing, &quot;WorkFinished&quot;, true);</span>
+<span class="pc bpc" id="L44" title="3 of 6 branches missed.">      if (phase == BoostPhase.Expired || o.executionDeadline() == null || !o.now().isBefore(o.executionDeadline()))</span>
+<span class="fc" id="L45">        return new Decision(BoostPhase.Expired, &quot;ExecutionExpired&quot;, true);</span>
+<span class="nc" id="L46">      return new Decision(phase, &quot;Active&quot;, true);</span>
+    }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">    if (phase == BoostPhase.Releasing) {</span>
+<span class="fc bfc" id="L49" title="All 6 branches covered.">      if (!o.blackout() &amp;&amp; o.matchingEvidence() &amp;&amp; o.releaseTargetConfirmed()) return new Decision(BoostPhase.Completed, &quot;Released&quot;, false);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">      return new Decision(phase, o.blackout() ? &quot;Blackout&quot; : &quot;ReleasePending&quot;, true);</span>
+    }
+<span class="nc" id="L52">    throw new IllegalStateException(&quot;Unhandled phase &quot; + phase);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

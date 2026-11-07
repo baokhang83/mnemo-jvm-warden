@@ -24,6 +24,12 @@
 
   private String acquisitionDeadline;
 
+  /** Immutable maximum execution duration captured at admission (ISO-8601). */
+  private String maxDuration;
+
+  /** Transition current when completion was recorded; release needs newer evidence. */
+  private String releaseBaselineTransitionId;
+
   private String grantedAt;
 
   private String executionDeadline;
@@ -44,152 +50,160 @@
   private java.util.List&lt;io.fabric8.kubernetes.api.model.Condition&gt; conditions;
 
   public BoostPhase getPhase() {
-<span class="fc" id="L47">    return phase;</span>
+<span class="fc" id="L53">    return phase;</span>
   }
 
   public void setPhase(BoostPhase phase) {
-<span class="fc" id="L51">    this.phase = phase;</span>
-<span class="fc" id="L52">  }</span>
+<span class="fc" id="L57">    this.phase = phase;</span>
+<span class="fc" id="L58">  }</span>
 
   public Long getObservedGeneration() {
-<span class="nc" id="L55">    return observedGeneration;</span>
+<span class="nc" id="L61">    return observedGeneration;</span>
   }
 
   public void setObservedGeneration(Long observedGeneration) {
-<span class="nc" id="L59">    this.observedGeneration = observedGeneration;</span>
-<span class="nc" id="L60">  }</span>
+<span class="nc" id="L65">    this.observedGeneration = observedGeneration;</span>
+<span class="nc" id="L66">  }</span>
 
   public String getPolicyUid() {
-<span class="fc" id="L63">    return policyUid;</span>
+<span class="fc" id="L69">    return policyUid;</span>
   }
 
   public void setPolicyUid(String policyUid) {
-<span class="fc" id="L67">    this.policyUid = policyUid;</span>
-<span class="fc" id="L68">  }</span>
+<span class="fc" id="L73">    this.policyUid = policyUid;</span>
+<span class="fc" id="L74">  }</span>
 
   public Long getPolicyGeneration() {
-<span class="nc" id="L71">    return policyGeneration;</span>
+<span class="nc" id="L77">    return policyGeneration;</span>
   }
 
   public void setPolicyGeneration(Long policyGeneration) {
-<span class="nc" id="L75">    this.policyGeneration = policyGeneration;</span>
-<span class="nc" id="L76">  }</span>
+<span class="nc" id="L81">    this.policyGeneration = policyGeneration;</span>
+<span class="nc" id="L82">  }</span>
 
   public String getPodUid() {
-<span class="fc" id="L79">    return podUid;</span>
+<span class="fc" id="L85">    return podUid;</span>
   }
 
   public void setPodUid(String podUid) {
-<span class="fc" id="L83">    this.podUid = podUid;</span>
-<span class="fc" id="L84">  }</span>
+<span class="fc" id="L89">    this.podUid = podUid;</span>
+<span class="fc" id="L90">  }</span>
 
   public String getContainerId() {
-<span class="fc" id="L87">    return containerId;</span>
+<span class="fc" id="L93">    return containerId;</span>
   }
 
   public void setContainerId(String containerId) {
-<span class="fc" id="L91">    this.containerId = containerId;</span>
-<span class="fc" id="L92">  }</span>
+<span class="fc" id="L97">    this.containerId = containerId;</span>
+<span class="fc" id="L98">  }</span>
 
   public String getRequestFloor() {
-<span class="fc" id="L95">    return requestFloor;</span>
+<span class="fc" id="L101">    return requestFloor;</span>
   }
 
   public void setRequestFloor(String requestFloor) {
-<span class="fc" id="L99">    this.requestFloor = requestFloor;</span>
-<span class="fc" id="L100">  }</span>
+<span class="fc" id="L105">    this.requestFloor = requestFloor;</span>
+<span class="fc" id="L106">  }</span>
 
   public String getLimitFloor() {
-<span class="fc" id="L103">    return limitFloor;</span>
+<span class="fc" id="L109">    return limitFloor;</span>
   }
 
   public void setLimitFloor(String limitFloor) {
-<span class="fc" id="L107">    this.limitFloor = limitFloor;</span>
-<span class="fc" id="L108">  }</span>
+<span class="fc" id="L113">    this.limitFloor = limitFloor;</span>
+<span class="fc" id="L114">  }</span>
 
   public String getHeapTarget() {
-<span class="fc" id="L111">    return heapTarget;</span>
+<span class="fc" id="L117">    return heapTarget;</span>
   }
 
   public void setHeapTarget(String heapTarget) {
-<span class="fc" id="L115">    this.heapTarget = heapTarget;</span>
-<span class="fc" id="L116">  }</span>
+<span class="fc" id="L121">    this.heapTarget = heapTarget;</span>
+<span class="fc" id="L122">  }</span>
 
   public String getAcquisitionDeadline() {
-<span class="nc" id="L119">    return acquisitionDeadline;</span>
+<span class="nc" id="L125">    return acquisitionDeadline;</span>
   }
 
   public void setAcquisitionDeadline(String acquisitionDeadline) {
-<span class="nc" id="L123">    this.acquisitionDeadline = acquisitionDeadline;</span>
-<span class="nc" id="L124">  }</span>
+<span class="nc" id="L129">    this.acquisitionDeadline = acquisitionDeadline;</span>
+<span class="nc" id="L130">  }</span>
+
+<span class="nc" id="L132">  public String getMaxDuration() { return maxDuration; }</span>
+
+<span class="nc" id="L134">  public void setMaxDuration(String maxDuration) { this.maxDuration = maxDuration; }</span>
+
+<span class="nc" id="L136">  public String getReleaseBaselineTransitionId() { return releaseBaselineTransitionId; }</span>
+
+<span class="nc" id="L138">  public void setReleaseBaselineTransitionId(String value) { this.releaseBaselineTransitionId = value; }</span>
 
   public String getGrantedAt() {
-<span class="nc" id="L127">    return grantedAt;</span>
+<span class="nc" id="L141">    return grantedAt;</span>
   }
 
   public void setGrantedAt(String grantedAt) {
-<span class="nc" id="L131">    this.grantedAt = grantedAt;</span>
-<span class="nc" id="L132">  }</span>
+<span class="nc" id="L145">    this.grantedAt = grantedAt;</span>
+<span class="nc" id="L146">  }</span>
 
   public String getExecutionDeadline() {
-<span class="nc" id="L135">    return executionDeadline;</span>
+<span class="nc" id="L149">    return executionDeadline;</span>
   }
 
   public void setExecutionDeadline(String executionDeadline) {
-<span class="nc" id="L139">    this.executionDeadline = executionDeadline;</span>
-<span class="nc" id="L140">  }</span>
+<span class="nc" id="L153">    this.executionDeadline = executionDeadline;</span>
+<span class="nc" id="L154">  }</span>
 
   public String getCompletedAt() {
-<span class="nc" id="L143">    return completedAt;</span>
+<span class="nc" id="L157">    return completedAt;</span>
   }
 
   public void setCompletedAt(String completedAt) {
-<span class="nc" id="L147">    this.completedAt = completedAt;</span>
-<span class="nc" id="L148">  }</span>
+<span class="nc" id="L161">    this.completedAt = completedAt;</span>
+<span class="nc" id="L162">  }</span>
 
   /** Complete durable target paired atomically with transitionId. */
-<span class="fc" id="L151">  public String getPreparedIntent() { return preparedIntent; }</span>
+<span class="fc" id="L165">  public String getPreparedIntent() { return preparedIntent; }</span>
 
-<span class="fc" id="L153">  public void setPreparedIntent(String preparedIntent) { this.preparedIntent = preparedIntent; }</span>
+<span class="fc" id="L167">  public void setPreparedIntent(String preparedIntent) { this.preparedIntent = preparedIntent; }</span>
 
   public String getTransitionId() {
-<span class="fc" id="L156">    return transitionId;</span>
+<span class="fc" id="L170">    return transitionId;</span>
   }
 
   public void setTransitionId(String transitionId) {
-<span class="fc" id="L160">    this.transitionId = transitionId;</span>
-<span class="fc" id="L161">  }</span>
+<span class="fc" id="L174">    this.transitionId = transitionId;</span>
+<span class="fc" id="L175">  }</span>
 
   public String getAppliedRequest() {
-<span class="nc" id="L164">    return appliedRequest;</span>
+<span class="nc" id="L178">    return appliedRequest;</span>
   }
 
   public void setAppliedRequest(String appliedRequest) {
-<span class="nc" id="L168">    this.appliedRequest = appliedRequest;</span>
-<span class="nc" id="L169">  }</span>
+<span class="nc" id="L182">    this.appliedRequest = appliedRequest;</span>
+<span class="nc" id="L183">  }</span>
 
   public String getAppliedLimit() {
-<span class="nc" id="L172">    return appliedLimit;</span>
+<span class="nc" id="L186">    return appliedLimit;</span>
   }
 
   public void setAppliedLimit(String appliedLimit) {
-<span class="nc" id="L176">    this.appliedLimit = appliedLimit;</span>
-<span class="nc" id="L177">  }</span>
+<span class="nc" id="L190">    this.appliedLimit = appliedLimit;</span>
+<span class="nc" id="L191">  }</span>
 
   public String getAppliedHeapTarget() {
-<span class="nc" id="L180">    return appliedHeapTarget;</span>
+<span class="nc" id="L194">    return appliedHeapTarget;</span>
   }
 
   public void setAppliedHeapTarget(String appliedHeapTarget) {
-<span class="nc" id="L184">    this.appliedHeapTarget = appliedHeapTarget;</span>
-<span class="nc" id="L185">  }</span>
+<span class="nc" id="L198">    this.appliedHeapTarget = appliedHeapTarget;</span>
+<span class="nc" id="L199">  }</span>
 
   public java.util.List&lt;io.fabric8.kubernetes.api.model.Condition&gt; getConditions() {
-<span class="fc" id="L188">    return conditions;</span>
+<span class="fc" id="L202">    return conditions;</span>
   }
 
   public void setConditions(java.util.List&lt;io.fabric8.kubernetes.api.model.Condition&gt; conditions) {
-<span class="fc" id="L192">    this.conditions = conditions;</span>
-<span class="fc" id="L193">  }</span>
+<span class="fc" id="L206">    this.conditions = conditions;</span>
+<span class="fc" id="L207">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

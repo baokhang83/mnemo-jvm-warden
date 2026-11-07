@@ -117,7 +117,7 @@ public final class IntentWatcher {
 <span class="nc" id="L117">        throw e;</span>
 <span class="nc" id="L118">      } catch (Exception e) {</span>
         try {
-<span class="nc" id="L120">          publishFailure(state);</span>
+<span class="nc" id="L120">          publishFailure(state, e);</span>
 <span class="nc" id="L121">        } catch (IOException publicationFailure) {</span>
 <span class="nc" id="L122">          AgentLog.info(&quot;could not publish failure evidence; retrying next tick&quot;);</span>
 <span class="nc" id="L123">        }</span>
@@ -197,26 +197,33 @@ public final class IntentWatcher {
 <span class="nc" id="L197">    intentReader.acknowledge(fresh, acknowledgement);</span>
 <span class="nc" id="L198">  }</span>
 
-  private void publishFailure(PodState attempted) throws IOException, InterruptedException {
+  private void publishFailure(PodState attempted, Exception failure) throws IOException, InterruptedException {
 <span class="nc" id="L201">    var intent = attempted.correlatedIntent().orElseThrow();</span>
 <span class="nc" id="L202">    PodState fresh = intentReader.read();</span>
 <span class="nc" id="L203">    CorrelatedResize.requireCurrent(intent, fresh); // A failure for an old instance is also stale.</span>
 <span class="nc" id="L204">    intentReader.acknowledge(fresh, new ResizeAcknowledgement(</span>
-<span class="nc" id="L205">        intent, false, &quot;PreparationFailed&quot;, fresh.currentRequestBytes().orElse(0),</span>
+<span class="nc" id="L205">        intent, false, failureReason(failure), fresh.currentRequestBytes().orElse(0),</span>
 <span class="nc" id="L206">        fresh.currentLimitBytes().orElse(0), 0, Instant.now()));</span>
 <span class="nc" id="L207">  }</span>
 
+  static String failureReason(Exception failure) {
+<span class="fc" id="L210">    String message = failure.getMessage();</span>
+<span class="fc bfc" id="L211" title="All 4 branches covered.">    if (&quot;UnsupportedRuntime&quot;.equals(message) || &quot;UnsupportedHeapTarget&quot;.equals(message)) return &quot;UnsupportedJvm&quot;;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">    if (&quot;VerificationFailed&quot;.equals(message)) return &quot;VerificationFailed&quot;;</span>
+<span class="fc" id="L213">    return &quot;PreparationFailed&quot;;</span>
+  }
+
   private void recordShrinkOutcome(ShrinkOutcome outcome, OptionalLong rssBeforeThisTick) {
-<span class="nc bnc" id="L210" title="All 2 branches missed.">    switch (outcome) {</span>
-<span class="nc" id="L211">      case ShrinkOutcome.Completed completed -&gt; {</span>
-<span class="nc" id="L212">        metrics.incrementResize(&quot;shrink&quot;);</span>
-<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (rssBeforeThisTick.isPresent()) {</span>
-<span class="nc" id="L214">          metrics.addBytesReclaimed(rssBeforeThisTick.getAsLong() - completed.finalRssBytes());</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">    switch (outcome) {</span>
+<span class="nc" id="L218">      case ShrinkOutcome.Completed completed -&gt; {</span>
+<span class="nc" id="L219">        metrics.incrementResize(&quot;shrink&quot;);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (rssBeforeThisTick.isPresent()) {</span>
+<span class="nc" id="L221">          metrics.addBytesReclaimed(rssBeforeThisTick.getAsLong() - completed.finalRssBytes());</span>
         }
       }
-<span class="nc" id="L217">      case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; metrics.incrementAborted();</span>
+<span class="nc" id="L224">      case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; metrics.incrementAborted();</span>
     }
-<span class="nc" id="L219">  }</span>
+<span class="nc" id="L226">  }</span>
 
   /**
    * Samples the target's current RSS and cumulative GC stats into {@link #metrics}. Isolated from
@@ -230,35 +237,35 @@ public final class IntentWatcher {
    */
   private OptionalLong sampleMetrics(AttachedJvm jvm) {
     try {
-<span class="nc" id="L233">      Optional&lt;HeapController&gt; heap = heapResolver.resolve(jvm);</span>
-<span class="nc bnc" id="L234" title="All 2 branches missed.">      if (heap.isEmpty()) {</span>
-<span class="nc" id="L235">        return OptionalLong.empty();</span>
+<span class="nc" id="L240">      Optional&lt;HeapController&gt; heap = heapResolver.resolve(jvm);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">      if (heap.isEmpty()) {</span>
+<span class="nc" id="L242">        return OptionalLong.empty();</span>
       }
-<span class="nc" id="L237">      long rss = heap.get().currentRss();</span>
-<span class="nc" id="L238">      metrics.setRss(rss);</span>
+<span class="nc" id="L244">      long rss = heap.get().currentRss();</span>
+<span class="nc" id="L245">      metrics.setRss(rss);</span>
 
-<span class="nc" id="L240">      List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
-<span class="nc" id="L241">          ManagementFactory.getPlatformMXBeans(jvm.mbeanConnection(), GarbageCollectorMXBean.class);</span>
-<span class="nc bnc" id="L242" title="All 2 branches missed.">      for (GarbageCollectorMXBean bean : gcBeans) {</span>
-<span class="nc" id="L243">        long count = bean.getCollectionCount();</span>
-<span class="nc" id="L244">        long time = bean.getCollectionTime();</span>
-<span class="nc bnc" id="L245" title="All 4 branches missed.">        if (count &gt;= 0 &amp;&amp; time &gt;= 0) {</span>
-<span class="nc" id="L246">          metrics.setGcStats(bean.getName(), count, time);</span>
+<span class="nc" id="L247">      List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
+<span class="nc" id="L248">          ManagementFactory.getPlatformMXBeans(jvm.mbeanConnection(), GarbageCollectorMXBean.class);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">      for (GarbageCollectorMXBean bean : gcBeans) {</span>
+<span class="nc" id="L250">        long count = bean.getCollectionCount();</span>
+<span class="nc" id="L251">        long time = bean.getCollectionTime();</span>
+<span class="nc bnc" id="L252" title="All 4 branches missed.">        if (count &gt;= 0 &amp;&amp; time &gt;= 0) {</span>
+<span class="nc" id="L253">          metrics.setGcStats(bean.getName(), count, time);</span>
         }
-<span class="nc" id="L248">      }</span>
-<span class="nc" id="L249">      return OptionalLong.of(rss);</span>
-<span class="nc" id="L250">    } catch (Exception e) {</span>
-<span class="nc" id="L251">      AgentLog.info(&quot;metrics sampling failed, continuing: &quot; + e.getMessage());</span>
-<span class="nc" id="L252">      return OptionalLong.empty();</span>
+<span class="nc" id="L255">      }</span>
+<span class="nc" id="L256">      return OptionalLong.of(rss);</span>
+<span class="nc" id="L257">    } catch (Exception e) {</span>
+<span class="nc" id="L258">      AgentLog.info(&quot;metrics sampling failed, continuing: &quot; + e.getMessage());</span>
+<span class="nc" id="L259">      return OptionalLong.empty();</span>
     }
   }
 
   private void sleep() {
     try {
-<span class="nc" id="L258">      Thread.sleep(config.intentPollInterval().toMillis());</span>
-<span class="nc" id="L259">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L260">      Thread.currentThread().interrupt();</span>
-<span class="nc" id="L261">    }</span>
-<span class="nc" id="L262">  }</span>
+<span class="nc" id="L265">      Thread.sleep(config.intentPollInterval().toMillis());</span>
+<span class="nc" id="L266">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L267">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L268">    }</span>
+<span class="nc" id="L269">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
