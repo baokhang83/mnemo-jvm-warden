@@ -223,7 +223,7 @@ In your own app chart's `Chart.yaml`:
 ```yaml
 dependencies:
   - name: warden-sidecar
-    version: "0.1.4"   # match the published chart version (see `helm search repo warden`)
+    version: "0.1.5"   # match the published chart version (see `helm search repo warden`)
     repository: "https://baokhang83.github.io/mnemo-jvm-warden/"
 ```
 
