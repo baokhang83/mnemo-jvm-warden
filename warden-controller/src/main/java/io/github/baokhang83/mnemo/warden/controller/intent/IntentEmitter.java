@@ -131,6 +131,7 @@ public final class IntentEmitter {
         || observed.getMetadata().getUid() == null) return;
     String encoded = observed.getMetadata().getAnnotations() == null ? null
         : observed.getMetadata().getAnnotations().get(ResizeIntent.ANNOTATION);
+    String claim = io.github.baokhang83.mnemo.warden.controller.boost.TargetClaim.owner(observed);
     if (policy != null) {
       var admitted = boosts.stream().filter(b -> b.getSpec() != null && b.getSpec().getPodRef() != null
           && observed.getMetadata().getUid().equals(b.getSpec().getPodRef().getUid())
@@ -145,6 +146,7 @@ public final class IntentEmitter {
       if (!admitted.isEmpty()) {
         if (correlatedScheduleUnavailable) return;
         var boost = admitted.getFirst();
+        if (claim != null && !claim.equals(boost.getMetadata().getUid())) return;
         if (encoded == null) {
           // A durable intent can survive a crash before the first pod annotation.
           if (boost.getStatus().getPreparedIntent() == null
@@ -161,7 +163,7 @@ public final class IntentEmitter {
       }
     }
     // Unknown correlated ownership is not permission to overwrite it with a schedule.
-    if (encoded != null || legacyVetoed) return;
+    if (encoded != null || claim != null || legacyVetoed) return;
     Pod desired = applyScheduled(observed, requestBytes, limitBytes);
     if (desired == observed) return;
     var annotations = desired.getMetadata().getAnnotations();
