@@ -2,9 +2,8 @@ name: publish-charts
 
 # Packages every chart under charts/ (warden, warden-sidecar) and publishes them as an
 # installable Helm repo: `helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/`.
-# chart-releaser is idempotent per chart version, so pushes that don't bump a Chart.yaml
-# version are no-ops — this can safely run on every push to main, decoupled from app releases
-# (publish.yml/publish-maven.yml), rather than only firing alongside a GitHub Release.
+# Changed charts need a new, unpublished version. Pull-request CI checks chart versions;
+# this workflow publishes chart-only changes independently from application releases.
 on:
   push:
     branches: [ main ]
