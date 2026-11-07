@@ -1,0 +1,226 @@
+{{- $boost := .Values.boost | default dict }}
+{{- $security := $boost.security | default dict }}
+{{- if $security.enabled }}
+{{- $agent := $security.agentServiceAccountName | default "warden-boost-agent" }}
+{{- $operator := $security.operatorServiceAccountName | default "warden-boost-operator" }}
+{{- $agentContainer := $security.agentContainerName | default "warden" }}
+{{- $selector := $security.namespaceSelector | default (dict "matchLabels" (dict "warden.mnemo.io/boost-enabled" "true")) }}
+{{- range $name := list $agent $operator $agentContainer }}
+{{- if or (gt (len $name) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $name)) }}{{ fail "Boost service account names must be DNS labels of at most 63 characters" }}{{ end }}
+{{- end }}
+{{- if eq $agent $operator }}{{ fail "Boost agent and operator service accounts must differ" }}{{ end }}
+{{- if or (eq $agent (include "warden.controller.serviceAccountName" .)) (eq $operator (include "warden.controller.serviceAccountName" .)) }}{{ fail "Boost agent and operator identities must differ from the controller" }}{{ end }}
+{{- if not $selector.matchLabels }}{{ fail "Boost security requires a nonempty namespaceSelector.matchLabels" }}{{ end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/resize"]
+    verbs: ["patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-operator
+rules:
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenboosts"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenpolicies"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-agent-token
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: dedicated-agent-pod
+      expression: {{ printf "has(object.spec.serviceAccountName) && object.spec.serviceAccountName == '%s'" $agent | quote }}
+  validations:
+    - expression: >-
+        has(object.spec.automountServiceAccountToken) && !object.spec.automountServiceAccountToken
+      message: "Boost agent Pods must disable automatic service-account token mounting"
+    - expression: >-
+        has(object.spec.volumes) && has(object.spec.initContainers) &&
+        object.spec.volumes.exists(v, has(v.projected) && has(v.projected.sources) &&
+          v.projected.sources.exists(s, has(s.serviceAccountToken)) &&
+          object.spec.initContainers.exists(c, c.name == {{ $agentContainer | quote }} && has(c.volumeMounts) &&
+            c.volumeMounts.exists(m, m.name == v.name && m.mountPath == '/var/run/secrets/kubernetes.io/serviceaccount'))) &&
+        object.spec.volumes.filter(v, has(v.projected) && has(v.projected.sources) &&
+          v.projected.sources.exists(s, has(s.serviceAccountToken))).all(v,
+          object.spec.containers.all(c, !has(c.volumeMounts) || c.volumeMounts.all(m, m.name != v.name)) &&
+          object.spec.initContainers.all(c, c.name == {{ $agentContainer | quote }} ||
+            !has(c.volumeMounts) || c.volumeMounts.all(m, m.name != v.name)))
+      message: "Boost Pod-bound token volumes must be mounted only in the Warden init container"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-agent-pod
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: dedicated-agent
+      expression: {{ printf "request.userInfo.username.matches('^system:serviceaccount:[^:]+:%s$')" $agent | quote }}
+  validations:
+    - expression: >-
+        has(request.userInfo.extra) &&
+        'authentication.kubernetes.io/pod-name' in request.userInfo.extra &&
+        'authentication.kubernetes.io/pod-uid' in request.userInfo.extra &&
+        size(request.userInfo.extra['authentication.kubernetes.io/pod-name']) == 1 &&
+        size(request.userInfo.extra['authentication.kubernetes.io/pod-uid']) == 1 &&
+        request.userInfo.extra['authentication.kubernetes.io/pod-name'][0] == object.metadata.name &&
+        request.userInfo.extra['authentication.kubernetes.io/pod-uid'][0] == object.metadata.uid
+      message: "Boost agent may patch only its token-bound Pod"
+    - expression: >-
+        object.spec == oldObject.spec && object.status == oldObject.status &&
+        object.metadata.?labels == oldObject.metadata.?labels &&
+        object.metadata.?ownerReferences == oldObject.metadata.?ownerReferences &&
+        object.metadata.?finalizers == oldObject.metadata.?finalizers &&
+        has(object.metadata.annotations) && has(oldObject.metadata.annotations) &&
+        object.metadata.annotations.all(k, k == 'warden.mnemo.io/resize-ack' ||
+          (k in oldObject.metadata.annotations && object.metadata.annotations[k] == oldObject.metadata.annotations[k])) &&
+        oldObject.metadata.annotations.all(k, k == 'warden.mnemo.io/resize-ack' ||
+          (k in object.metadata.annotations && object.metadata.annotations[k] == oldObject.metadata.annotations[k])) &&
+        'warden.mnemo.io/resize-ack' in object.metadata.annotations &&
+        size(object.metadata.annotations['warden.mnemo.io/resize-ack']) <= 8192
+      message: "Boost agent may change only the bounded acknowledgement"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-ack-owner
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: acknowledgement-changed
+      expression: >-
+        (has(object.metadata.annotations) && 'warden.mnemo.io/resize-ack' in object.metadata.annotations
+          ? object.metadata.annotations['warden.mnemo.io/resize-ack'] : '') !=
+        (has(oldObject.metadata.annotations) && 'warden.mnemo.io/resize-ack' in oldObject.metadata.annotations
+          ? oldObject.metadata.annotations['warden.mnemo.io/resize-ack'] : '')
+  validations:
+    - expression: >-
+        request.userInfo.username == {{ printf "'system:serviceaccount:' + request.namespace + ':%s'" $agent }} ||
+        (request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace (include "warden.controller.serviceAccountName" .) | quote }} &&
+         has(oldObject.metadata.annotations) && 'warden.mnemo.io/resize-ack' in oldObject.metadata.annotations &&
+         'warden.mnemo.io/boost-claim' in oldObject.metadata.annotations &&
+         (!has(object.metadata.annotations) ||
+           (!('warden.mnemo.io/resize-ack' in object.metadata.annotations) &&
+            !('warden.mnemo.io/boost-claim' in object.metadata.annotations) &&
+            !('warden.mnemo.io/resize-intent' in object.metadata.annotations))))
+      message: "Only the Boost agent may write acknowledgements; the controller may remove them"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-agent-resize
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods/resize"]
+  matchConditions:
+    - name: dedicated-agent
+      expression: {{ printf "request.userInfo.username.matches('^system:serviceaccount:[^:]+:%s$')" $agent | quote }}
+  validations:
+    - expression: >-
+        has(request.userInfo.extra) &&
+        'authentication.kubernetes.io/pod-name' in request.userInfo.extra &&
+        'authentication.kubernetes.io/pod-uid' in request.userInfo.extra &&
+        size(request.userInfo.extra['authentication.kubernetes.io/pod-name']) == 1 &&
+        size(request.userInfo.extra['authentication.kubernetes.io/pod-uid']) == 1 &&
+        request.userInfo.extra['authentication.kubernetes.io/pod-name'][0] == object.metadata.name &&
+        request.userInfo.extra['authentication.kubernetes.io/pod-uid'][0] == object.metadata.uid
+      message: "Boost agent may resize only its token-bound Pod"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-request-guard
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["warden.mnemo.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["wardenboosts", "wardenboosts/status"]
+  validations:
+    - expression: {{ printf "!request.userInfo.username.matches('^system:serviceaccount:[^:]+:%s$')" $agent | quote }}
+      message: "Boost agent identity cannot create or change Boost requests or status"
+    - expression: >-
+        !has(request.subResource) || request.subResource != 'status' ||
+        request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace (include "warden.controller.serviceAccountName" .) | quote }}
+      message: "Only the Boost controller may change status"
+    - expression: >-
+        request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace (include "warden.controller.serviceAccountName" .) | quote }} ||
+        !has(request.userInfo.extra) || !('authentication.kubernetes.io/pod-name' in request.userInfo.extra) ||
+        ('authentication.kubernetes.io/pod-uid' in request.userInfo.extra &&
+         size(request.userInfo.extra['authentication.kubernetes.io/pod-name']) == 1 &&
+         size(request.userInfo.extra['authentication.kubernetes.io/pod-uid']) == 1 &&
+         (request.operation == 'DELETE'
+           ? oldObject.spec.podRef.name == request.userInfo.extra['authentication.kubernetes.io/pod-name'][0] &&
+             oldObject.spec.podRef.uid == request.userInfo.extra['authentication.kubernetes.io/pod-uid'][0]
+           : object.spec.podRef.name == request.userInfo.extra['authentication.kubernetes.io/pod-name'][0] &&
+             object.spec.podRef.uid == request.userInfo.extra['authentication.kubernetes.io/pod-uid'][0]))
+      message: "Pod-bound tokens may target only their own Pod identity"
+    - expression: >-
+        request.operation != 'DELETE' ||
+        request.userInfo.username != {{ printf "'system:serviceaccount:' + request.namespace + ':%s'" $operator }}
+      message: "Boost operator must request completion rather than delete"
+    - expression: >-
+        request.operation != 'UPDATE' || (has(request.subResource) && request.subResource != '') ||
+        request.userInfo.username != {{ printf "'system:serviceaccount:' + request.namespace + ':%s'" $operator }} ||
+        (object.metadata.?finalizers == oldObject.metadata.?finalizers &&
+         object.metadata.?labels == oldObject.metadata.?labels &&
+         object.metadata.?annotations == oldObject.metadata.?annotations &&
+         object.metadata.?ownerReferences == oldObject.metadata.?ownerReferences)
+      message: "Boost operator cannot modify request ownership metadata"
+---
+{{- range $name := list "boost-agent-token" "boost-agent-pod" "boost-ack-owner" "boost-agent-resize" "boost-request-guard" }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ include "warden.fullname" $ }}-{{ $name }}
+spec:
+  policyName: {{ include "warden.fullname" $ }}-{{ $name }}
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      {{- toYaml $selector | nindent 6 }}
+---
+{{- end }}
+{{- end }}

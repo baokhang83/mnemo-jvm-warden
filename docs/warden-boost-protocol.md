@@ -1,8 +1,8 @@
 # Correlated resize transport (B3)
 
 B3 introduced the transport and evidence path. B4 resolves admitted floors, and B5
-reconciles request admission and grants. B6 still needs to harden the request and evidence
-paths for untrusted callers. Ordinary scheduled intent uses the existing two annotations.
+reconciles request admission and grants. The optional B6 chart package protects selected
+namespaces' request and evidence paths when its roles and policies are correctly installed. Ordinary scheduled intent uses the existing two annotations.
 
 ## Shared wire contract
 
@@ -71,10 +71,12 @@ named `warden-boost-agent` and must be installed before granting that identity p
 
 The policy restricts its writes to its token-bound pod name/UID and the bounded resize-ack
 annotation, preserving other annotations, labels, owners, finalizers, spec, and status.
-A second policy denies acknowledgement changes by unrelated identities, including the
-controller. Existing scheduled annotation writes remain available to the controller.
+In that standalone fixture, a second policy denies acknowledgement changes by unrelated
+identities, including the controller; it is incompatible with B5 controller cleanup as-is. Existing scheduled annotation writes remain available to the controller.
 These are cluster-wide guards; use only on a disposable cluster for the supplied harness.
-Production packaging and configurable identities remain B6/M8 #97–#102.
+This standalone example is a B3 test fixture and can block B5 acknowledgement cleanup. Use the
+opt-in chart package described in the [Boost guide](warden-boost.md#enable-the-manual-flow-security-package)
+for B6; M8 hardening #97–#102 remains.
 
 A pod-bound token identifies a pod, not a container. Mount the agent token only in the
 trusted agent; a compromised application with that token could impersonate it. Shared
@@ -178,7 +180,8 @@ The Boost reconciler requires each target Pod to opt in to its policy by carryin
 the Pod is selected by the referenced policy, that its UID matches the request, and that the
 named application container is running. This label is an operational ownership marker;
 cluster permissions must prevent untrusted workloads from setting it or forging status and
-acknowledgements. Production admission packaging remains B6/M8 work.
+acknowledgements. The optional B6 chart package narrows these writes in selected namespaces;
+M8 follow-up hardening remains.
 
 A compare-and-set claim on the Pod serializes admission. This implementation permits one
 active Boost per Pod, including when it has multiple application containers. A finalizer is
@@ -193,8 +196,7 @@ matching the bound Pod and container and applied resources, before the acquisiti
 and outside blackout. The grant names a specific instance; consumers must not reuse it after
 that instance changes. Resource status and Pod status are distinct API objects, so they cannot
 be read and updated as one atomic Kubernetes transaction. A later reconciliation detects an
-instance change; admission and acknowledgement authentication are required before enabling
-untrusted requesters.
+instance change; install and verify the opt-in admission package before delegating access.
 
 Completion records `WorkFinished` and a release baseline. The policy writer computes the
 current policy target and creates a fresh transition even if its quantities are unchanged;
@@ -215,8 +217,8 @@ Upgrade the WardenBoost CRD explicitly before upgrading the controller: Helm doe
 existing CRDs automatically. The acceptance probes in `deploy/verify-boost-claim.py`,
 `deploy/verify-boost-lifecycle.py`, and `deploy/verify-boost-operator.py` require a disposable
 Kubernetes cluster. The lifecycle probe supplies synthetic acknowledgement evidence; it does
-not prove real JVM preparation, agent identity enforcement, or production security. B6 and B7
-cover the hardened request flow and end-to-end deployed JVM acceptance respectively.
+not prove real JVM preparation or production security. The B6 security probe checks the
+packaged manual flow, and B7 covers end-to-end deployed JVM acceptance.
 
 Because the controller does not currently use leader election, the Helm Deployment uses one
 replica and a `Recreate` rollout. New admissions and grants require the configured controller

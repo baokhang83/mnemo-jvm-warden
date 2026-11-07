@@ -20,7 +20,12 @@ public final class BoostStatusStore {
         + JsonString.quote(Objects.requireNonNull(metadata.getResourceVersion()))
         + "},{\"op\":\"add\",\"path\":\"/status\",\"value\":"
         + client.getKubernetesSerialization().asJson(Objects.requireNonNull(next)) + "}]";
-    return client.resources(WardenBoost.class).inNamespace(metadata.getNamespace()).withName(metadata.getName())
+    WardenBoost saved = client.resources(WardenBoost.class).inNamespace(metadata.getNamespace()).withName(metadata.getName())
         .subresource("status").patch(PatchContext.of(PatchType.JSON), patch);
+    try { BoostTelemetry.changed(client, observed, saved); }
+    catch (RuntimeException e) {
+      org.slf4j.LoggerFactory.getLogger(BoostStatusStore.class).warn("Boost telemetry failed: {}", e.getMessage());
+    }
+    return saved;
   }
 }

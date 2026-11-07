@@ -304,10 +304,10 @@ Maven Central), and the full schedule → shrink/grow → verify flow works end 
 cluster. It has not yet been battle-tested under production load, and APIs may still change —
 issues and feedback welcome.
 
-**Boost is experimental.** Admission, claims, grant and release reconciliation are implemented,
-but hardened request/acknowledgement permissions and a full deployed JVM acceptance flow are
-still in progress. There is no application-facing Boost API or Java lease client yet. Use the
-[Boost guide](docs/warden-boost.md) for trusted, controlled evaluation.
+**Boost is experimental.** The chart can opt into scoped request/acknowledgement admission,
+RBAC roles, events, and metrics. Full deployed JVM acceptance is still in progress; there is no
+application-facing Boost API or Java lease client yet. See the [Boost guide](docs/warden-boost.md)
+for setup, trust assumptions, and controlled evaluation.
 
 ## Requirements
 

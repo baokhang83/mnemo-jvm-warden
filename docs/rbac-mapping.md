@@ -22,6 +22,7 @@ Source: `charts/warden/templates/controller-rbac.yaml`.
 | `warden.mnemo.io` | `wardenboosts/status` | `get`, `patch` | cluster-wide | `PreparedTransitionStore.prepare` and `BoostStatusStore.compareAndSet` | Record fenced lifecycle updates and the exact replacement before its pod intent is published. Status write permission is sensitive; see the Boost threat model and admission follow-ups #97–#102. |
 | `warden.mnemo.io` | `wardenpolicies/status` | `get`, `patch` | cluster-wide | `WardenPolicyReconciler.reconcile` → `UpdateControl.patchStatus` | `reconcile()` only ever patches the status subresource. No finalizer is registered (`WardenPolicyReconciler` doesn't implement `Cleaner`), so `update`/`patch` on the main `wardenpolicies` resource is never needed. |
 | `apps` | `deployments`, `statefulsets` | `get` | cluster-wide (namespace-filtered at call time via `inNamespace`) | `IntentEmitter.resolvePodNames` | Read-only lookup of a `targetRef`'s `spec.selector`. Never created, updated, or deleted by the controller — no `create`/`update`/`delete`/`patch` verb is granted. |
+| `""` (core) | `events` | `create` | cluster-wide; only when `boost.observability.enabled` | `BoostTelemetry` | Publish best-effort lifecycle events in each request's namespace. |
 | `""` (core) | `pods` | `get`, `list`, `patch` | cluster-wide | `IntentEmitter` and `TargetClaim` (UID/resourceVersion-fenced JSON Patch) | Lists a `Deployment`/`StatefulSet`'s live pods by selector and PATCHes intent, acknowledgement cleanup, and per-pod claim annotations. **Distinct from `pods/resize`** — the controller never resizes a pod itself, only annotates it; see the sidecar's own `Role` below for the actual resize grant. |
 
 Notable *absences* (no grant exists, and no code path needs one):
@@ -61,3 +62,24 @@ via `kubectl auth can-i --as=<service-account>`, both:
 - a representative set of verbs/resources **not** in either table — `secrets`
   get/list, `pods/exec` create, workload `delete`, and any `nodes` verb — is
   **denied** for both service accounts.
+
+
+## Optional Boost roles
+
+When `boost.security.enabled=true`, the chart supplies reusable `*-boost-agent` and
+`*-boost-operator` ClusterRoles. Administrators bind them with RoleBindings in each selected
+workload namespace; no bindings or service accounts are created automatically. The agent role
+grants Pod `get`/`patch` and `pods/resize` `patch` in the bound namespace. Admission binds writes
+to the agent token's Pod UID/name, restricts Pod metadata edits to the acknowledgement, and
+limits resize to that Pod. Admission also requires automatic token mounting to be disabled and
+projected service-account token volumes to be mounted only in the configured Warden init
+container. RBAC still allows the agent to read other Pods in that namespace.
+
+The operator role grants WardenBoost `get/list/watch/create/patch`, WardenPolicy `get/list`,
+and Pod `get/list`. It does not grant request deletion or status writes. Admission additionally
+protects status and request ownership metadata, even if those dedicated identities acquire extra
+RBAC. An authorized operator is trusted to request Boosts for approved Pods in its namespace;
+Other Pod-bound identities, except the trusted controller, are restricted to their own Pod UID/name. Cluster
+administrators retain authority outside this delegated model. See the
+[Boost guide](warden-boost.md#enable-the-manual-flow-security-package) for namespace selectors,
+identity restrictions, and credential isolation.

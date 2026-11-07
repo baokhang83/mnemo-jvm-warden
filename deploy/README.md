@@ -337,7 +337,10 @@ The existing sidecar example and scheduled-path checks above do not require Boos
 see the [operator guide](../docs/warden-boost.md), including the extra acknowledgement permission
 and trust requirements. On a **disposable** cluster, the Boost schema, claim, and lifecycle
 probes are available as `verify-wardenboost-schema.py`, `verify-boost-claim.py`, and
-`verify-boost-lifecycle.py`; each takes `--context`. The lifecycle probe uses synthetic agent
+`verify-boost-lifecycle.py`; each takes `--context`. `verify-boost-security.py` installs the
+opt-in chart policies on a disposable cluster and checks identity restrictions; pass
+`--controller-image repository:tag` for the packaged-controller flow and telemetry check. The
+image must already be available in the cluster. The lifecycle probe uses synthetic agent
 acknowledgements and does not validate a deployed JVM. The packaged-controller probe
 `verify-boost-operator.py` additionally requires a compatible controller already installed.
 See the [protocol verification notes](../docs/warden-boost-protocol.md#b5-lifecycle-and-target-claims)

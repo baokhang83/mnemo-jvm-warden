@@ -2,7 +2,7 @@
 
 The controller admits requests, resolves the recorded Boost floor during policy reconciliation,
 and records grants only after matching evidence. Do not start application work based on resource
-creation or a pod patch. Request and acknowledgement authorization remains B6 work.
+creation or a pod patch. Opt-in B6 admission and RBAC protect the manual flow in selected namespaces.
 
 ## Policy configuration
 
@@ -73,8 +73,8 @@ kubectl apply -f charts/warden/crds/wardenboost-crd.yaml
 ```
 
 The controller role can watch and patch WardenBoosts and their status. B5 implements a
-per-Pod claim and lifecycle checks; request and acknowledgement admission hardening remains
-B6 and the M8 follow-ups. See [RBAC mapping](rbac-mapping.md).
+per-Pod claim and lifecycle checks. The chart's opt-in B6 admission package protects the
+manual request and acknowledgement flow; M8 follow-ups remain. See [RBAC mapping](rbac-mapping.md).
 
 ## Verification
 

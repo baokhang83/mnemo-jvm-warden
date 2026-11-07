@@ -201,6 +201,9 @@ memory files without a container-boundary-crossing hack. See
 | `WARDEN_PROMETHEUS_URL` | no | unset | Base URL of the Prometheus the controller queries for `spec.guardrail.metric`. Leave unset if no policy uses a guardrail — it's optional, not a hard dependency. |
 | `WARDEN_CONTROLLER_DEPLOYMENT` | for Boost admission/grant in custom installations | unset | Controller Deployment name; the Helm chart supplies it. New Boost admission and grant are held if topology cannot be verified. |
 | `WARDEN_CONTROLLER_NAMESPACE` | for Boost admission/grant in custom installations | unset | Namespace of that Deployment; supplied by the Helm chart through the Downward API. |
+| `WARDEN_BOOST_OBSERVABILITY_ENABLED` | no | unset | `true` starts the optional Boost metrics endpoint. |
+| `WARDEN_BOOST_METRICS_PORT` | no | `8081` | Port for the optional controller metrics endpoint. |
+| `WARDEN_BOOST_EVENTS_ENABLED` | no | unset | `true` enables best-effort Boost Events; controller RBAC must allow Events creation. |
 
 ## Helm chart values
 
@@ -239,6 +242,31 @@ sidecar:
 `sidecar.*` are reference defaults for the `warden.sidecar` template — an app chart including
 it supplies its own equivalent `cfg` dict following this same shape (see
 `deploy/example-sidecar.yaml` for the hand-authored pattern the template reproduces).
+
+### Optional Boost chart values
+
+These defaults leave the scheduled-only deployment unchanged. See the
+[Boost security setup](warden-boost.md#enable-the-manual-flow-security-package) before enabling
+cluster-scoped admission resources and binding roles in workload namespaces.
+
+```yaml
+boost:
+  security:
+    enabled: false
+    agentServiceAccountName: warden-boost-agent
+    agentContainerName: warden
+    operatorServiceAccountName: warden-boost-operator
+    namespaceSelector:
+      matchLabels:
+        warden.mnemo.io/boost-enabled: "true"
+  observability:
+    enabled: false
+    port: 8081
+```
+
+The security policies apply only in selected namespaces. The observability setting exposes an
+unauthenticated metrics Service and grants the controller Events creation; protect access with
+network policy. ClusterRole bindings and service accounts are operator-managed.
 
 ## Runbook
 
@@ -362,6 +390,6 @@ never change, check:
 ## Boost operations
 
 Boost is optional and currently experimental. See [Warden Boost](warden-boost.md) for the
-manual request flow, the additional acknowledgement permission, lifecycle and troubleshooting.
+manual request flow, optional scoped admission and observability, lifecycle and troubleshooting.
 Existing scheduled-only workload permissions and collector choices are unchanged; controller
 upgrades still require the updated CRDs and controller RBAC described in the guide.

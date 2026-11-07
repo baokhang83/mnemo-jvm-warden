@@ -6,9 +6,9 @@ then request release when the rebuild and its child work have finished. Boost wo
 the normal schedule: Warden combines the admitted floor with the current scheduled and
 emergency targets and keeps the existing shrink guard and blackout rules.
 
-**Status:** the controller lifecycle and correlated agent protocol are implemented, but the
-hardened request and acknowledgement flow is not yet packaged ([B6](https://github.com/baokhang83/mnemo-jvm-warden/issues/110)),
-and full deployed JVM acceptance is still planned ([B7](https://github.com/baokhang83/mnemo-jvm-warden/issues/111)).
+**Status:** the controller lifecycle and correlated agent protocol are implemented. The chart
+can opt into scoped admission, RBAC roles, events, and metrics for the manual Kubernetes flow.
+Full deployed JVM acceptance is still planned ([B7](https://github.com/baokhang83/mnemo-jvm-warden/issues/111)).
 There is no application-facing endpoint or Java lease client yet. Treat the manual flow below
 as an evaluation for a trusted operator in a controlled cluster, not as a production-ready
 multi-tenant interface.
@@ -94,16 +94,17 @@ sidecar permissions for scheduled-only resizing remain unchanged.
   enforcement.
 - Only trusted operators should create or complete requests or modify policy, target labels,
   claims, and status. Protect agent acknowledgements from forgery and restrict Pod patch
-  access. The optional [acknowledgement admission example](../deploy/warden-boost-ack-admission-policy.yaml)
-  is an experimental cluster-wide guard with a fixed service-account name, not an installed
-  or complete B6 security configuration. Its acknowledgement-writer rule denies changes by
-  the controller, while B5 cleanup removes the acknowledgement annotation; applying it as-is
-  can block claim cleanup. Do not apply it blindly to an existing cluster.
+  access. Use the chart's opt-in admission policies described below. The older standalone
+  [acknowledgement admission example](../deploy/warden-boost-ack-admission-policy.yaml) is a
+  B3 test fixture: its acknowledgement-writer rule can block controller cleanup. Do not install
+  it alongside the chart's B6 policies or apply it blindly to an existing cluster.
 
 A Pod service-account token can be visible to more than one container depending on the Pod
 configuration. Do not assume that sharing a Pod or using loopback authenticates the app or
 protects the sidecar's credentials. See the [threat model](threat-model.md) and
 [hardening guide](hardening.md).
+
+### Legacy static-Pod evaluation
 
 For a single, statically named test Pod, this **additional** Role grants its existing agent
 service account Pod patch access. Change the namespace, Pod name, and service-account name to
@@ -139,8 +140,125 @@ roleRef:
 ```
 
 This static name restriction does not solve per-replica authorization for a Deployment or
-StatefulSet, and it does not keep a shared Pod credential away from the app container. A
-hardened, packaged permission model remains B6 work.
+StatefulSet, and it does not keep a shared Pod credential away from the app container. Prefer
+the scoped chart security package below for the manual Boost flow.
+
+## Enable the manual-flow security package
+
+The security package is **opt-in** and requires Kubernetes `ValidatingAdmissionPolicy` support
+(Kubernetes 1.30 or later; Warden's existing in-place resize requirements still apply). Render and
+review the chart before enabling cluster-scoped admission resources. The chart does not change
+the existing scheduled-only sidecar Role or install any new policy by default.
+
+```bash
+helm upgrade "$WARDEN_HELM_RELEASE" ./charts/warden --namespace "$WARDEN_HELM_NAMESPACE" \
+  --reuse-values --set boost.security.enabled=true --set boost.observability.enabled=true
+```
+
+Use controller and agent images containing this B6 implementation. `boost.security.enabled`
+installs two ClusterRoles and namespace-scoped policy bindings; it does not create service
+accounts or bind roles into workload namespaces. `boost.observability.enabled` independently
+exposes events and a ClusterIP metrics Service. Choose the namespace selector and dedicated
+service-account names in chart values before installing. The default selector is the namespace
+label `warden.mnemo.io/boost-enabled=true`; the default names are `warden-boost-agent` and
+`warden-boost-operator`, and the default agent init-container name is `warden`
+(`boost.security.agentContainerName`). A nonempty `matchLabels` selector is required. Namespace labels must be
+controlled by trusted cluster administrators. Ensure selectors for separate Warden releases do
+not overlap: their controller identities are different and overlapping policies can block each
+other's updates.
+
+Before labeling a namespace, inventory any existing Pods that use the configured agent service
+account: once selected, their Pod updates must satisfy the new token-mount policy. In each
+participating namespace, **label the namespace and verify the policies are active before
+binding either role**. Replace `<chart-fullname>` with the rendered name prefix, for example
+`warden` for a release named `warden` or `my-release-warden` for a release named `my-release`.
+
+```bash
+WARDEN_NS=example
+WARDEN_CHART_FULLNAME=warden
+kubectl label namespace "$WARDEN_NS" warden.mnemo.io/boost-enabled=true
+for policy in boost-agent-token boost-agent-pod boost-ack-owner boost-agent-resize boost-request-guard; do
+  kubectl get validatingadmissionpolicy "$WARDEN_CHART_FULLNAME-$policy" -o yaml
+  kubectl get validatingadmissionpolicybinding "$WARDEN_CHART_FULLNAME-$policy" -o yaml
+done
+# Confirm each policy's observed generation and type-checking status before continuing.
+kubectl -n "$WARDEN_NS" create serviceaccount warden-boost-agent
+kubectl -n "$WARDEN_NS" create serviceaccount warden-boost-operator
+kubectl -n "$WARDEN_NS" create rolebinding warden-boost-agent \
+  --clusterrole="$WARDEN_CHART_FULLNAME-boost-agent" --serviceaccount="$WARDEN_NS:warden-boost-agent"
+kubectl -n "$WARDEN_NS" create rolebinding warden-boost-operator \
+  --clusterrole="$WARDEN_CHART_FULLNAME-boost-operator" --serviceaccount="$WARDEN_NS:warden-boost-operator"
+```
+
+The role bindings are namespaced, even though the reusable roles and admission policies are
+cluster-scoped. Set `WARDEN_CHART_FULLNAME` to the rendered prefix before running the commands. Check that each
+policy's `status.observedGeneration` matches `metadata.generation` and that its type-checking
+warnings are empty; also confirm the bindings select the intended namespaces. The operator identity can
+create and complete requests for authorized Pods in its namespace; it is a **trusted namespace
+operator**, not an application identity. Use a kubeconfig or authentication mechanism for that
+service account, provisioned according to your cluster's credential practices. Do not bind these
+roles to other identities without equivalent admission protections. The agent identity cannot
+create or modify requests or status. The policy allows only the configured controller to write
+Boost status, and rejects cross-Pod requests made with other Pod-bound tokens. A dedicated agent
+with a Pod-bound token can patch only its own bounded acknowledgement and resize only its own
+Pod; it does not restrict which container or resource fields in that Pod may be resized. The
+controller may remove an acknowledgement only while clearing its claim and intent. Agent Pods must disable automatic service-account token mounting and mount projected
+service-account token volumes into the configured Warden init container, not app or other init
+containers.
+
+RBAC does not constrain GET/LIST by the requesting Pod identity; the agent role can read Pods in
+its bound namespace. The policies do not protect against a compromised trusted controller or
+cluster administrator, or untrusted principals with independently granted broad permissions to
+modify policies, Pod labels, claims, or permissions. In particular, Kubernetes RBAC alone does
+not prevent a user who can create Pods or workload templates from selecting the dedicated agent
+service account and running a different image as the configured init container. Restrict who
+can create or change those workloads, create service-account tokens, or alter RoleBindings and
+namespace labels. These policies are not a boundary against a malicious workload creator; see
+[hardening](hardening.md) and [RBAC mapping](rbac-mapping.md).
+
+The agent needs a **Pod-bound token available only to the trusted agent container**. Set the Pod's
+`serviceAccountName` to the configured agent account, disable automatic token mounting, and mount
+a projected token, cluster CA, and namespace only in the sidecar. For example, merge the following
+pieces into your existing Pod template and its Warden sidecar; keep its existing cgroup mount,
+JMX settings, and other required configuration:
+
+```yaml
+spec:
+  serviceAccountName: warden-boost-agent
+  automountServiceAccountToken: false
+  volumes:
+    - name: warden-api-credentials
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3600
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+                - key: ca.crt
+                  path: ca.crt
+          - downwardAPI:
+              items:
+                - path: namespace
+                  fieldRef:
+                    fieldPath: metadata.namespace
+  initContainers:
+    - name: warden
+      # Merge this mount into the existing sidecar; do not replace its other fields.
+      volumeMounts:
+        - name: warden-api-credentials
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+```
+
+The chart's admission policy requires `automountServiceAccountToken: false` and checks that
+projected service-account token volumes are not mounted into application or other init containers.
+It does not prevent access through other credentials, shared process inspection, `pods/exec`,
+or ephemeral containers. Do not mount this volume into the app. A shared process namespace,
+root app container, or other permission to inspect the sidecar can still expose credentials;
+follow the existing hardening requirements. Changing a workload template can trigger a rollout. Existing scheduled-only Pods
+need not adopt this Boost-specific setup.
 
 ## Configure an approved Boost
 
@@ -234,7 +352,7 @@ ownership before changing it. Replace the request's UID placeholder with the pri
 `WARDEN_POD_UID`, save the file, and apply it:
 
 ```bash
-kubectl apply -f boost-request.yaml
+kubectl create -f boost-request.yaml
 kubectl -n "$WARDEN_NS" get wardenboost index-rebuild-001 -o yaml
 kubectl -n "$WARDEN_NS" get pod "$WARDEN_POD" -o jsonpath='{.metadata.uid}{"\n"}{.status.containerStatuses[?(@.name=="app")].containerID}{"\n"}'
 ```
@@ -275,6 +393,13 @@ while work might still be running; doing so bypasses the protection that retains
 | `UnsupportedJvm` | The agent could not prepare the explicit heap target on this JVM. Check the collector, soft-max capability, and `-Xmx`. |
 | `StaleAcknowledgement` / `ReleaseBlocked` | The evidence is for another transition, or release verification failed. Inspect controller and agent logs; do not force a shrink. |
 
+If a client times out or disconnects after submitting a request, the API server may still have
+accepted it. Look up the original request by its stable name and inspect its status before
+retrying; do not assume a grant or operation could not have raced with the timeout. If an
+in-place increase is deferred, inspect Pod resize status, node headroom, and agent logs; work
+must wait for a matching grant. An agent or application restart can invalidate prior instance
+evidence, so compare the live container ID before any work.
+
 Inspect status with `kubectl ... get wardenboost ... -o yaml`, and inspect the current policy,
 Pod UID, container ID, annotations, and controller/agent logs. A missing or recreated policy
 can leave release pending; investigate before any operator recovery. If an active Pod
@@ -283,3 +408,21 @@ recovery procedure and recognize that force-removing a finalizer can bypass Ward
 
 For wire format, status fields, concurrency details, and disposable-cluster verification,
 see [Boost schema](warden-boost-schema.md) and [correlated protocol](warden-boost-protocol.md).
+
+
+## Events and metrics
+
+When `boost.observability.enabled=true`, the controller emits best-effort Kubernetes Events on
+phase, readiness-reason, or persisted transition changes, with request and transition IDs in
+event messages. Events
+are diagnostic and may be lost on a crash; status remains authoritative.
+
+The chart creates `<chart-fullname>-boost-metrics`, a ClusterIP Service exposing `/metrics`
+on port 8081 by default (`boost.observability.port` changes it). Restrict access with your
+network policy or monitoring infrastructure: the endpoint is unauthenticated. It exposes
+`warden_boost_active_grants`, `warden_boost_expired_grants`, and
+`warden_boost_blocked_releases` as gauges from current request status;
+`warden_boost_transitions_total{phase=...}` counts process-local transitions. Acquisition and
+release duration summaries expose `_sum` and `_count` in seconds. Counters and duration sums
+reset on controller restart; deleted requests leave the gauges. Request and Pod IDs are not
+metric labels. A failed Kubernetes list returns HTTP 503 instead of reporting zero.
