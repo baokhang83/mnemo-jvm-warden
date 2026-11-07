@@ -81,6 +81,7 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
     Optional<String> emergencyGrowProfile = Optional.empty();
     Optional<String> scheduleCandidate = Optional.empty();
     boolean shrinkVetoed = false;
+    boolean correlatedScheduleUnavailable = false;
     if (!blackedOut) {
       emergencyGrowProfile = EmergencyGrowEvaluator.emergencyProfile(policy.getSpec(), metricValue);
       if (emergencyGrowProfile.isEmpty()) {
@@ -89,13 +90,28 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
             scheduleCandidate.isPresent()
                 && ShrinkVetoEvaluator.vetoesShrink(
                     policy.getSpec(), previousProfile, scheduleCandidate.get(), metricValue);
+      } else {
+        // Legacy workloads keep emergency precedence. Correlated workloads also need the
+        // scheduled floor, since resource profiles can be crossed component-wise.
+        try {
+          scheduleCandidate = ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now);
+          if (scheduleCandidate.isPresent() && (policy.getSpec().getProfiles() == null
+              || !policy.getSpec().getProfiles().containsKey(scheduleCandidate.get())))
+            correlatedScheduleUnavailable = true;
+        } catch (RuntimeException e) {
+          correlatedScheduleUnavailable = true;
+          log.warn("could not evaluate scheduled floor for correlated emergency target; holding Boost targets", e);
+        }
       }
     }
 
     Optional<String> resolved = PrecedenceEngine.resolve(blackedOut, emergencyGrowProfile, scheduleCandidate, shrinkVetoed);
     if (resolved.isPresent()) {
-      applyResolvedProfile(policy, context, resolved.get(), emergencyGrowProfile.isPresent(), metricValue);
+      applyResolvedProfile(policy, context, resolved.get(), emergencyGrowProfile.isPresent(), metricValue, scheduleCandidate, correlatedScheduleUnavailable);
     } else if (shrinkVetoed) {
+      // The merged Boost floor may turn a profile-level shrink into a grow.
+      // Evaluate it per pod while preserving the legacy policy-wide veto.
+      emitIntent(policy, context, scheduleCandidate.orElseThrow(), metricValue, Optional.empty(), false, true);
       log.info(
           "guardrail vetoed shrink for WardenPolicy {}/{}: metric={} not verified below shrinkBelow, staying on {}",
           policy.getMetadata().getNamespace(),
@@ -111,7 +127,7 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
       Context<WardenPolicy> context,
       String resolvedProfile,
       boolean isEmergencyGrow,
-      Double metricValue) {
+      Double metricValue, Optional<String> scheduleCandidate, boolean correlatedScheduleUnavailable) {
     ensureStatus(policy);
     if (isEmergencyGrow) {
       log.info(
@@ -122,14 +138,19 @@ public class WardenPolicyReconciler implements Reconciler<WardenPolicy> {
           resolvedProfile);
     }
     policy.getStatus().setCurrentProfile(resolvedProfile);
-    emitIntent(policy, context, resolvedProfile);
+    emitIntent(policy, context, resolvedProfile, metricValue, isEmergencyGrow ? scheduleCandidate : Optional.empty(), correlatedScheduleUnavailable, false);
   }
 
-  private void emitIntent(WardenPolicy policy, Context<WardenPolicy> context, String currentProfile) {
+  private void emitIntent(WardenPolicy policy, Context<WardenPolicy> context, String currentProfile, Double metricValue, Optional<String> scheduleCandidate, boolean correlatedScheduleUnavailable, boolean legacyVetoed) {
     try {
       ResourceProfile profile =
           policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);
-      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile);
+      var guardrail = policy.getSpec().getGuardrail();
+      String threshold = guardrail == null ? null : guardrail.getShrinkBelow();
+      boolean shrinkAllowed = threshold == null || threshold.isBlank()
+          || (metricValue != null && Double.isFinite(metricValue) && metricValue < Double.parseDouble(threshold));
+      ResourceProfile schedule = scheduleCandidate.map(name -> policy.getSpec().getProfiles().get(name)).orElse(null);
+      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile, policy, shrinkAllowed, schedule, correlatedScheduleUnavailable, legacyVetoed);
     } catch (RuntimeException e) {
       log.warn(
           "failed to emit intent for WardenPolicy {}/{} (status.currentProfile still updated): {}",

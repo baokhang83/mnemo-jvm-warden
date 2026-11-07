@@ -31,6 +31,7 @@ public class WardenPolicySpec {
   @Required
   private String timezone;
 
+  @Size(max = 64)
   private Map<String, ResourceProfile> profiles;
 
   @Size(max = 32)

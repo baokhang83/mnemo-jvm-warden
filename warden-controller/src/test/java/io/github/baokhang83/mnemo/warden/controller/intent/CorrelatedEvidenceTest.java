@@ -40,4 +40,14 @@ class CorrelatedEvidenceTest {
     p = pod(); p.getMetadata().getAnnotations().put(IntentEmitter.ANNOTATION_REQUEST_BYTES, "99");
     assertTrue(CorrelatedIntentEmitter.evidence(p, intent).isEmpty());
   }
+  @Test void intentPatchFencesUidAndResourceVersion() throws Exception {
+    var observed = pod(); observed.getMetadata().setResourceVersion("42");
+    var operations = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+        CorrelatedIntentEmitter.patch(observed, intent));
+    assertEquals("test", operations.get(0).get("op").asText());
+    assertEquals("/metadata/uid", operations.get(0).get("path").asText());
+    assertEquals("pod-uid", operations.get(0).get("value").asText());
+    assertEquals("/metadata/resourceVersion", operations.get(1).get("path").asText());
+    assertEquals("42", operations.get(1).get("value").asText());
+  }
 }

@@ -32,6 +32,9 @@ public class WardenBoostStatus {
 
   private String transitionId;
 
+  @io.fabric8.generator.annotation.Size(max = 8192)
+  private String preparedIntent;
+
   private String appliedRequest;
 
   private String appliedLimit;
@@ -143,6 +146,11 @@ public class WardenBoostStatus {
   public void setCompletedAt(String completedAt) {
     this.completedAt = completedAt;
   }
+
+  /** Complete durable target paired atomically with transitionId. */
+  public String getPreparedIntent() { return preparedIntent; }
+
+  public void setPreparedIntent(String preparedIntent) { this.preparedIntent = preparedIntent; }
 
   public String getTransitionId() {
     return transitionId;

@@ -127,6 +127,9 @@ spec:
                 type: "integer"
               policyUid:
                 type: "string"
+              preparedIntent:
+                maxLength: 8192
+                type: "string"
               requestFloor:
                 type: "string"
               transitionId:

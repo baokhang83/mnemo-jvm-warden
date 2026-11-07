@@ -82,6 +82,10 @@ spec:
               profiles:
                 additionalProperties:
                   properties:
+                    heapTarget:
+                      maxLength: 64
+                      minLength: 1
+                      type: "string"
                     limit:
                       maxLength: 64
                       type: "string"
@@ -89,6 +93,14 @@ spec:
                       maxLength: 64
                       type: "string"
                   type: "object"
+                  x-kubernetes-validations:
+                  - message: "heapTarget must be a positive integral-byte quantity\
+                      \ below limit"
+                    rule: "!has(self.heapTarget) || (has(self.limit) && isQuantity(self.heapTarget)\
+                      \ && isQuantity(self.limit) && quantity(self.heapTarget).compareTo(quantity('0'))\
+                      \ > 0 && quantity(self.heapTarget).isInteger() && quantity(self.heapTarget).compareTo(quantity(self.limit))\
+                      \ < 0)"
+                maxProperties: 64
                 type: "object"
               schedule:
                 items:

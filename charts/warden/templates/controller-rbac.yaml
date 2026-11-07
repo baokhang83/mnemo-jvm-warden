@@ -18,6 +18,13 @@ rules:
   - apiGroups: ["warden.mnemo.io"]
     resources: ["wardenpolicies"]
     verbs: ["get", "list", "watch"]
+  # Correlated policy writes resolve and update the admitted Boost transition.
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenboosts"]
+    verbs: ["get", "list"]
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenboosts/status"]
+    verbs: ["get", "patch"]
   # reconcile() ends in UpdateControl.patchStatus - a PATCH on the status subresource only;
   # no finalizer is added (WardenPolicyReconciler doesn't implement Cleaner), so no "update" verb
   # on the main wardenpolicies resource is needed.

@@ -135,6 +135,15 @@ than `wardenpolicies/status` and `pods`/`pods/resize`.
 
 ### 1. Controller compromise
 
+**Boost extension:** the controller can list/get WardenBoosts and patch their status across
+namespaces. A compromised controller could forge a prepared transition or falsely alter a
+request's lifecycle status. Resource-version checks prevent stale writers, not a malicious
+controller. The policy writer resolves requests in the policy namespace and checks policy,
+pod, container, and request identities. These checks do not replace Kubernetes authorization.
+Exclusive claim and status-authoritative grant enforcement remain B5; request/ack admission
+hardening remains B6 and #97–#102. Do not treat B4 as evidence that arbitrary clients can
+safely request or receive boosts.
+
 **Scenario:** an attacker achieves arbitrary code execution inside the
 `warden-controller` process (e.g. a dependency CVE in the fabric8 client,
 operator-framework, or cron-utils — the controller's shaded jar bundles all
