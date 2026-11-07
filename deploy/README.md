@@ -147,7 +147,6 @@ instead of depending on flaky, traffic-driven memory pressure.
 A real shrink attempt is driven by `harness.ShrinkTrialDriver`, `kubectl exec`'d into the running
 `warden` container — a test-only entry point, not the production one (nothing wires
 `ShrinkSequence` into `WardenAgent`'s own runtime loop yet; that is M3's intent handoff, W-306).
-See `docs/fluencyloop/features/w-206-*/design.md` for the full reasoning.
 
 ```bash
 deploy/verify-oomkill-safety.sh              # spins up + tears down its own kind cluster

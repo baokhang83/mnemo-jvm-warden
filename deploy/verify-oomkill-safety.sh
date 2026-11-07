@@ -3,8 +3,8 @@
 # safe no-op (cgroup untouched, no OOMKill); under idle load, a shrink attempt actually completes
 # (cgroup lowered, no OOMKill). Drives a real ShrinkSequence against a real attached target and a
 # real Kubernetes API via harness.ShrinkTrialDriver (kubectl exec'd into the running sidecar) —
-# see docs/fluencyloop/features/w-206-*/design.md for why a test-only driver exists instead of
-# waiting on M3's intent handoff, and deploy/README.md for how to run this manually.
+# a test-only driver used instead of waiting on M3's intent handoff; see deploy/README.md for
+# how to run this manually.
 #
 # Manual-run only for now, matching W-202's verify-lifecycle-ordering.sh precedent — CI wiring
 # (building the image + a kind cluster inside GitHub Actions) is a deliberate fast-follow, not
