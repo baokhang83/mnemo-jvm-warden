@@ -2,7 +2,7 @@
 
 B3 adds the transport and evidence path used by later Boost reconciliation. It does not
 watch WardenBoost requests, grant leases, resolve active floors, or enable application work.
-Those behaviors remain B4–B6. Ordinary scheduled intent uses the existing two annotations.
+Admission and grant lifecycle remain B5–B6; B4 resolves and persists targets for admitted requests. Ordinary scheduled intent uses the existing two annotations.
 
 ## Shared wire contract
 
@@ -32,8 +32,8 @@ recording permission in WardenBoost status.
 
 ## Controller boundary
 
-CorrelatedIntentEmitter emits to one explicit pod after checking its UID and running
-application-container instance. It provides an evidence reader that requires the current
+PreparedTransitionStore publishes to one explicit pod after checking its UID and running
+application-container instance. CorrelatedIntentEmitter provides an evidence reader that requires the current
 intent and legacy target annotations to agree, the acknowledgement to match that intent,
 and current applied container resources to equal the acknowledged allocation.
 
@@ -66,7 +66,7 @@ again. Acknowledgement failure does not undo prepared capacity or trigger a blin
 
 ## Permissions and trust
 
-B3 grants no new permissions to the default Helm/controller/agent deployment. The optional
+B3 added no permissions to the default Helm/controller/agent deployment; B4 adds controller access to WardenBoost resources as described below. The optional
 `deploy/warden-boost-ack-admission-policy.yaml` demonstrates a dedicated ServiceAccount
 named `warden-boost-agent` and must be installed before granting that identity pods/patch.
 
@@ -131,13 +131,19 @@ This status update is atomic **within the WardenBoost resource**. Kubernetes doe
 it atomic with a later patch to a different Pod. `prepareAndPublish` captures the target pod, persists the exact transition, checks the
 current status, and patches that captured pod using its UID and resourceVersion. A later
 pod write fences an older captured version. A failed pod write leaves the durable intent
-for reconciliation and retry. The helper is not yet called by the policy reconciler.
+for reconciliation and retry. The policy reconciler uses the helper for correlated targets with a matching admitted
+request. It reads the floor by request UID and validates the policy, pod, and container
+identities before preparing a replacement.
 
 The two-resource handoff still requires serialized target ownership: a later status update
 can race between the final status read and the pod patch. Consumers must compare evidence
-against current status and must not infer a grant from a pod patch. No additional RBAC is
-enabled by this change. B4 remains incomplete until the policy path and lifecycle enforce
-these rules and provide emergency/release behavior.
+against current status and must not infer a grant from a pod patch. The Helm controller role
+can list/get WardenBoosts and patch their status; those permissions are cluster-wide, with
+normal resolution restricted to the policy namespace. B5 still owns exclusive claim creation,
+status-authoritative grants, and final completion.
+A release target is eligible only when the controller records WorkFinished=True; otherwise
+the floor remains active. During a release, shrink veto compares both target dimensions to
+actual container resources. The existing agent performs the verified shrink sequence.
 
 For a real API-server test on a disposable cluster:
 
@@ -151,3 +157,17 @@ kind delete cluster --name warden-atomic-check
 The harness installs the WardenBoost CRD, creates its own namespace, and checks complete
 status persistence, floor and identity rejection, ID reuse, stale replacement, and a stale
 idempotent retry. It does not publish an intent to a pod.
+
+## Profile heap target
+
+A resource profile may specify an optional `heapTarget` quantity. During a correlated
+transition, the effective heap target is at least the admitted Boost floor and any selected
+profile heap target. Configure it below the profile's memory limit and at or below the JVM's
+launch-time maximum heap. The agent rejects unsupported targets before resizing. If the
+profile omits `heapTarget`, Warden retains the previous explicit Boost heap target; a larger
+container allocation alone will not raise the JVM soft maximum. During release, Warden
+preserves the last target's non-heap allowance and refuses a target too small for it.
+
+The schema bounds policies to 64 profiles and 32 Boost definitions for CEL validation cost.
+A policy above either bound requires revision before CRD upgrade. Helm does not update
+CRDs in its `crds/` directory during upgrade; apply the updated policy CRD explicitly.

@@ -66,6 +66,15 @@ def main():
             invalid['spec']['boosts']['index-rebuild'][field] = value
             kubectl('create', '--dry-run=server', '-f', '-', obj=invalid, success=False, reason=reason)
             count += 1
+        profile_heap = copy.deepcopy(policy)
+        profile_heap['spec']['profiles']['maintenance']['heapTarget'] = '2Gi'
+        kubectl('create', '--dry-run=server', '-f', '-', obj=profile_heap)
+        count += 1
+        for value in ['4Gi', '0', '0.5', 'bad']:
+            invalid = copy.deepcopy(profile_heap)
+            invalid['spec']['profiles']['maintenance']['heapTarget'] = value
+            kubectl('create', '--dry-run=server', '-f', '-', obj=invalid, success=False, reason='heapTarget')
+            count += 1
         for request in ['5Gi', '0', 'bad', '0.5']:
             invalid = copy.deepcopy(policy)
             invalid['spec']['profiles']['maintenance']['request'] = request

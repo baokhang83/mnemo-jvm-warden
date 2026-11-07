@@ -2,10 +2,7 @@ package io.github.baokhang83.mnemo.warden.controller.intent;
 
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.client.dsl.base.PatchContext;
-import io.fabric8.kubernetes.client.dsl.base.PatchType;
 import io.github.baokhang83.mnemo.warden.protocol.JsonString;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
@@ -15,15 +12,6 @@ import java.util.Optional;
 /** Per-pod transport for the later Boost resolver; never independently grants permission. */
 public final class CorrelatedIntentEmitter {
   private CorrelatedIntentEmitter() {}
-
-  /** Caller supplies a durable transition ID; retries must not generate a new identity. */
-  public static void emit(KubernetesClient client, String namespace, String podName, ResizeIntent intent) {
-    var resource = client.pods().inNamespace(namespace).withName(podName);
-    Pod pod = resource.get();
-    if (currentContainer(pod, intent).isEmpty() || pod.getMetadata().getResourceVersion() == null)
-      throw new IllegalArgumentException("correlated target identity changed");
-    resource.patch(PatchContext.of(PatchType.JSON), patch(pod, intent));
-  }
 
   /** Atomic UID and resourceVersion tests fence replacement and concurrent intent changes. */
   static String patch(Pod observed, ResizeIntent intent) {

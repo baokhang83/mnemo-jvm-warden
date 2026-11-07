@@ -1,12 +1,13 @@
 # Warden Boost schemas (B2)
 
-This change installs schemas only. The current controller does not process WardenBoost
-requests, issue grants, or implement boost floors. Do not start application work based on
-resource creation. B3–B6 implement the confirmed grant protocol.
+The controller can resolve an already-admitted Boost floor during policy reconciliation.
+It does not yet admit requests or issue grants; those belong to B5. Do not start application
+work based on resource creation or a pod patch.
 
 ## Policy configuration
 
-Existing policies can omit `boosts`. A policy can define up to 32 named boosts:
+Existing policies can omit `boosts`. A policy can define up to 64 resource profiles and
+32 named boosts. Profiles can optionally specify `heapTarget` for correlated transitions:
 
 ```yaml
 apiVersion: warden.mnemo.io/v1alpha1
@@ -19,6 +20,7 @@ spec:
     maintenance:
       request: 3Gi
       limit: 4Gi
+      heapTarget: 2Gi
   boosts:
     index-rebuild:
       profile: maintenance
@@ -66,8 +68,9 @@ kubectl apply -f charts/warden/crds/wardenpolicy-crd.yaml
 kubectl apply -f charts/warden/crds/wardenboost-crd.yaml
 ```
 
-No new controller/agent permissions are granted by B2. RBAC, request authorization, and
-acknowledgement admission controls are implemented in B6 with M8 follow-ups.
+The controller role can read WardenBoosts and patch their status for admitted transitions.
+Request authorization, exclusive claims, and acknowledgement admission controls require
+B5/B6 and the M8 follow-ups. See `docs/rbac-mapping.md`.
 
 ## Verification
 

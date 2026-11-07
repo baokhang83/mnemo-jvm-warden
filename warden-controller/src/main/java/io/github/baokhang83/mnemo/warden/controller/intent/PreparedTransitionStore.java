@@ -28,14 +28,21 @@ public final class PreparedTransitionStore {
         || !intent.podUid().equals(spec.getPodRef().getUid())
         || !intent.containerName().equals(spec.getContainer()) || meta.getResourceVersion() == null)
       throw new IllegalArgumentException("transition does not match admitted request identity");
-    if (status.getPhase() != BoostPhase.Preparing && status.getPhase() != BoostPhase.Granted
+    boolean releasing = status.getPhase() == BoostPhase.Releasing && status.getConditions() != null
+        && status.getConditions().stream().anyMatch(c -> "WorkFinished".equals(c.getType()) && "True".equals(c.getStatus()));
+    if (!releasing && status.getPhase() != BoostPhase.Preparing && status.getPhase() != BoostPhase.Granted
         && status.getPhase() != BoostPhase.Expired)
-      throw new IllegalStateException("replacement requires an active admission");
+      throw new IllegalStateException("replacement requires an active admission or verified completion");
     var floor = AdmittedBoostFloor.read(observed, Objects.requireNonNull(status.getPolicyUid()),
-        intent.podUid(), intent.containerName(), intent.containerId()).orElseThrow();
-    if (intent.requestBytes() < floor.memory().request() || intent.limitBytes() < floor.memory().limit()
-        || intent.heapBytes() < floor.heapBytes())
-      throw new IllegalArgumentException("replacement is below the admitted floor");
+        intent.podUid(), intent.containerName(), intent.containerId());
+    if (!releasing) {
+      var held = floor.orElseThrow();
+      if (intent.requestBytes() < held.memory().request() || intent.limitBytes() < held.memory().limit()
+          || intent.heapBytes() < held.heapBytes())
+        throw new IllegalArgumentException("replacement is below the admitted floor");
+    } else if (floor.isPresent()) {
+      throw new IllegalStateException("completion was not confirmed");
+    }
     if (intent.transitionId().equals(status.getTransitionId())) {
       if (!intent.encode().equals(status.getPreparedIntent()))
         throw new IllegalArgumentException("transition ID reused for a different target");
