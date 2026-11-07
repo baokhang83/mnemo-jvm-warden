@@ -206,7 +206,7 @@ WARDEN_POLICY=reporting
 WARDEN_POLICY_UID=$(kubectl -n "$WARDEN_NS" get wardenpolicy "$WARDEN_POLICY" -o jsonpath='{.metadata.uid}')
 WARDEN_POD_UID=$(kubectl -n "$WARDEN_NS" get pod "$WARDEN_POD" -o jsonpath='{.metadata.uid}')
 printf 'Pod UID: %s\n' "$WARDEN_POD_UID"
-kubectl -n "$WARDEN_NS" label pod "$WARDEN_POD" "warden.mnemo.io/policy-uid=$WARDEN_POLICY_UID" --overwrite
+kubectl -n "$WARDEN_NS" label pod "$WARDEN_POD" "warden.mnemo.io/policy-uid=$WARDEN_POLICY_UID"
 ```
 
 Create a request using those **actual** Pod name and UID values. The API defaults
@@ -229,7 +229,9 @@ spec:
   completionRequested: false
 ```
 
-Replace the UID with the printed value of `WARDEN_POD_UID`, save the file, and apply it:
+If the label already names a different policy UID, the command fails; investigate the existing
+ownership before changing it. Replace the request's UID placeholder with the printed value of
+`WARDEN_POD_UID`, save the file, and apply it:
 
 ```bash
 kubectl apply -f boost-request.yaml
