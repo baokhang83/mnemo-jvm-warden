@@ -112,3 +112,37 @@ controller/sidecar/lifecycle deployment or a replacement for B7's failure matrix
 Helm packaging and CI reactor builds include the protocol module. No runtime JSON library
 is added to the agent. Later protocol changes must preserve versioned compatibility and
 fail closed when an older agent cannot acknowledge a Boost request.
+
+## Persisting a replacement transition
+
+`PreparedTransitionStore.prepare` writes `status.transitionId` and the complete encoded
+`status.preparedIntent` together in one JSON Patch on the WardenBoost status subresource.
+The patch tests both the request UID and its observed resourceVersion. Concurrent changes
+reject the patch; the caller must re-read and reconcile. Even an idempotent retry performs
+the version check. The current transition ID cannot be reused for a different target. The caller must ensure
+IDs are unique across earlier transitions as well; the status stores no complete ID history.
+
+The store verifies the admitted pod/container identity, active phase, and resource/heap
+floor before the patch. `current` decodes the persisted target and checks its identity and
+transition ID. Authorization, policy ownership, and exclusive target claiming remain the
+caller's responsibility. The store does not grant a Boost.
+
+This status update is atomic **within the WardenBoost resource**. Kubernetes does not make
+it atomic with a later patch to a different Pod. The policy writer is not connected to this
+store yet: before doing so, it needs a single-writer protocol that prevents a delayed older
+publisher from overwriting a newer transition. No pod patch may be treated as proof that a
+transition remains current. B4 remains incomplete until that integration and its restart/
+race tests are implemented. No additional RBAC is enabled by this change.
+
+For a real API-server test on a disposable cluster:
+
+```bash
+mvn -B --no-transfer-progress -pl warden-controller -am package
+kind create cluster --name warden-atomic-check --wait 90s
+python3 deploy/verify-prepared-transition.py --context kind-warden-atomic-check
+kind delete cluster --name warden-atomic-check
+```
+
+The harness installs the WardenBoost CRD, creates its own namespace, and checks complete
+status persistence, floor and identity rejection, ID reuse, stale replacement, and a stale
+idempotent retry. It does not publish an intent to a pod.
