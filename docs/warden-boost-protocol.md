@@ -206,6 +206,10 @@ finalizer bypasses that protection. If the policy disappears, release remains pe
 operator recovery. Pod/container replacement is recorded as orphaning; a replacement cannot
 inherit the old request's permission.
 
+Waiting requests expose reasons including blackout, unsupported JVM preparation, stale
+acknowledgements, and blocked release. Agent failure reasons are bounded codes and do not
+include exception details. Failed preparation is retried until the acquisition deadline.
+
 The Helm controller now watches and patches WardenBoost resources in addition to status.
 Upgrade the WardenBoost CRD explicitly before upgrading the controller: Helm does not update
 existing CRDs automatically. The acceptance probes in `deploy/verify-boost-claim.py`,

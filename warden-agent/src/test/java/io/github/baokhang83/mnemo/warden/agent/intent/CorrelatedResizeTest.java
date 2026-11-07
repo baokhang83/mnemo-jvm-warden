@@ -28,6 +28,13 @@ class CorrelatedResizeTest {
         Duration.ofSeconds(1), Duration.ofSeconds(1), () -> state, clock);
   }
 
+  @Test void failureEvidenceUsesStableBoundedReasons() {
+    assertEquals("UnsupportedJvm", IntentWatcher.failureReason(new IOException("UnsupportedRuntime")));
+    assertEquals("UnsupportedJvm", IntentWatcher.failureReason(new IOException("UnsupportedHeapTarget")));
+    assertEquals("VerificationFailed", IntentWatcher.failureReason(new IOException("VerificationFailed")));
+    assertEquals("PreparationFailed", IntentWatcher.failureReason(new IOException("private details")));
+  }
+
   @Test void growsResourcesBeforeHeapAndAcknowledgesObservedState() throws Exception {
     state = state(50, 300);
     var ack = run();

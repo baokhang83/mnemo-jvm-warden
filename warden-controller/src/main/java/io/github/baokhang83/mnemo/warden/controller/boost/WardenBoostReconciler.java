@@ -116,7 +116,11 @@ public final class WardenBoostReconciler implements Reconciler<WardenBoost>, Cle
     var decision = BoostLifecycle.evaluate(new BoostLifecycle.Observation(phase, true, true,
         Boolean.TRUE.equals(spec.getCompletionRequested()) || (phase == BoostPhase.Failed && status.getGrantedAt() == null),
         blackout, evidence, releaseTarget, acquisition, execution, now));
-    if (decision.phase() == phase) return;
+    if (decision.phase() == phase) {
+      if (phase == BoostPhase.Preparing || phase == BoostPhase.Releasing)
+        reportWaiting(client, boost, pod, decision.reason(), now);
+      return;
+    }
     var next = copy(client, status);
     next.setPhase(decision.phase());
     if (decision.phase() == BoostPhase.Granted) {
@@ -132,14 +136,17 @@ public final class WardenBoostReconciler implements Reconciler<WardenBoost>, Cle
       if (next.getPreparedIntent() == null) {
         next.setPhase(BoostPhase.Completed); next.setCompletedAt(now.toString());
         condition(next, "Released", true, "NoTransition", now);
+        condition(next, "Ready", false, "Completed", now);
       } else {
         next.setReleaseBaselineTransitionId(next.getTransitionId());
         condition(next, "WorkFinished", true, decision.reason(), now);
+        condition(next, "Ready", false, "Releasing", now);
       }
     } else if (decision.phase() == BoostPhase.Completed) {
       next.setCompletedAt(now.toString());
       recordApplied(next, PreparedTransitionStore.current(boost));
       condition(next, "Released", true, "Applied", now);
+      condition(next, "Ready", false, "Completed", now);
     } else if (decision.phase() == BoostPhase.Failed || decision.phase() == BoostPhase.Expired) {
       condition(next, "Ready", false, decision.reason(), now);
     }
@@ -183,6 +190,35 @@ public final class WardenBoostReconciler implements Reconciler<WardenBoost>, Cle
     next.setAcquisitionDeadline(snapshot.acquisitionDeadline().toString()); next.setMaxDuration(snapshot.maxDuration().toString());
     next.setTransitionId(UUID.randomUUID().toString());
     condition(next, "Ready", false, "Preparing", now);
+    BoostStatusStore.compareAndSet(client, boost, next);
+  }
+
+  private static void reportWaiting(KubernetesClient client, WardenBoost boost, Pod pod,
+      String fallback, Instant now) {
+    String reason = fallback;
+    var status = boost.getStatus();
+    var annotations = pod.getMetadata().getAnnotations();
+    if (!"Blackout".equals(fallback) && status.getPreparedIntent() != null && annotations != null) {
+      String encoded = annotations.get(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ACK_ANNOTATION);
+      if (encoded != null) {
+        try {
+          var ack = io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement.decode(encoded);
+          var current = PreparedTransitionStore.current(boost);
+          if (!ack.intent().equals(current)) reason = "StaleAcknowledgement";
+          else if (!ack.applied()) {
+            if (status.getPhase() == BoostPhase.Releasing) reason = "ReleaseBlocked";
+            else if ("UnsupportedJvm".equals(ack.reason())) reason = "UnsupportedJvm";
+            else reason = "PreparationFailed";
+          }
+        } catch (IllegalArgumentException e) { reason = "StaleAcknowledgement"; }
+      }
+    }
+    if (status.getConditions() != null) {
+      String observedReason = reason;
+      if (status.getConditions().stream().anyMatch(c -> "Ready".equals(c.getType())
+          && "False".equals(c.getStatus()) && observedReason.equals(c.getReason()))) return;
+    }
+    var next = copy(client, status); condition(next, "Ready", false, reason, now);
     BoostStatusStore.compareAndSet(client, boost, next);
   }
 

@@ -23,6 +23,14 @@ public class BoostLifecycleProbe {
     String patch = "{\"metadata\":{\"annotations\":{\"" + ResizeIntent.ACK_ANNOTATION + "\":" + JsonString.quote(ack.encode()) + "}}}";
     client.pods().inNamespace(namespace).withName("worker").patch(PatchContext.of(PatchType.JSON_MERGE), patch);
   }
+  static void fail(KubernetesClient client, String namespace, ResizeIntent intent, String reason) {
+    var ack = new ResizeAcknowledgement(intent, false, reason, intent.requestBytes(), intent.limitBytes(), 0, Instant.now());
+    String patch = "{\"metadata\":{\"annotations\":{\"" + ResizeIntent.ACK_ANNOTATION + "\":" + JsonString.quote(ack.encode()) + "}}}";
+    client.pods().inNamespace(namespace).withName("worker").patch(PatchContext.of(PatchType.JSON_MERGE), patch);
+  }
+  static boolean reason(WardenBoost boost, String value) {
+    return boost.getStatus().getConditions().stream().anyMatch(c -> value.equals(c.getReason()));
+  }
   public static void main(String[] args) {
     try (var client = new KubernetesClientBuilder().build()) {
       String ns = args[0];
@@ -51,6 +59,9 @@ public class BoostLifecycleProbe {
       var first = ResizeIntent.decode(prepared);
       lifecycle.reconcile(requests.get(), context(client));
       require(requests.get().getStatus().getPhase() == BoostPhase.Preparing, "granted without acknowledgement");
+      fail(client, ns, first, "UnsupportedJvm");
+      lifecycle.reconcile(requests.get(), context(client));
+      require(reason(requests.get(), "UnsupportedJvm"), "unsupported JVM reason not surfaced");
       acknowledge(client, ns, first);
       lifecycle.reconcile(requests.get(), context(client));
       require(requests.get().getStatus().getPhase() == BoostPhase.Granted, "matching evidence did not grant");
@@ -65,6 +76,9 @@ public class BoostLifecycleProbe {
       require(!release.transitionId().equals(first.transitionId()), "release was not re-correlated");
       lifecycle.reconcile(requests.get(), context(client));
       require(requests.get().getStatus().getPhase() == BoostPhase.Releasing, "stale evidence completed release");
+      fail(client, ns, release, "VerificationFailed");
+      lifecycle.reconcile(requests.get(), context(client));
+      require(reason(requests.get(), "ReleaseBlocked"), "blocked release reason not surfaced");
       // A newer schedule cannot be bypassed by evidence for the earlier release target.
       policies.patch(PatchContext.of(PatchType.JSON_MERGE),
           "{\"spec\":{\"profiles\":{\"normal\":{\"request\":\"128Mi\"}}}}");
