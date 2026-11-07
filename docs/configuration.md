@@ -63,8 +63,8 @@ created by a later rollout picks up the current intent without a dedicated watch
 
 ### `spec.timezone` — required
 
-IANA zone id (e.g. `"Europe/Paris"`, `"UTC"`). The **only** field the API server rejects a
-policy for omitting — every `cron` window in `spec.schedule` is evaluated in this zone,
+IANA zone id (e.g. `"Europe/Paris"`, `"UTC"`). This field is required by the API server;
+profiles and Boost definitions also have validation rules. Every `cron` window is evaluated in this zone,
 DST-correctly, so a `22:00` window means 22:00 local time year-round, not a fixed UTC offset.
 
 ### `spec.profiles` — map of profile name → `ResourceProfile`
@@ -77,6 +77,19 @@ by `schedule[].profile`.
 |---|---|---|---|
 | `request` | quantity string | no | Kubernetes quantity, e.g. `"128Mi"` |
 | `limit` | quantity string | no | Kubernetes quantity, e.g. `"256Mi"` |
+| `heapTarget` | quantity string | no | Optional soft heap target for correlated Boost transitions; positive integral bytes, below `limit`. It does not change the legacy scheduled-only agent path. |
+
+A policy can contain at most 64 profiles. Request/limit strings are bounded to 64 characters.
+Profiles referenced by a Boost have additional quantity and ordering validation; see
+[Warden Boost](warden-boost.md#configure-an-approved-boost).
+
+### `spec.boosts` — optional named Boosts
+
+Each entry names an approved profile, a required `heapTarget`, `acquisitionTimeout`, and
+`maxDuration`. Existing scheduled-only policies can omit this map. The controller accepts at
+most 32 definitions; a request references one by name and cannot provide its own quantities.
+See the [Boost guide](warden-boost.md) for a complete example, request lifecycle, and current
+security requirements.
 
 ### `spec.schedule` — list of `ScheduleWindow`
 
@@ -114,7 +127,7 @@ shrink veto lookup. It beats every other signal (see [precedence](#precedence-bl
 Live-metric thresholds evaluated against `metric`, a PromQL query the controller runs on the
 same 30s resync as the schedule. Requires the controller's `WARDEN_PROMETHEUS_URL` to be set
 ([see below](#warden-controller-configuration)) — without it, `metric` is never evaluated and
-both thresholds are inert.
+the emergency threshold cannot trigger and a configured shrink threshold fails closed.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -131,7 +144,7 @@ letting it through, and `emergencyGrowAbove` simply never fires. See
 
 | Field | Type | Notes |
 |---|---|---|
-| `currentProfile` | string | The profile last resolved and patched to the target's intent annotation |
+| `currentProfile` | string | The last resolved profile; a Pod intent write can still fail, so this is not confirmation that the resize was applied |
 | `currentMetricValue` | number | The guardrail metric's last successful reading; absent if no guardrail is configured or the last evaluation failed |
 
 ### Precedence: blackout > metric > schedule
@@ -186,6 +199,8 @@ memory files without a container-boundary-crossing hack. See
 | Variable | Required | Default | Notes |
 |---|---|---|---|
 | `WARDEN_PROMETHEUS_URL` | no | unset | Base URL of the Prometheus the controller queries for `spec.guardrail.metric`. Leave unset if no policy uses a guardrail — it's optional, not a hard dependency. |
+| `WARDEN_CONTROLLER_DEPLOYMENT` | for Boost admission/grant in custom installations | unset | Controller Deployment name; the Helm chart supplies it. New Boost admission and grant are held if topology cannot be verified. |
+| `WARDEN_CONTROLLER_NAMESPACE` | for Boost admission/grant in custom installations | unset | Namespace of that Deployment; supplied by the Helm chart through the Downward API. |
 
 ## Helm chart values
 
@@ -200,8 +215,8 @@ controller:
     pullPolicy: IfNotPresent
   prometheusUrl: ""        # -> WARDEN_PROMETHEUS_URL
   resources:
-    requests: { cpu: 100m, memory: 128Mi }
-    limits: { memory: 256Mi }
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
 
 sidecar:
   enabled: true             # master toggle an app chart gates its own include() on
@@ -343,3 +358,10 @@ never change, check:
    controller has nothing to PATCH.
 3. The agent's own `/readyz` — if the agent hasn't attached yet, it has nothing to act on even
    once it reads the correct intent annotation.
+
+## Boost operations
+
+Boost is optional and currently experimental. See [Warden Boost](warden-boost.md) for the
+manual request flow, the additional acknowledgement permission, lifecycle and troubleshooting.
+Existing scheduled-only workload permissions and collector choices are unchanged; controller
+upgrades still require the updated CRDs and controller RBAC described in the guide.

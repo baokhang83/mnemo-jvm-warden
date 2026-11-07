@@ -331,6 +331,18 @@ the same way any out-of-cluster tool would reach it — then points `WARDEN_PROM
 forwarded port. Confirms `status.currentMetricValue` reaches `1.0`. Manual-run only for now,
 matching every other check in this directory.
 
+## Experimental Boost verification
+
+The existing sidecar example and scheduled-path checks above do not require Boost. For Boost,
+see the [operator guide](../docs/warden-boost.md), including the extra acknowledgement permission
+and trust requirements. On a **disposable** cluster, the Boost schema, claim, and lifecycle
+probes are available as `verify-wardenboost-schema.py`, `verify-boost-claim.py`, and
+`verify-boost-lifecycle.py`; each takes `--context`. The lifecycle probe uses synthetic agent
+acknowledgements and does not validate a deployed JVM. The packaged-controller probe
+`verify-boost-operator.py` additionally requires a compatible controller already installed.
+See the [protocol verification notes](../docs/warden-boost-protocol.md#b5-lifecycle-and-target-claims)
+for the boundaries of these checks.
+
 ## `verify-rbac-boundaries.sh` — the shipped RBAC grants exactly what's documented, and nothing else (W-804)
 
 Verifies, against a real cluster, that `docs/rbac-mapping.md`'s two tables are accurate: installs

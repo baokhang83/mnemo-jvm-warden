@@ -9,6 +9,10 @@ creation or a pod patch. Request and acknowledgement authorization remains B6 wo
 Existing policies can omit `boosts`. A policy can define up to 64 resource profiles and
 32 named boosts. Profiles can optionally specify `heapTarget` for correlated transitions:
 
+The following fragment illustrates schema fields; it omits the target and schedule required for
+an operational request. For a complete policy and manual request, see the
+[Boost operator guide](warden-boost.md).
+
 ```yaml
 apiVersion: warden.mnemo.io/v1alpha1
 kind: WardenPolicy
@@ -36,9 +40,9 @@ limit to bound CEL evaluation cost; durations have a 32-character limit. This le
 also applies to profiles in policies without boosts. Ordinary quantity syntax is unchanged.
 
 `heapTarget` reserves a distinction between heap and total container memory. The operator
-must choose enough non-heap headroom. Checking runtime capability, actual JVM maximum,
-target authorization, and live pod identity requires the later admission/reconcile path;
-the CRD alone cannot resolve those external objects.
+must choose enough non-heap headroom. The controller checks target authorization and live
+Pod/container identity during admission; the agent checks runtime capability and the actual JVM maximum during preparation. The CRD
+alone cannot resolve those external objects.
 
 ## Request
 
@@ -68,9 +72,9 @@ kubectl apply -f charts/warden/crds/wardenpolicy-crd.yaml
 kubectl apply -f charts/warden/crds/wardenboost-crd.yaml
 ```
 
-The controller role can read WardenBoosts and patch their status for admitted transitions.
-Request authorization, exclusive claims, and acknowledgement admission controls require
-B5/B6 and the M8 follow-ups. See `docs/rbac-mapping.md`.
+The controller role can watch and patch WardenBoosts and their status. B5 implements a
+per-Pod claim and lifecycle checks; request and acknowledgement admission hardening remains
+B6 and the M8 follow-ups. See [RBAC mapping](rbac-mapping.md).
 
 ## Verification
 

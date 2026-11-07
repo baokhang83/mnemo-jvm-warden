@@ -73,6 +73,23 @@ annotation-based schedule for simple minimum-replica baselines.
 
 ---
 
+## Experimental Boost path
+
+A `WardenBoost` requests a named, operator-approved memory floor for one Pod/container
+instance. The Boost reconciler validates admission, claims the Pod, records the floor and
+lifecycle, and grants only after matching agent evidence. The existing policy reconciler
+remains the intent writer: it combines the floor with scheduled and emergency targets,
+respects blackout and shrink guards, and persists a correlated transition before publishing it.
+The agent applies the normal grow/shrink ordering and acknowledges the exact transition.
+Completion recomputes the current policy target; expiry alone does not stop work or remove the
+floor. See the [Boost operator guide](warden-boost.md) for prerequisites and current security
+and validation limits.
+
+The existing scheduled-only path remains available without a Boost request; it continues to
+use its existing intent annotations and collector behavior.
+
+---
+
 ## The resize state machine
 
 Every transition is a state machine in the agent, not a linear script — because

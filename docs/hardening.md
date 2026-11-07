@@ -48,6 +48,17 @@ is the checklist to actually run through before going to production.
   and friends) that can drive a real resize using that token. See threat
   model, "Out-of-scope assumptions."
 
+## Experimental Boost
+
+The scheduled-only setup above does not need Boost request or acknowledgement permissions.
+For a Boost evaluation, the agent additionally needs to patch its own Pod metadata, and only
+trusted actors should be able to create or complete requests, change target opt-in labels,
+write status, or forge acknowledgements. RBAC cannot restrict a Pod patch to the acknowledgement
+annotation or enforce self-Pod request fields. The example acknowledgement admission policy is
+not a complete, chart-packaged security solution; B6 and M8 work remains. Review the
+[Boost guide's prerequisites](warden-boost.md#prerequisites-for-a-boost-evaluation) and the
+[threat model](threat-model.md) before enabling it.
+
 ## Verify, don't assume
 
 Run [`../deploy/verify-rbac-boundaries.sh`](../deploy/verify-rbac-boundaries.sh)
