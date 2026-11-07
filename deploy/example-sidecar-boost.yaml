@@ -1,0 +1,175 @@
+# Example: the B8 application-facing local Boost API, layered on top of
+# deploy/example-sidecar.yaml's base native-sidecar pattern (read that file first — this one
+# only calls out what's different).
+#
+# Three things change relative to the base example:
+#   1. A new `warden-boost-token` emptyDir volume, mounted read-write into the `warden`
+#      container and read-only into the `app` container — the explicit app-to-sidecar
+#      credential the dev plan requires ("loopback binding alone is not an authorization
+#      boundary between containers sharing a pod network"). The agent generates a random
+#      bearer token at startup and writes it to this volume; the app reads it back from the
+#      same path and sends it as `Authorization: Bearer <token>` on every call.
+#   2. Three new env vars on the `warden` container: WARDEN_POD_UID (Downward API, needed for
+#      the WardenBoost CR's podRef.uid), WARDEN_BOOST_POLICY_REF (the WardenPolicy name — this
+#      one variable is the feature flag; the local API only starts when it's set), and
+#      WARDEN_BOOST_PORT (loopback-only, defaults to 8090 if omitted).
+#   3. RBAC: this pod's ServiceAccount also needs `wardenboosts` get/list/watch/create/patch —
+#      see charts/warden/templates/boost-security.yaml's `boost-agent` ClusterRole, and enable
+#      `boost.security.enabled=true` in the warden chart so that ClusterRole's bindings and the
+#      `boost-request-guard` admission narrowing (self-pod-bound create/update only, never
+#      delete, never status) are actually deployed. Without that chart flag, this pod's
+#      `acquire` calls will reach the Kubernetes API but be denied by RBAC.
+#
+# The app container's own calls (not shown — this is the sidecar/RBAC wiring, not the client)
+# look like:
+#   TOKEN=$(cat /var/run/warden/boost/token)
+#   curl -s -X POST http://127.0.0.1:8090/v1/boost/acquire \
+#     -H "Authorization: Bearer $TOKEN" -d '{"boost":"index-rebuild"}'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: warden-example-boost
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: warden-example-boost
+rules:
+  - apiGroups: [""]
+    resources: ["pods/resize"]
+    resourceNames: ["warden-example-boost"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["warden-example-boost"]
+    verbs: ["get"]
+  # B8: self-request/release a boost for this pod. No "delete" (operator-only) and no
+  # "wardenboosts/status" (controller-only) — see boost-security.yaml's boost-agent ClusterRole.
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenboosts"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: warden-example-boost
+subjects:
+  - kind: ServiceAccount
+    name: warden-example-boost
+roleRef:
+  kind: Role
+  name: warden-example-boost
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: warden-example-boost
+  labels:
+    app.kubernetes.io/name: warden-example-boost
+    # Required for boost.security's namespaceSelector-scoped RoleBindings to apply in this
+    # namespace — see docs/warden-boost.md.
+    warden.mnemo.io/boost-enabled: "true"
+spec:
+  serviceAccountName: warden-example-boost
+  shareProcessNamespace: true
+
+  volumes:
+    - name: host-cgroup
+      hostPath:
+        path: /sys/fs/cgroup
+        type: Directory
+    # The shared app<->sidecar credential (point 1 above). An emptyDir, not a Secret: the SDK
+    # needs no Kubernetes credentials at all, per the dev plan.
+    - name: warden-boost-token
+      emptyDir: {}
+
+  initContainers:
+    - name: warden
+      image: ghcr.io/baokhang83/mnemo-jvm-warden:latest
+      imagePullPolicy: IfNotPresent
+      restartPolicy: Always # native sidecar
+      ports:
+        - name: health
+          containerPort: 8080
+        - name: boost-api
+          containerPort: 8090
+      env:
+        - name: WARDEN_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: WARDEN_TARGET_CONTAINER_NAME
+          value: app
+        # B8 (point 2 above):
+        - name: WARDEN_POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: WARDEN_BOOST_POLICY_REF
+          value: my-policy # must name a real WardenPolicy in this namespace
+        - name: WARDEN_BOOST_PORT
+          value: "8090"
+      volumeMounts:
+        - name: host-cgroup
+          mountPath: /host-cgroup
+          readOnly: true
+        - name: warden-boost-token
+          mountPath: /var/run/warden/boost # the agent writes "token" under here at startup
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: health
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: health
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+
+  containers:
+    - name: app
+      image: eclipse-temurin:21-jdk
+      command:
+        - java
+        - -XX:+UseG1GC
+        - -Dcom.sun.management.jmxremote.port=9999
+        - -Dcom.sun.management.jmxremote.rmi.port=9999
+        - -Dcom.sun.management.jmxremote.host=127.0.0.1
+        - -Dcom.sun.management.jmxremote.authenticate=false
+        - -Dcom.sun.management.jmxremote.ssl=false
+        - -Djava.rmi.server.hostname=127.0.0.1
+        - -m
+        - jdk.httpserver/sun.net.httpserver.simpleserver.JWebServer
+        - -b
+        - "0.0.0.0"
+        - -p
+        - "8000"
+      ports:
+        - name: http
+          containerPort: 8000
+      volumeMounts:
+        # Point 1 above: the app reads the bearer token back from the same volume, read-only.
+        - name: warden-boost-token
+          mountPath: /var/run/warden/boost
+          readOnly: true
+      readinessProbe:
+        httpGet:
+          path: /
+          port: http
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      resizePolicy:
+        - resourceName: memory
+          restartPolicy: NotRequired

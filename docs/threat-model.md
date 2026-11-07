@@ -69,6 +69,7 @@ flowchart TB
             APP["app container<br/>(often runs as root)"]
             AGT["warden sidecar<br/>(non-root, own SA)"]
             APP <-->|"JMX :9999, loopback-bound<br/>shareProcessNamespace: true"| AGT
+            APP <-->|"Boost API :8090, loopback-bound<br/>bearer token on shared emptyDir"| AGT
         end
     end
 
@@ -106,6 +107,11 @@ The crossing points that matter:
 - **Pod boundary → pod boundary (same ServiceAccount, different replica):**
   closed by `warden-resize-admission-policy.yaml` (#71) — see "Resize API
   abuse" below.
+- **Container boundary → pod boundary (B8 Boost API):** like the JMX port
+  above, loopback binding alone does not separate `app` from `AGT` — both
+  share the pod's network namespace. Closed by an explicit bearer token (not
+  a Kubernetes credential) shared over an `emptyDir`, independent of the JMX
+  pair above. See "Boost local API" below.
 
 ## Data flows
 
@@ -485,6 +491,40 @@ JSON body). Tracked in the review checklist as a follow-up: a test that
 captures agent/controller stdout during a real resize and asserts the
 bearer-token pattern never appears in it.
 
+### 12. Boost local API (app↔sidecar)
+
+**Scenario:** B8's local `/v1/boost/*` HTTP API lets the `app` container
+acquire/release a boost through the sidecar, without either container
+holding a Kubernetes credential for it (`app` never does; `AGT` reuses its
+existing B6 token). Like JMX (abuse case 5), the two containers share the
+Pod's network namespace, so a loopback bind alone does not separate them
+from each other — only from *other* pods.
+
+**Impact if the bearer token were skipped or weak:** any process able to
+reach the loopback interface inside the Pod (i.e. `app`, or anything that
+later runs in `app`'s container) could acquire/release boosts as the
+sidecar's identity, without needing the sidecar's own Kubernetes token.
+Still pod-scoped (the sidecar's RBAC and the `boost-request-guard` admission
+policy bind every created `WardenBoost` to this one Pod — see "Resize API
+abuse" below for the equivalent reasoning on the resize path), so this could
+not reach another pod's boosts; the exposure is entirely intra-pod.
+
+**Mitigation:** `BoostApiServer` binds `127.0.0.1` explicitly (not the
+wildcard address `HealthServer` uses) and requires `Authorization: Bearer
+<token>` on every request, compared with `MessageDigest.isEqual`
+(constant-time). The token is a 256-bit value `BoostToken.generate()`
+creates fresh on every agent startup and writes to an `emptyDir` shared with
+the `app` container — not a Kubernetes `Secret`, so the app container needs
+no Kubernetes credential of any kind to use the API.
+
+**Accepted risk:** the token has no expiry of its own; a sidecar restart
+regenerates it (invalidating whatever `app` last read), but a sidecar that
+stays up for a long time keeps the same token for that whole lifetime.
+Equivalent, deliberately, to `InClusterApiServer`'s own token-handling
+posture for the resize path — see "Secret or log leakage" above for why the
+project doesn't log it and re-reads rather than caches credentials where it
+can.
+
 ---
 
 ## Namespace and targetRef boundaries — summary
@@ -507,6 +547,7 @@ bearer-token pattern never appears in it.
 | --- | --- | --- | --- |
 | Agent `/healthz`, `/readyz`, `/metrics` (`HealthServer`) | all interfaces, pod's own network namespace (`InetSocketAddress(port)`, no host given) | any pod that can route to this pod's IP, unless a `NetworkPolicy` restricts it | none |
 | Target JVM's JMX port | `127.0.0.1` only (must be configured this way — see abuse case 5) | same pod only, when configured correctly | none needed, given the loopback binding |
+| Agent Boost API (`BoostApiServer`, B8, optional) | `127.0.0.1` only, always (code-enforced, not operator-configured) | same pod only | bearer token on a shared `emptyDir` (see abuse case 12) |
 | Controller: no inbound listener | — | — | — |
 
 **Hardening recommendation:** the agent's `/metrics` endpoint carries no

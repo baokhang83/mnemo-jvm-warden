@@ -323,4 +323,17 @@ No runtime grant/reconcile behavior is introduced in B2.
 
 The shared versioned protocol, per-pod emitter/evidence reader, and agent confirmation
 path are implemented. See [correlated transport and verification](warden-boost-protocol.md).
+
+## B8 local API
+
+The authenticated local sidecar Boost API is implemented: a loopback-only HTTP server
+(`warden-agent`'s `agent.boost` package) the app container calls to acquire/check/release a
+boost, authenticated with a random bearer token shared over an `emptyDir` volume rather than
+any Kubernetes credential, satisfying "the SDK does not need Kubernetes credentials." The
+agent reuses its existing B6 identity (a Pod cannot run as two ServiceAccounts at once, so a
+second identity wasn't possible) with narrowed RBAC and admission (create/update, never
+delete, never status, always bound to its own Pod — see
+[Enable the manual-flow security package](warden-boost.md#enable-the-manual-flow-security-package)).
+See [the application-facing local API](warden-boost.md#application-facing-local-api-b8) for the
+wire format. B9 (the Java lease client) is a separate, later milestone — not part of this one.
 B4/B5 still own floor resolution and durable request/grant reconciliation.

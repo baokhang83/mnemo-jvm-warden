@@ -21,6 +21,43 @@ class AgentConfigTest {
     assertEquals(AgentConfig.DEFAULT_GC_TIMEOUT, config.gcTimeout());
     assertEquals(AgentConfig.DEFAULT_RESIZE_TIMEOUT, config.resizeTimeout());
     assertEquals(AgentConfig.DEFAULT_INTENT_POLL_INTERVAL, config.intentPollInterval());
+    assertEquals(null, config.podUid());
+    assertEquals(AgentConfig.DEFAULT_BOOST_PORT, config.boostPort());
+    assertEquals(null, config.boostPolicyRef());
+    assertEquals(AgentConfig.DEFAULT_BOOST_ACQUIRE_WAIT, config.boostAcquireWait());
+    assertEquals(AgentConfig.DEFAULT_BOOST_TOKEN_PATH, config.boostTokenPath());
+    assertEquals(false, config.boostApiEnabled());
+  }
+
+  @Test
+  void boostApiIsDisabledUnlessPolicyRefIsSet() {
+    AgentConfig withoutPolicy = AgentConfig.fromEnv(REQUIRED_ENV::get);
+    assertEquals(false, withoutPolicy.boostApiEnabled());
+
+    AgentConfig withPolicy =
+        AgentConfig.fromEnv(merge(REQUIRED_ENV, Map.of("WARDEN_BOOST_POLICY_REF", "my-policy"))::get);
+    assertEquals(true, withPolicy.boostApiEnabled());
+    assertEquals("my-policy", withPolicy.boostPolicyRef());
+  }
+
+  @Test
+  void readsBoostFieldsFromEnvironment() {
+    AgentConfig config =
+        AgentConfig.fromEnv(
+            merge(
+                    REQUIRED_ENV,
+                    Map.of(
+                        "WARDEN_POD_UID", "11111111-1111-1111-1111-111111111111",
+                        "WARDEN_BOOST_PORT", "9999",
+                        "WARDEN_BOOST_POLICY_REF", "my-policy",
+                        "WARDEN_BOOST_ACQUIRE_WAIT_SECONDS", "40",
+                        "WARDEN_BOOST_TOKEN_PATH", "/tmp/boost-token"))
+                ::get);
+    assertEquals("11111111-1111-1111-1111-111111111111", config.podUid());
+    assertEquals(9999, config.boostPort());
+    assertEquals("my-policy", config.boostPolicyRef());
+    assertEquals(Duration.ofSeconds(40), config.boostAcquireWait());
+    assertEquals("/tmp/boost-token", config.boostTokenPath());
   }
 
   @Test

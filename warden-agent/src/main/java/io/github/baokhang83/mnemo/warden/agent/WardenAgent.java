@@ -1,9 +1,13 @@
 package io.github.baokhang83.mnemo.warden.agent;
 
 import io.github.baokhang83.mnemo.warden.agent.attach.AttachSupervisor;
+import io.github.baokhang83.mnemo.warden.agent.boost.BoostApiServer;
+import io.github.baokhang83.mnemo.warden.agent.boost.BoostRequestClient;
+import io.github.baokhang83.mnemo.warden.agent.boost.BoostToken;
 import io.github.baokhang83.mnemo.warden.agent.intent.IntentWatcher;
 import io.github.baokhang83.mnemo.warden.agent.intent.PodIntentReader;
 import io.github.baokhang83.mnemo.warden.agent.metrics.AgentMetrics;
+import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -13,6 +17,10 @@ import java.util.concurrent.CountDownLatch;
  * pod's W-306 intent annotations and drives {@code ShrinkSequence}/{@code GrowSequence} against
  * the attached target, and shuts down cleanly on {@code SIGTERM}. Readiness reflects a real
  * attached target, not just the health server being up &mdash; see {@link HealthState}.
+ *
+ * <p>Also starts the B8 local Boost API ({@link BoostApiServer}) when {@link
+ * AgentConfig#boostApiEnabled()} &mdash; optional, so existing scheduled-only sidecars are
+ * unaffected.
  */
 public final class WardenAgent {
 
@@ -36,6 +44,29 @@ public final class WardenAgent {
     intentWatcher.start();
     AgentLog.info("intent watcher started; polling own pod every " + config.intentPollInterval());
 
+    BoostApiServer boostApiServer = null;
+    if (config.boostApiEnabled()) {
+      if (config.podUid() == null) {
+        throw new IllegalArgumentException(
+            AgentConfig.ENV_POD_UID + " is not set; required when " + AgentConfig.ENV_BOOST_POLICY_REF + " is set");
+      }
+      String token = BoostToken.generate();
+      BoostToken.write(Path.of(config.boostTokenPath()), token);
+      boostApiServer =
+          new BoostApiServer(
+              config.boostPort(),
+              token,
+              BoostRequestClient.forInClusterAgent(),
+              config.boostPolicyRef(),
+              config.podName(),
+              config.podUid(),
+              config.targetContainerName(),
+              config.boostAcquireWait());
+      boostApiServer.start();
+      AgentLog.info("boost API enabled for policy " + config.boostPolicyRef());
+    }
+    BoostApiServer boostApi = boostApiServer;
+
     Runtime.getRuntime()
         .addShutdownHook(
             new Thread(
@@ -43,6 +74,9 @@ public final class WardenAgent {
                   AgentLog.info("shutting down");
                   intentWatcher.stop();
                   attachSupervisor.stop();
+                  if (boostApi != null) {
+                    boostApi.stop();
+                  }
                   server.stop();
                 },
                 "warden-shutdown"));
