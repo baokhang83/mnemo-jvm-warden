@@ -22,6 +22,12 @@ rules:
   - apiGroups: [""]
     resources: ["pods/resize"]
     verbs: ["patch"]
+  # B8: lets the agent self-request/release a boost for its own pod via the local sidecar API.
+  # Deliberately no "delete" and no "wardenboosts/status" &mdash; deletion stays operator-only
+  # and status stays controller-only, both still enforced below by boost-request-guard.
+  - apiGroups: ["warden.mnemo.io"]
+    resources: ["wardenboosts"]
+    verbs: ["get", "list", "watch", "create", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -179,8 +185,15 @@ spec:
         operations: ["CREATE", "UPDATE", "DELETE"]
         resources: ["wardenboosts", "wardenboosts/status"]
   validations:
-    - expression: {{ printf "!request.userInfo.username.matches('^system:serviceaccount:[^:]+:%s$')" $agent | quote }}
-      message: "Boost agent identity cannot create or change Boost requests or status"
+    # B8: the agent identity may now CREATE/UPDATE the main resource (self-requesting a boost
+    # via the local sidecar API) &mdash; validation below still binds that to its own Pod. It
+    # may never DELETE and never touch the status subresource; the next two validations already
+    # enforce "controller-only status" and "self-pod-only target" independently, so this is
+    # belt-and-suspenders, not the sole guard against either.
+    - expression: >-
+        {{ printf "!request.userInfo.username.matches('^system:serviceaccount:[^:]+:%s$')" $agent }} ||
+        (request.operation != 'DELETE' && (!has(request.subResource) || request.subResource == ''))
+      message: "Boost agent identity cannot delete Boost requests or change status"
     - expression: >-
         !has(request.subResource) || request.subResource != 'status' ||
         request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace (include "warden.controller.serviceAccountName" .) | quote }}

@@ -345,6 +345,15 @@ acknowledgements and does not validate a deployed JVM. The packaged-controller p
 See the [protocol verification notes](../docs/warden-boost-protocol.md#b5-lifecycle-and-target-claims)
 for the boundaries of these checks.
 
+`verify-boost-local-api.py` exercises the B8 application-facing local Boost API (see
+[the local API docs](../docs/warden-boost.md#application-facing-local-api-b8)) end to end
+against a real Pod: a real agent image, real admission/RBAC, and real cross-container token
+sharing over a shared `emptyDir`. Pass `--context` and `--agent-image repository:tag`; the
+image must already be loaded into the cluster (`docker build` then `kind load docker-image`).
+Cross-pod admission denial is already covered by `verify-boost-security.py`'s agent/intruder
+scenarios, so this script focuses on the local HTTP surface instead: bearer-token auth,
+idempotent `requestId` retries, the one-outstanding-request limit, and acquire/status/release.
+
 For an end-to-end index rebuild with the real controller, sidecar, JVM, and resize API, see
 [Boost B7 acceptance](../docs/validation/warden-boost-b7-kind.md). This separate test is
 for disposable clusters and does not change the scheduled-only setup.

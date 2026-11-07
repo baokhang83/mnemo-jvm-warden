@@ -44,6 +44,18 @@ sidecar:
       memory: 64Mi
     limits:
       memory: 256Mi
+  # -- B8: the application-facing local Boost API. Disabled by default; existing sidecars are
+  # unaffected. Enabling it also requires the `boost.security` RBAC below (the agent identity
+  # needs `wardenboosts` create/patch to self-request a boost) and an app-container volume mount
+  # of the shared token &mdash; see docs/warden-boost.md and deploy/example-sidecar-boost.yaml.
+  boost:
+    enabled: false
+    port: 8090
+    # -- No default, mirroring targetContainerName's fail-fast posture: a pod can't discover its
+    # own WardenPolicy's name any other way (it only carries the policy's UID).
+    policyRef: ""
+    acquireWaitSeconds: 25
+    tokenPath: /var/run/warden/boost/token
 
 # -- Optional Boost security resources. Label each participating namespace with the selector
 # below and bind the supplied ClusterRoles in that namespace. Disabled for legacy installations.

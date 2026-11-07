@@ -6,12 +6,16 @@ then request release when the rebuild and its child work have finished. Boost wo
 the normal schedule: Warden combines the admitted floor with the current scheduled and
 emergency targets and keeps the existing shrink guard and blackout rules.
 
-**Status:** the controller lifecycle and correlated agent protocol are implemented. The chart
-can opt into scoped admission, RBAC roles, events, and metrics for the manual Kubernetes flow.
-Full deployed JVM acceptance is still planned ([B7](https://github.com/baokhang83/mnemo-jvm-warden/issues/111)).
-There is no application-facing endpoint or Java lease client yet. Treat the manual flow below
-as an evaluation for a trusted operator in a controlled cluster, not as a production-ready
-multi-tenant interface.
+**Status:** the controller lifecycle and correlated agent protocol are implemented, and full
+deployed JVM acceptance is verified
+([B7](https://github.com/baokhang83/mnemo-jvm-warden/issues/111)). The chart can opt into scoped
+admission, RBAC roles, events, and metrics for the manual Kubernetes flow. A pod-bound,
+authenticated [application-facing local API](#application-facing-local-api-b8) now lets the app
+container itself acquire/release a boost
+([B8](https://github.com/baokhang83/mnemo-jvm-warden/issues/112)) — there is no Java lease
+client (`warden-boost-client`) yet; that's a separate, later milestone (B9). Treat the manual
+flow below as an evaluation for a trusted operator in a controlled cluster, not as a
+production-ready multi-tenant interface.
 
 If you only use scheduled right-sizing, you do not need a `boosts` section, a `WardenBoost`
 request, a policy opt-in label, or Boost acknowledgement permissions for the sidecar. Keep the
@@ -197,9 +201,11 @@ warnings are empty; also confirm the bindings select the intended namespaces. Th
 create and complete requests for authorized Pods in its namespace; it is a **trusted namespace
 operator**, not an application identity. Use a kubeconfig or authentication mechanism for that
 service account, provisioned according to your cluster's credential practices. Do not bind these
-roles to other identities without equivalent admission protections. The agent identity cannot
-create or modify requests or status. The policy allows only the configured controller to write
-Boost status, and rejects cross-Pod requests made with other Pod-bound tokens. A dedicated agent
+roles to other identities without equivalent admission protections. The agent identity may
+create and update a Boost request bound to its own Pod (B8's local API does this on the app's
+behalf), but may never delete one and may never write status; the policy allows only the
+configured controller to write Boost status, and rejects cross-Pod requests made with other
+Pod-bound tokens, including the agent's own. A dedicated agent
 with a Pod-bound token can patch only its own bounded acknowledgement and resize only its own
 Pod; it does not restrict which container or resource fields in that Pod may be resized. The
 controller may remove an acknowledgement only while clearing its claim and intent. Agent Pods must disable automatic service-account token mounting and mount projected
@@ -429,3 +435,72 @@ metric labels. A failed Kubernetes list returns HTTP 503 instead of reporting ze
 
 For a runnable index rebuild and recorded end-to-end checks on a disposable cluster, see
 [Boost B7 acceptance](validation/warden-boost-b7-kind.md).
+
+## Application-facing local API (B8)
+
+The app container can acquire and release a boost itself, over a loopback-only HTTP API the
+agent sidecar serves — no `kubectl`, no Kubernetes credentials in the app. This closes the gap
+the manual flow above leaves: until now, "There is no application-facing endpoint" (`docs/
+warden-boost-development-plan.md`); a human had to create the `WardenBoost` object by hand.
+
+**Enable it** by setting, on the `warden` sidecar container (see
+`deploy/example-sidecar-boost.yaml` for a complete manifest):
+
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `WARDEN_BOOST_POLICY_REF` | to enable the API | unset | The `WardenPolicy` name to stamp on self-requested boosts. Presence of this one variable is the feature flag — a Pod can't discover its own policy's *name* any other way (only its UID, via the existing resize-intent label), so there's no safe default to fall back to. |
+| `WARDEN_POD_UID` | yes, once enabled | unset | Downward API `fieldRef: metadata.uid`. Needed for the request's `podRef.uid`. |
+| `WARDEN_BOOST_PORT` | no | `8090` | Loopback-only; never bind this to the Pod IP. |
+| `WARDEN_BOOST_ACQUIRE_WAIT_SECONDS` | no | `25` | How long an `acquire` call blocks before returning `202` so the caller polls `/status` instead. |
+| `WARDEN_BOOST_TOKEN_PATH` | no | `/var/run/warden/boost/token` | Where the agent writes the shared bearer token (see below). |
+
+This also requires the same RBAC the manual flow's `boost.security.enabled=true` package
+grants the agent identity (`wardenboosts` get/list/watch/create/patch — never `delete`, never
+the `status` subresource) and the `boost-request-guard` admission policy, which binds any
+self-requested boost to the requesting Pod's own identity. Without that chart flag, `acquire`
+calls reach the Kubernetes API but are denied by RBAC.
+
+**Authentication.** Loopback binding alone is not an authorization boundary between containers
+sharing a pod network — any container in the Pod's network namespace can reach a loopback port.
+So every call needs `Authorization: Bearer <token>`, where the token is a random value the
+agent generates at startup and writes to a file on an `emptyDir` volume shared with the app
+container (not a Kubernetes Secret — no extra API call, and the app needs no Kubernetes
+credentials at all). Mount the same volume into both containers; the agent writes
+read-write, the app reads read-only:
+
+```yaml
+volumes:
+  - name: warden-boost-token
+    emptyDir: {}
+# warden (sidecar) container:
+volumeMounts:
+  - name: warden-boost-token
+    mountPath: /var/run/warden/boost
+# app container:
+volumeMounts:
+  - name: warden-boost-token
+    mountPath: /var/run/warden/boost
+    readOnly: true
+```
+
+The agent is the sole writer and regenerates the token on every restart; it never reads an
+existing file back. If the sidecar restarts independently of the app, the app's previously-read
+token goes stale — read the token file fresh per call (or at least on a `401`) rather than
+caching it for the process lifetime.
+
+**Endpoints** (all require the bearer token above):
+
+- `POST /v1/boost/acquire` — body `{"boost":"<name>","requestId":"<optional>"}`. Omit
+  `requestId` for a new request (the server generates one and returns it); supply it back to
+  retry idempotently — the same `requestId` never creates a second `WardenBoost`. Blocks up to
+  `WARDEN_BOOST_ACQUIRE_WAIT_SECONDS` for `Granted` or a terminal phase: returns `200` if it
+  settled in time, `202` with the current phase if the wait elapsed (poll `/status` next). Only
+  one request may be outstanding per agent process at a time — a second `acquire` for a
+  different, still-active `requestId` gets `409` with the existing one.
+- `GET /v1/boost/status?requestId=<id>` — the current phase (`404` if unknown).
+- `POST /v1/boost/release` — body `{"requestId":"<id>"}`. Idempotent: releasing an
+  already-releasing or already-completed request is a no-op, not an error.
+
+All three respond with `{"requestId":"...","phase":"...","message":"..."}` (`message` may be
+`null`). The app never supplies a Pod name, container name, policy name, or any Kubernetes API
+path — those come from the sidecar's own configuration, never from the app's request body.

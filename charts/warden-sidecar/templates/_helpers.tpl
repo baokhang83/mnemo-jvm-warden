@@ -10,6 +10,12 @@ Call with: {{ include "warden.sidecar" (dict "cfg" .Values.warden) }}
         with no default here either (see charts/warden/values.yaml's comment on
         targetContainerName).
 
+        cfg.boost (optional; B8) - enabled, port, policyRef, acquireWaitSeconds, tokenPath. When
+        cfg.boost.enabled is unset/false, none of the Boost-API env vars, the container port, or
+        the token volume mount render &mdash; every existing caller that doesn't pass this key is
+        unaffected. When enabled, cfg.boost.policyRef is required (same fail-fast posture as
+        targetContainerName): a Pod can't discover its own WardenPolicy's name any other way.
+
 This renders only the initContainer entry - it deliberately does NOT set
 `shareProcessNamespace: true` on the Pod spec, or mount the host-cgroup volume (see
 warden.sidecar.volumes below). Both are Pod-spec-level fields a single `include` can't inject
@@ -28,6 +34,10 @@ a pod it doesn't own - and, being a library chart, never deploys anything of its
   ports:
     - name: health
       containerPort: {{ $cfg.healthPort | default 8080 }}
+    {{- if ($cfg.boost).enabled }}
+    - name: boost-api
+      containerPort: {{ $cfg.boost.port | default 8090 }}
+    {{- end }}
   env:
     - name: WARDEN_POD_NAME
       valueFrom:
@@ -43,10 +53,28 @@ a pod it doesn't own - and, being a library chart, never deploys anything of its
       value: {{ $cfg.resize.timeoutSeconds | default 30 | quote }}
     - name: WARDEN_INTENT_POLL_INTERVAL_SECONDS
       value: {{ $cfg.intentPollIntervalSeconds | default 5 | quote }}
+    {{- if ($cfg.boost).enabled }}
+    - name: WARDEN_POD_UID
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.uid
+    - name: WARDEN_BOOST_PORT
+      value: {{ $cfg.boost.port | default 8090 | quote }}
+    - name: WARDEN_BOOST_POLICY_REF
+      value: {{ required "sidecar.boost.policyRef is required when sidecar.boost.enabled - a Pod cannot discover its own WardenPolicy's name any other way" $cfg.boost.policyRef | quote }}
+    - name: WARDEN_BOOST_ACQUIRE_WAIT_SECONDS
+      value: {{ $cfg.boost.acquireWaitSeconds | default 25 | quote }}
+    - name: WARDEN_BOOST_TOKEN_PATH
+      value: {{ $cfg.boost.tokenPath | default "/var/run/warden/boost/token" | quote }}
+    {{- end }}
   volumeMounts:
     - name: warden-host-cgroup
       mountPath: /host-cgroup # must match RssReader.HOST_CGROUP_ROOT
       readOnly: true
+    {{- if ($cfg.boost).enabled }}
+    - name: warden-boost-token
+      mountPath: {{ ($cfg.boost.tokenPath | default "/var/run/warden/boost/token" | dir) }}
+    {{- end }}
   livenessProbe:
     httpGet:
       path: /healthz
@@ -74,4 +102,26 @@ Call with: {{ include "warden.sidecar.volumes" . }}
   hostPath:
     path: /sys/fs/cgroup
     type: Directory
+{{- end -}}
+
+{{/*
+warden.sidecar.boostVolumes - the B8 app<->sidecar token emptyDir warden.sidecar's own mount
+needs, for the calling chart to include under its Pod spec's `spec.volumes:` list, alongside
+warden.sidecar.volumes. Empty (renders nothing) when cfg.boost.enabled is unset/false.
+
+This volume is deliberately NOT mounted into the app container by this library chart: like the
+split documented on warden.sidecar above, a single `include` can't reach into a container this
+chart doesn't own. The calling chart's own app container must mount the same volume name
+read-only at the same path (cfg.boost.tokenPath's directory) to read the bearer token the agent
+writes there at startup - see docs/warden-boost.md and deploy/example-sidecar-boost.yaml for the
+exact snippet.
+
+Call with: {{ include "warden.sidecar.boostVolumes" (dict "cfg" .Values.warden) }}
+*/}}
+{{- define "warden.sidecar.boostVolumes" -}}
+{{- $cfg := .cfg -}}
+{{- if ($cfg.boost).enabled }}
+- name: warden-boost-token
+  emptyDir: {}
+{{- end -}}
 {{- end -}}

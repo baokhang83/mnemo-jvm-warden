@@ -169,14 +169,29 @@ try:
                        'metadata': {'name': 'request', 'namespace': ns},
                        'spec': {'policyRef': 'policy', 'podRef': {'name': 'worker-b', 'uid': uid},
                                 'container': 'app', 'boost': 'job', 'completionRequested': False}}
-            k('create', '-f', '-', data=request, config=agent, deny='cannot create or change Boost')
+            # B8: the agent identity may now create/update a request, but ONLY bound to its own
+            # Pod — targeting a different Pod (worker-b, while the agent's token is bound to
+            # worker-a) is still denied, for the same reason an unrelated intruder is denied.
+            k('create', '-f', '-', data=request, config=agent, deny='may target only their own Pod identity')
             k('create', '-f', '-', data=request, config=intruder, deny='may target only their own Pod identity')
+            self_request = json.loads(json.dumps(request))
+            self_request['metadata']['name'] = 'self-request'
+            self_request['spec']['podRef']['name'] = 'worker-a'
+            k('create', '-f', '-', data=self_request, config=agent)
+            k('delete', 'wardenboost', 'self-request', '-n', ns, '--wait=false', config=agent,
+              deny='cannot delete Boost requests')
+            # Agent identity hits the narrowed B8 rule first (validations short-circuit in
+            # order), so its own status-write attempt is denied there, not by the
+            # controller-only rule below — unlike operator/intruder, which aren't the agent SA
+            # and so fall through to that rule.
+            patch('wardenboost', 'self-request', {'status': {'phase': 'Granted'}}, config=agent,
+                  suffix=('--subresource=status',), deny='cannot delete Boost requests or change status')
             request['spec']['podRef']['name'] = 'worker-a'
             k('create', '-f', '-', data=request, config=operator)
             patch('wardenboost', 'request', {'status': {'phase': 'Granted'}}, config=operator,
                   suffix=('--subresource=status',), deny='Only the Boost controller may change status')
             patch('wardenboost', 'request', {'status': {'phase': 'Granted'}}, config=agent,
-                  suffix=('--subresource=status',), deny='cannot create or change Boost')
+                  suffix=('--subresource=status',), deny='cannot delete Boost requests or change status')
             patch('wardenboost', 'request', {'status': {'phase': 'Granted'}}, config=intruder,
                   suffix=('--subresource=status',), deny='Only the Boost controller may change status')
             patch('wardenboost', 'request', {'metadata': {'finalizers': ['attacker.example/finalizer']}}, config=operator,
