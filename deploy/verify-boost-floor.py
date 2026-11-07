@@ -23,6 +23,11 @@ def kubectl(*arguments, data=None):
     return result.stdout
 
 
+# Install only on a disposable cluster; CRDs are cluster-scoped.
+crd = root / 'charts/warden/crds/wardenboost-crd.yaml'
+kubectl('apply', '-f', str(crd))
+kubectl('wait', '--for=condition=Established', 'crd/wardenboosts.warden.mnemo.io', '--timeout=30s')
+
 # Refuse to reuse an existing namespace, so cleanup only affects resources created here.
 kubectl('create', 'namespace', namespace)
 try:

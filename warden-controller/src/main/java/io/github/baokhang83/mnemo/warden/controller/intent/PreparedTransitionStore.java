@@ -50,6 +50,29 @@ public final class PreparedTransitionStore {
     return saved;
   }
 
+  /**
+   * Capture the pod before preparing, persist the exact intent, then patch that captured pod
+   * using its UID/resourceVersion. A delayed publisher cannot overwrite a newer pod write.
+   * A successful status write followed by a failed pod write is recovered by reconciling again.
+   * The caller must still serialize target ownership and check current status before granting.
+   */
+  public static void prepareAndPublish(KubernetesClient client, WardenBoost observed, ResizeIntent intent) {
+    var spec = Objects.requireNonNull(observed.getSpec(), "missing request spec");
+    var podRef = Objects.requireNonNull(spec.getPodRef(), "missing pod reference");
+    var pods = client.pods().inNamespace(observed.getMetadata().getNamespace()).withName(podRef.getName());
+    var pod = pods.get();
+    if (CorrelatedIntentEmitter.currentContainer(pod, intent).isEmpty()
+        || pod.getMetadata().getResourceVersion() == null)
+      throw new IllegalStateException("pod instance changed before preparation");
+    String patch = CorrelatedIntentEmitter.patch(pod, intent);
+    WardenBoost saved = prepare(client, observed, intent);
+    var latest = client.resources(WardenBoost.class).inNamespace(saved.getMetadata().getNamespace())
+        .withName(saved.getMetadata().getName()).get();
+    if (latest == null || !current(latest).equals(intent))
+      throw new IllegalStateException("prepared transition was superseded before publication");
+    pods.patch(PatchContext.of(PatchType.JSON), patch);
+  }
+
   /** Fail closed on missing, stale, or partially persisted evidence. */
   public static ResizeIntent current(WardenBoost boost) {
     var status = Objects.requireNonNull(boost.getStatus(), "missing status");

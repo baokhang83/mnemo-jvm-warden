@@ -128,11 +128,16 @@ transition ID. Authorization, policy ownership, and exclusive target claiming re
 caller's responsibility. The store does not grant a Boost.
 
 This status update is atomic **within the WardenBoost resource**. Kubernetes does not make
-it atomic with a later patch to a different Pod. The policy writer is not connected to this
-store yet: before doing so, it needs a single-writer protocol that prevents a delayed older
-publisher from overwriting a newer transition. No pod patch may be treated as proof that a
-transition remains current. B4 remains incomplete until that integration and its restart/
-race tests are implemented. No additional RBAC is enabled by this change.
+it atomic with a later patch to a different Pod. `prepareAndPublish` captures the target pod, persists the exact transition, checks the
+current status, and patches that captured pod using its UID and resourceVersion. A later
+pod write fences an older captured version. A failed pod write leaves the durable intent
+for reconciliation and retry. The helper is not yet called by the policy reconciler.
+
+The two-resource handoff still requires serialized target ownership: a later status update
+can race between the final status read and the pod patch. Consumers must compare evidence
+against current status and must not infer a grant from a pod patch. No additional RBAC is
+enabled by this change. B4 remains incomplete until the policy path and lifecycle enforce
+these rules and provide emergency/release behavior.
 
 For a real API-server test on a disposable cluster:
 

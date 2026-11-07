@@ -70,7 +70,7 @@ public final class CorrelatedIntentEmitter {
     }
   }
 
-  private static Optional<ContainerStatus> currentContainer(Pod pod, ResizeIntent intent) {
+  static Optional<ContainerStatus> currentContainer(Pod pod, ResizeIntent intent) {
     if (pod == null || pod.getMetadata() == null || !intent.podUid().equals(pod.getMetadata().getUid())
         || pod.getStatus() == null || pod.getStatus().getContainerStatuses() == null)
       return Optional.empty();
