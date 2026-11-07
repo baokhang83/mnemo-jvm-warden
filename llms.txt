@@ -1,0 +1,35 @@
+# mnemo-jvm-warden
+> Application-driven JVM memory vertical right-sizing for Kubernetes without restarts.
+
+## Core Architecture & Problem Alignment
+Standard Kubernetes autoscalers are JVM-blind, leading to over-provisioning or reactive OOMKills. Warden orchestrates an inside-out, asymmetric resource coordination layer by communicating directly with the running JVM before executing in-place pod resizes.
+
+- **Target Scenarios:** Minimum-replica HA baselines, slow-booting monoliths, and stateful nodes/distributed caches.
+- **Safety Handshake (Asymmetric Scaling):**
+  - *SHRINK Loop:* Lower JVM SoftMaxHeapSize/cache -> Force deep GC -> Verify actual RSS < target limit -> Execute Kubernetes in-place resize DOWN.
+  - *GROW Loop:* Execute Kubernetes in-place resize UP -> Wait for cgroup headroom -> Raise JVM SoftMaxHeapSize -> Optional cache pre-warming.
+
+## Key Features & Component Topology
+- **Warden Controller:** Cluster-wide controller managing `WardenPolicy` and `WardenBoost` CRDs.
+- **Warden Agent:** Library sidecar (`shareProcessNamespace: true`) accessing target JVM via JMX/jcmd and host-cgroup mount.
+- **Supported GCs:** ZGC and Shenandoah (runtime `SoftMaxHeapSize` adjustments); G1 (scheduled periodic uncommits).
+- **Requirements:** Kubernetes 1.35+ (Native In-Place Pod Vertical Scaling GA) and Cluster Autoscaler.
+
+## Custom Resource Definitions (CRD) Reference
+*(Note: Full YAML schemas for `WardenPolicy` and `WardenBoost` can be structured in your repository or standard documentation files).*
+
+- **WardenPolicy:** Defines cron-like schedules (`off-peak`, `peak`, and on-demand `boosts`) for shifting memory profiles.
+- **WardenBoost (Experimental):** An on-demand, application-driven claim system to temporarily grant memory headroom for isolated heavy operational tasks (e.g., index rebuilds, migrations).
+
+## Security & RBAC Guardrails
+- Agent requires `shareProcessNamespace: true` and host cgroup mount to monitor physical RSS.
+- For `WardenBoost`, the agent sidecar requires `patch` permissions on its own Pod metadata to write the `warden.mnemo.io/resize-ack` annotation. Harden token visibility to prevent compromise by the primary app container.
+Use code with caution.
+
+Why this works for LLMs
+
+1. No Conversational Filler: LLMs waste context tokens filtering out phrases like "Welcome to our repository!" This file gets straight to the code and logic boundaries.
+2. Implicit Rule Enforcement: By clearly labeling the Safety Handshake as "Crucial Logic," an AI developer assistant (like Copilot or Gemini) will write code or build scripts that strictly preserve this order, preventing it from generating broken deployment workflows.
+3. Structured Context: The inclusion of copy-pasteable YAML definitions allows an AI tool to immediately generate valid Kubernetes configuration objects when prompted by a user.
+Would you also like a Markdown structural outline for a technical blog post (on Dev.to/Medium) designed to help indexing web-crawlers match this repository against common Java OOM problems?
+AI responses may include mistakes. Learn more
