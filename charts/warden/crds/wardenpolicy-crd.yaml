@@ -26,6 +26,43 @@ spec:
                       type: "string"
                   type: "object"
                 type: "array"
+              boosts:
+                additionalProperties:
+                  properties:
+                    acquisitionTimeout:
+                      maxLength: 32
+                      minLength: 1
+                      type: "string"
+                      x-kubernetes-validations:
+                      - message: "acquisitionTimeout must be a positive duration"
+                        rule: "duration(self) > duration('0s')"
+                    heapTarget:
+                      maxLength: 64
+                      minLength: 1
+                      type: "string"
+                      x-kubernetes-validations:
+                      - message: "heapTarget must be a positive integral-byte quantity"
+                        rule: "isQuantity(self) && quantity(self).compareTo(quantity('0'))\
+                          \ > 0 && quantity(self).isInteger()"
+                    maxDuration:
+                      maxLength: 32
+                      minLength: 1
+                      type: "string"
+                      x-kubernetes-validations:
+                      - message: "maxDuration must be a positive duration"
+                        rule: "duration(self) > duration('0s')"
+                    profile:
+                      maxLength: 253
+                      minLength: 1
+                      type: "string"
+                  required:
+                  - "acquisitionTimeout"
+                  - "heapTarget"
+                  - "maxDuration"
+                  - "profile"
+                  type: "object"
+                maxProperties: 32
+                type: "object"
               guardrail:
                 properties:
                   emergencyGrowAbove:
@@ -46,8 +83,10 @@ spec:
                 additionalProperties:
                   properties:
                     limit:
+                      maxLength: 64
                       type: "string"
                     request:
+                      maxLength: 64
                       type: "string"
                   type: "object"
                 type: "object"
@@ -74,6 +113,21 @@ spec:
             required:
             - "timezone"
             type: "object"
+            x-kubernetes-validations:
+            - message: "every boost must reference an existing profile"
+              rule: "!has(self.boosts) || self.boosts.all(k, has(self.profiles) &&\
+                \ self.boosts[k].profile in self.profiles)"
+            - message: "boost profiles require positive integral-byte request <= limit\
+                \ and heapTarget < limit"
+              rule: "!has(self.boosts) || self.boosts.all(k, !has(self.profiles) ||\
+                \ !(self.boosts[k].profile in self.profiles) || (has(self.profiles[self.boosts[k].profile].request)\
+                \ && has(self.profiles[self.boosts[k].profile].limit) && isQuantity(self.profiles[self.boosts[k].profile].request)\
+                \ && isQuantity(self.profiles[self.boosts[k].profile].limit) && quantity(self.profiles[self.boosts[k].profile].request).compareTo(quantity('0'))\
+                \ > 0 && quantity(self.profiles[self.boosts[k].profile].request).isInteger()\
+                \ && quantity(self.profiles[self.boosts[k].profile].limit).isInteger()\
+                \ && quantity(self.profiles[self.boosts[k].profile].request).compareTo(quantity(self.profiles[self.boosts[k].profile].limit))\
+                \ <= 0 && isQuantity(self.boosts[k].heapTarget) && quantity(self.boosts[k].heapTarget).compareTo(quantity(self.profiles[self.boosts[k].profile].limit))\
+                \ < 0))"
           status:
             properties:
               currentMetricValue:

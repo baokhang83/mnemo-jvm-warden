@@ -99,6 +99,15 @@
 
   <dependencyManagement>
     <dependencies>
+      <!-- Fabric8 also brings Jackson core, annotations, and YAML. Keep them aligned
+           with databind: mixed versions fail when serializing custom resources. -->
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- One entry the whole tree needs today: JUnit 5, imported as a BOM so every
            module gets a consistent test stack without repeating the version. -->
       <dependency>
