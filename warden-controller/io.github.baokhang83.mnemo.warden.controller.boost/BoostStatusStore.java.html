@@ -20,8 +20,13 @@ public final class BoostStatusStore {
 <span class="nc" id="L20">        + JsonString.quote(Objects.requireNonNull(metadata.getResourceVersion()))</span>
         + &quot;},{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:\&quot;/status\&quot;,\&quot;value\&quot;:&quot;
 <span class="nc" id="L22">        + client.getKubernetesSerialization().asJson(Objects.requireNonNull(next)) + &quot;}]&quot;;</span>
-<span class="nc" id="L23">    return client.resources(WardenBoost.class).inNamespace(metadata.getNamespace()).withName(metadata.getName())</span>
+<span class="nc" id="L23">    WardenBoost saved = client.resources(WardenBoost.class).inNamespace(metadata.getNamespace()).withName(metadata.getName())</span>
 <span class="nc" id="L24">        .subresource(&quot;status&quot;).patch(PatchContext.of(PatchType.JSON), patch);</span>
+<span class="nc" id="L25">    try { BoostTelemetry.changed(client, observed, saved); }</span>
+<span class="nc" id="L26">    catch (RuntimeException e) {</span>
+<span class="nc" id="L27">      org.slf4j.LoggerFactory.getLogger(BoostStatusStore.class).warn(&quot;Boost telemetry failed: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L28">    }</span>
+<span class="nc" id="L29">    return saved;</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -19,12 +19,22 @@ public final class WardenController {
 <span class="nc" id="L19">    operator.register(new WardenPolicyReconciler(config));</span>
 <span class="nc" id="L20">    operator.register(new io.github.baokhang83.mnemo.warden.controller.boost.WardenBoostReconciler());</span>
 <span class="nc" id="L21">    operator.start();</span>
-
-<span class="nc" id="L23">    Runtime.getRuntime().addShutdownHook(new Thread(operator::stop, &quot;warden-controller-shutdown&quot;));</span>
+<span class="nc" id="L22">    com.sun.net.httpserver.HttpServer metrics = null;</span>
+<span class="nc bnc" id="L23" title="All 2 branches missed.">    if (&quot;true&quot;.equalsIgnoreCase(System.getenv(&quot;WARDEN_BOOST_OBSERVABILITY_ENABLED&quot;))) {</span>
+<span class="nc" id="L24">      String rawPort = System.getenv(&quot;WARDEN_BOOST_METRICS_PORT&quot;);</span>
+<span class="nc bnc" id="L25" title="All 4 branches missed.">      int port = rawPort == null || rawPort.isBlank() ? 8081 : Integer.parseInt(rawPort);</span>
+<span class="nc" id="L26">      try { metrics = io.github.baokhang83.mnemo.warden.controller.boost.BoostTelemetry.start(operator.getKubernetesClient(), port); }</span>
+<span class="nc" id="L27">      catch (java.io.IOException e) { operator.stop(); throw new IllegalStateException(&quot;cannot start Boost metrics&quot;, e); }</span>
+    }
+<span class="nc" id="L29">    final var metricsServer = metrics;</span>
+<span class="nc" id="L30">    Runtime.getRuntime().addShutdownHook(new Thread(() -&gt; {</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">      if (metricsServer != null) metricsServer.stop(0);</span>
+<span class="nc" id="L32">      operator.stop();</span>
+<span class="nc" id="L33">    }, &quot;warden-controller-shutdown&quot;));</span>
 
     // Park the main thread until the JVM is terminated (SIGTERM runs the hook above) — same
     // pattern WardenAgent.main uses.
-<span class="nc" id="L27">    new CountDownLatch(1).await();</span>
-<span class="nc" id="L28">  }</span>
+<span class="nc" id="L37">    new CountDownLatch(1).await();</span>
+<span class="nc" id="L38">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
