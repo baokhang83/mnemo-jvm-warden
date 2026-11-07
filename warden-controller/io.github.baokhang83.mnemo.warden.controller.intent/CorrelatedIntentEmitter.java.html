@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CorrelatedIntentEmitter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-controller</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.controller.intent</a> &gt; <span class="el_source">CorrelatedIntentEmitter.java</span></div><h1>CorrelatedIntentEmitter.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.controller.intent;
+
+import io.fabric8.kubernetes.api.model.ContainerStatus;
+import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.PodBuilder;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
+import java.util.Map;
+import java.util.Optional;
+
+/** Per-pod transport for the later Boost resolver; never independently grants permission. */
+public final class CorrelatedIntentEmitter {
+  private CorrelatedIntentEmitter() {}
+
+  /** Caller supplies a durable transition ID; retries must not generate a new identity. */
+  public static void emit(KubernetesClient client, String namespace, String podName, ResizeIntent intent) {
+<span class="nc" id="L19">    client.pods().inNamespace(namespace).withName(podName).edit(pod -&gt; {</span>
+<span class="nc bnc" id="L20" title="All 2 branches missed.">      if (currentContainer(pod, intent).isEmpty())</span>
+<span class="nc" id="L21">        throw new IllegalArgumentException(&quot;correlated target identity changed&quot;);</span>
+<span class="nc" id="L22">      return new PodBuilder(pod).editMetadata()</span>
+<span class="nc" id="L23">          .addToAnnotations(IntentEmitter.ANNOTATION_REQUEST_BYTES, Long.toString(intent.requestBytes()))</span>
+<span class="nc" id="L24">          .addToAnnotations(IntentEmitter.ANNOTATION_LIMIT_BYTES, Long.toString(intent.limitBytes()))</span>
+<span class="nc" id="L25">          .addToAnnotations(ResizeIntent.ANNOTATION, intent.encode()).endMetadata().build();</span>
+    });
+<span class="nc" id="L27">  }</span>
+
+  /** Requires live allocation plus evidence for the current intent, never desired pod spec. */
+  public static Optional&lt;ResizeAcknowledgement&gt; evidence(Pod pod, ResizeIntent intent) {
+<span class="fc" id="L31">    Optional&lt;ContainerStatus&gt; container = currentContainer(pod, intent);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">    if (container.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L33">    Map&lt;String, String&gt; annotations = pod.getMetadata().getAnnotations();</span>
+<span class="pc bpc" id="L34" title="1 of 4 branches missed.">    if (annotations == null || !intent.encode().equals(annotations.get(ResizeIntent.ANNOTATION))</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        || !Long.toString(intent.requestBytes()).equals(annotations.get(IntentEmitter.ANNOTATION_REQUEST_BYTES))</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        || !Long.toString(intent.limitBytes()).equals(annotations.get(IntentEmitter.ANNOTATION_LIMIT_BYTES)))</span>
+<span class="fc" id="L37">      return Optional.empty();</span>
+    try {
+<span class="fc" id="L39">      var resources = container.get().getResources();</span>
+<span class="pc bpc" id="L40" title="3 of 6 branches missed.">      if (resources == null || resources.getRequests() == null || resources.getLimits() == null)</span>
+<span class="nc" id="L41">        return Optional.empty();</span>
+<span class="fc" id="L42">      var request = resources.getRequests().get(&quot;memory&quot;);</span>
+<span class="fc" id="L43">      var limit = resources.getLimits().get(&quot;memory&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">      if (request == null || limit == null) return Optional.empty();</span>
+<span class="fc" id="L45">      ResizeAcknowledgement ack = ResizeAcknowledgement.decode(annotations.get(ResizeIntent.ACK_ANNOTATION));</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">      return ack.confirms(intent, pod.getMetadata().getUid(), container.get().getContainerID(),</span>
+<span class="fc" id="L47">          ResourceQuantity.parseBytes(request.toString()), ResourceQuantity.parseBytes(limit.toString()))</span>
+<span class="pc" id="L48">          ? Optional.of(ack) : Optional.empty();</span>
+<span class="fc" id="L49">    } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L50">      return Optional.empty();</span>
+    }
+  }
+
+  private static Optional&lt;ContainerStatus&gt; currentContainer(Pod pod, ResizeIntent intent) {
+<span class="pc bpc" id="L55" title="3 of 6 branches missed.">    if (pod == null || pod.getMetadata() == null || !intent.podUid().equals(pod.getMetadata().getUid())</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        || pod.getStatus() == null || pod.getStatus().getContainerStatuses() == null)</span>
+<span class="fc" id="L57">      return Optional.empty();</span>
+<span class="fc" id="L58">    return pod.getStatus().getContainerStatuses().stream()</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">        .filter(c -&gt; intent.containerName().equals(c.getName()) &amp;&amp; intent.containerId().equals(c.getContainerID())</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            &amp;&amp; c.getState() != null &amp;&amp; c.getState().getRunning() != null).findFirst();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -48,8 +48,8 @@ public final class ResourceQuantity {
 
 <span class="fc" id="L49">    BigDecimal number = new BigDecimal(matcher.group(1));</span>
 <span class="fc" id="L50">    String suffix = matcher.group(2);</span>
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">    if (suffix.isEmpty()) {</span>
-<span class="nc" id="L52">      return number.longValueExact();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">    if (suffix.isEmpty()) {</span>
+<span class="fc" id="L52">      return number.longValueExact();</span>
     }
 
 <span class="fc" id="L55">    BigDecimal multiplier = BINARY_SUFFIXES.get(suffix);</span>

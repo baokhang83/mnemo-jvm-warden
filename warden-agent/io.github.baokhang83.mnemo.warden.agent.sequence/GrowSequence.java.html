@@ -53,10 +53,16 @@ public final class GrowSequence {
    * ceiling already reflect the new size.
    */
   public GrowOutcome growTo(long requestBytes, long limitBytes) throws IOException, InterruptedException {
-<span class="fc" id="L56">    resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);</span>
-<span class="fc" id="L57">    heap.setSoftMax(limitBytes);</span>
-<span class="fc" id="L58">    preWarmCaches();</span>
-<span class="fc" id="L59">    return new GrowOutcome(limitBytes);</span>
+<span class="fc" id="L56">    return growTo(requestBytes, limitBytes, limitBytes);</span>
+  }
+
+  /** Explicit heap target for correlated transitions; legacy callers retain their mapping. */
+  public GrowOutcome growTo(long requestBytes, long limitBytes, long heapBytes) throws IOException, InterruptedException {
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">    if (heapBytes &lt;= 0 || heapBytes &gt; limitBytes) throw new IllegalArgumentException(&quot;invalid heap target&quot;);</span>
+<span class="fc" id="L62">    resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);</span>
+<span class="fc" id="L63">    heap.setSoftMax(heapBytes);</span>
+<span class="fc" id="L64">    preWarmCaches();</span>
+<span class="fc" id="L65">    return new GrowOutcome(limitBytes);</span>
   }
 
   /**
@@ -67,13 +73,13 @@ public final class GrowSequence {
    * to fail a grow that has already succeeded by throwing.
    */
   private void preWarmCaches() {
-<span class="fc bfc" id="L70" title="All 2 branches covered.">    for (Map.Entry&lt;String, CacheHook&gt; entry : cacheHooks.entrySet()) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    for (Map.Entry&lt;String, CacheHook&gt; entry : cacheHooks.entrySet()) {</span>
       try {
-<span class="fc" id="L72">        entry.getValue().preWarm();</span>
-<span class="fc" id="L73">      } catch (RuntimeException e) {</span>
-<span class="fc" id="L74">        AgentLog.info(&quot;cache hook '&quot; + entry.getKey() + &quot;' preWarm() failed, continuing: &quot; + e.getMessage());</span>
-<span class="fc" id="L75">      }</span>
-<span class="fc" id="L76">    }</span>
-<span class="fc" id="L77">  }</span>
+<span class="fc" id="L78">        entry.getValue().preWarm();</span>
+<span class="fc" id="L79">      } catch (RuntimeException e) {</span>
+<span class="fc" id="L80">        AgentLog.info(&quot;cache hook '&quot; + entry.getKey() + &quot;' preWarm() failed, continuing: &quot; + e.getMessage());</span>
+<span class="fc" id="L81">      }</span>
+<span class="fc" id="L82">    }</span>
+<span class="fc" id="L83">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

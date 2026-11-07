@@ -60,17 +60,23 @@ public final class ShrinkSequence {
    * &amp;mdash; the cgroup limit is only ever lowered on a verified precondition (§5).
    */
   public ShrinkOutcome shrinkTo(long requestBytes, long limitBytes) throws IOException, InterruptedException {
-<span class="fc" id="L63">    heap.setSoftMax(limitBytes);</span>
-<span class="fc" id="L64">    flushEvictableCaches();</span>
-<span class="fc" id="L65">    heap.deepGcAndUncommit(gcTimeout);</span>
+<span class="fc" id="L63">    return shrinkTo(requestBytes, limitBytes, limitBytes);</span>
+  }
 
-<span class="fc" id="L67">    long rss = heap.currentRss();</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">    if (rss &gt;= limitBytes) {</span>
-<span class="fc" id="L69">      return new ShrinkOutcome.AbortedVerificationFailed(rss, limitBytes);</span>
+  /** Explicit heap target for correlated transitions; legacy callers retain their mapping. */
+  public ShrinkOutcome shrinkTo(long requestBytes, long limitBytes, long heapBytes) throws IOException, InterruptedException {
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">    if (heapBytes &lt;= 0 || heapBytes &gt; limitBytes) throw new IllegalArgumentException(&quot;invalid heap target&quot;);</span>
+<span class="fc" id="L69">    heap.setSoftMax(heapBytes);</span>
+<span class="fc" id="L70">    flushEvictableCaches();</span>
+<span class="fc" id="L71">    heap.deepGcAndUncommit(gcTimeout);</span>
+
+<span class="fc" id="L73">    long rss = heap.currentRss();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    if (rss &gt;= limitBytes) {</span>
+<span class="fc" id="L75">      return new ShrinkOutcome.AbortedVerificationFailed(rss, limitBytes);</span>
     }
 
-<span class="fc" id="L72">    resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);</span>
-<span class="fc" id="L73">    return new ShrinkOutcome.Completed(rss);</span>
+<span class="fc" id="L78">    resizeClient.resizeMemory(podName, containerName, requestBytes, limitBytes, resizeTimeout);</span>
+<span class="fc" id="L79">    return new ShrinkOutcome.Completed(rss);</span>
   }
 
   /**
@@ -81,13 +87,13 @@ public final class ShrinkSequence {
    * handshake by throwing.
    */
   private void flushEvictableCaches() {
-<span class="fc bfc" id="L84" title="All 2 branches covered.">    for (Map.Entry&lt;String, CacheHook&gt; entry : cacheHooks.entrySet()) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">    for (Map.Entry&lt;String, CacheHook&gt; entry : cacheHooks.entrySet()) {</span>
       try {
-<span class="fc" id="L86">        entry.getValue().flushEvictable();</span>
-<span class="fc" id="L87">      } catch (RuntimeException e) {</span>
-<span class="fc" id="L88">        AgentLog.info(&quot;cache hook '&quot; + entry.getKey() + &quot;' flushEvictable() failed, continuing: &quot; + e.getMessage());</span>
-<span class="fc" id="L89">      }</span>
-<span class="fc" id="L90">    }</span>
-<span class="fc" id="L91">  }</span>
+<span class="fc" id="L92">        entry.getValue().flushEvictable();</span>
+<span class="fc" id="L93">      } catch (RuntimeException e) {</span>
+<span class="fc" id="L94">        AgentLog.info(&quot;cache hook '&quot; + entry.getKey() + &quot;' flushEvictable() failed, continuing: &quot; + e.getMessage());</span>
+<span class="fc" id="L95">      }</span>
+<span class="fc" id="L96">    }</span>
+<span class="fc" id="L97">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

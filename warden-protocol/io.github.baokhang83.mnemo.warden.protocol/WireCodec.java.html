@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WireCodec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-protocol</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.protocol</a> &gt; <span class="el_source">WireCodec.java</span></div><h1>WireCodec.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.protocol;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+/** Bounded, versioned annotation encoding. Field framing cannot collide with container IDs. */
+final class WireCodec {
+  private WireCodec() {}
+
+  static String encode(String... fields) {
+<span class="fc" id="L11">    StringBuilder result = new StringBuilder(&quot;v1&quot;);</span>
+<span class="fc bfc" id="L12" title="All 2 branches covered.">    for (String field : fields) {</span>
+<span class="pc bpc" id="L13" title="2 of 4 branches missed.">      if (field == null || field.isBlank()) throw new IllegalArgumentException(&quot;missing protocol field&quot;);</span>
+<span class="fc" id="L14">      result.append('.').append(Base64.getUrlEncoder().withoutPadding()</span>
+<span class="fc" id="L15">          .encodeToString(field.getBytes(StandardCharsets.UTF_8)));</span>
+    }
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">    if (result.length() &gt; 8192) throw new IllegalArgumentException(&quot;protocol payload exceeds 8192 characters&quot;);</span>
+<span class="fc" id="L18">    return result.toString();</span>
+  }
+
+  static String[] decode(String encoded, int count) {
+<span class="pc bpc" id="L22" title="1 of 4 branches missed.">    if (encoded == null || encoded.length() &gt; 8192) throw new IllegalArgumentException(&quot;invalid protocol payload size&quot;);</span>
+<span class="fc" id="L23">    String[] parts = encoded.split(&quot;\\.&quot;, -1);</span>
+<span class="fc bfc" id="L24" title="All 4 branches covered.">    if (parts.length != count + 1 || !parts[0].equals(&quot;v1&quot;))</span>
+<span class="fc" id="L25">      throw new IllegalArgumentException(&quot;unsupported protocol version or field count&quot;);</span>
+<span class="fc" id="L26">    String[] fields = new String[count];</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L28">      fields[i] = new String(Base64.getUrlDecoder().decode(parts[i + 1]), StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">      if (fields[i].isBlank()) throw new IllegalArgumentException(&quot;missing protocol field&quot;);</span>
+    }
+<span class="fc bfc" id="L31" title="All 2 branches covered.">    if (!encode(fields).equals(encoded)) throw new IllegalArgumentException(&quot;noncanonical protocol payload&quot;);</span>
+<span class="fc" id="L32">    return fields;</span>
+  }
+
+  static void identity(String value) {
+<span class="pc bpc" id="L36" title="3 of 6 branches missed.">    if (value == null || value.isBlank() || value.length() &gt; 256)</span>
+<span class="nc" id="L37">      throw new IllegalArgumentException(&quot;invalid protocol identity&quot;);</span>
+<span class="fc" id="L38">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

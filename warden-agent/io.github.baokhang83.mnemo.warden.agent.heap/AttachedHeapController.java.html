@@ -4,6 +4,7 @@ import io.github.baokhang83.mnemo.warden.agent.attach.AttachedJvm;
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -23,21 +24,24 @@ public final class AttachedHeapController implements HeapController {
 
   private static final String OPERATION = &quot;M2 shrink sequence&quot;;
 
+  private final MemoryMXBean memory;
+
   private final SoftMax softMax; // null on G1 — capabilities.supportsSoftMax() is false there
   private final DeepGc deepGc;
   private final RssReader rssReader;
   private final GcCapabilities capabilities;
 
-<span class="fc" id="L31">  private AttachedHeapController(SoftMax softMax, DeepGc deepGc, RssReader rssReader, GcCapabilities capabilities) {</span>
-<span class="fc" id="L32">    this.softMax = softMax;</span>
-<span class="fc" id="L33">    this.deepGc = deepGc;</span>
-<span class="fc" id="L34">    this.rssReader = rssReader;</span>
-<span class="fc" id="L35">    this.capabilities = capabilities;</span>
-<span class="fc" id="L36">  }</span>
+<span class="fc" id="L34">  private AttachedHeapController(SoftMax softMax, DeepGc deepGc, RssReader rssReader, GcCapabilities capabilities, MemoryMXBean memory) {</span>
+<span class="fc" id="L35">    this.softMax = softMax;</span>
+<span class="fc" id="L36">    this.deepGc = deepGc;</span>
+<span class="fc" id="L37">    this.rssReader = rssReader;</span>
+<span class="fc" id="L38">    this.capabilities = capabilities;</span>
+<span class="fc" id="L39">    this.memory = memory;</span>
+<span class="fc" id="L40">  }</span>
 
   /** @throws UnsupportedCollectorException if the target's collector cannot uncommit at all */
   public static AttachedHeapController forTarget(AttachedJvm target) throws IOException {
-<span class="nc" id="L40">    return forTarget(target, Path.of(RssReader.HOST_CGROUP_ROOT));</span>
+<span class="nc" id="L44">    return forTarget(target, Path.of(RssReader.HOST_CGROUP_ROOT));</span>
   }
 
   /**
@@ -47,40 +51,50 @@ public final class AttachedHeapController implements HeapController {
    * mirrors exactly how {@code RssReaderTest} exercises {@link RssReader} itself.
    */
   static AttachedHeapController forTarget(AttachedJvm target, Path hostCgroupRoot) throws IOException {
-<span class="fc" id="L50">    List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
-<span class="fc" id="L51">        ManagementFactory.getPlatformMXBeans(target.mbeanConnection(), GarbageCollectorMXBean.class);</span>
-<span class="fc" id="L52">    GcCapabilities capabilities = GcDetector.detect(gcBeans);</span>
-<span class="fc bfc" id="L53" title="All 2 branches covered.">    if (!capabilities.supported()) {</span>
-<span class="fc" id="L54">      throw new UnsupportedCollectorException(OPERATION, capabilities.collector());</span>
+<span class="fc" id="L54">    List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
+<span class="fc" id="L55">        ManagementFactory.getPlatformMXBeans(target.mbeanConnection(), GarbageCollectorMXBean.class);</span>
+<span class="fc" id="L56">    GcCapabilities capabilities = GcDetector.detect(gcBeans);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">    if (!capabilities.supported()) {</span>
+<span class="fc" id="L58">      throw new UnsupportedCollectorException(OPERATION, capabilities.collector());</span>
     }
 
-<span class="fc bfc" id="L57" title="All 2 branches covered.">    SoftMax softMax = capabilities.supportsSoftMax() ? SoftMax.forTarget(target) : null;</span>
-<span class="fc" id="L58">    DeepGc deepGc = DeepGc.forTarget(target);</span>
-<span class="fc" id="L59">    Path cgroupRoot = RssReader.resolveCgroupRoot(target.pid(), hostCgroupRoot);</span>
-<span class="fc" id="L60">    RssReader rssReader = RssReader.forTarget(target.pid(), cgroupRoot, target.mbeanConnection());</span>
-<span class="fc" id="L61">    return new AttachedHeapController(softMax, deepGc, rssReader, capabilities);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    SoftMax softMax = capabilities.supportsSoftMax() ? SoftMax.forTarget(target) : null;</span>
+<span class="fc" id="L62">    DeepGc deepGc = DeepGc.forTarget(target);</span>
+<span class="fc" id="L63">    Path cgroupRoot = RssReader.resolveCgroupRoot(target.pid(), hostCgroupRoot);</span>
+<span class="fc" id="L64">    RssReader rssReader = RssReader.forTarget(target.pid(), cgroupRoot, target.mbeanConnection());</span>
+<span class="fc" id="L65">    var memory = ManagementFactory.getPlatformMXBean(target.mbeanConnection(), MemoryMXBean.class);</span>
+<span class="fc" id="L66">    return new AttachedHeapController(softMax, deepGc, rssReader, capabilities, memory);</span>
   }
 
   @Override
   public long currentRss() throws IOException {
-<span class="fc" id="L66">    return rssReader.currentRss().workingSetBytes();</span>
+<span class="fc" id="L71">    return rssReader.currentRss().workingSetBytes();</span>
   }
 
   @Override
   public void setSoftMax(long bytes) {
-<span class="fc bfc" id="L71" title="All 2 branches covered.">    if (softMax != null) {</span>
-<span class="fc" id="L72">      softMax.setSoftMaxHeapSize(bytes);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    if (softMax != null) {</span>
+<span class="fc" id="L77">      softMax.setSoftMaxHeapSize(bytes);</span>
     }
-<span class="fc" id="L74">  }</span>
-
-  @Override
-  public void deepGcAndUncommit(Duration timeout) throws IOException, InterruptedException {
-<span class="fc" id="L78">    deepGc.runAndAwaitUncommit(timeout);</span>
 <span class="fc" id="L79">  }</span>
 
   @Override
+  public void deepGcAndUncommit(Duration timeout) throws IOException, InterruptedException {
+<span class="fc" id="L83">    deepGc.runAndAwaitUncommit(timeout);</span>
+<span class="fc" id="L84">  }</span>
+
+  @Override
+  public long softMaxBytes() {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">    if (softMax == null) throw new UnsupportedOperationException(&quot;collector has no soft max&quot;);</span>
+<span class="nc" id="L89">    return softMax.softMaxHeapSize();</span>
+  }
+
+  @Override
+<span class="nc" id="L93">  public long maxHeapBytes() { return memory.getHeapMemoryUsage().getMax(); }</span>
+
+  @Override
   public GcCapabilities capabilities() {
-<span class="fc" id="L83">    return capabilities;</span>
+<span class="fc" id="L97">    return capabilities;</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

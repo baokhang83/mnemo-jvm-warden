@@ -14,9 +14,12 @@ import io.github.baokhang83.mnemo.warden.agent.sequence.GrowSequence;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkOutcome;
 import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
 import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,107 +64,159 @@ public final class IntentWatcher {
   private final TargetHeapControllerResolver heapResolver;
 
   public IntentWatcher(
-<span class="nc" id="L64">      AgentConfig config, AttachSupervisor attachSupervisor, PodIntentReader intentReader, AgentMetrics metrics) {</span>
-<span class="nc" id="L65">    this.config = config;</span>
-<span class="nc" id="L66">    this.attachSupervisor = attachSupervisor;</span>
-<span class="nc" id="L67">    this.intentReader = intentReader;</span>
-<span class="nc" id="L68">    this.metrics = metrics;</span>
-<span class="nc" id="L69">    this.heapResolver = new TargetHeapControllerResolver(metrics);</span>
-<span class="nc" id="L70">    this.thread = new Thread(this::run, &quot;warden-intent-watcher&quot;);</span>
-<span class="nc" id="L71">    this.thread.setDaemon(true);</span>
-<span class="nc" id="L72">  }</span>
+<span class="nc" id="L67">      AgentConfig config, AttachSupervisor attachSupervisor, PodIntentReader intentReader, AgentMetrics metrics) {</span>
+<span class="nc" id="L68">    this.config = config;</span>
+<span class="nc" id="L69">    this.attachSupervisor = attachSupervisor;</span>
+<span class="nc" id="L70">    this.intentReader = intentReader;</span>
+<span class="nc" id="L71">    this.metrics = metrics;</span>
+<span class="nc" id="L72">    this.heapResolver = new TargetHeapControllerResolver(metrics);</span>
+<span class="nc" id="L73">    this.thread = new Thread(this::run, &quot;warden-intent-watcher&quot;);</span>
+<span class="nc" id="L74">    this.thread.setDaemon(true);</span>
+<span class="nc" id="L75">  }</span>
 
   public void start() {
-<span class="nc" id="L75">    running = true;</span>
-<span class="nc" id="L76">    thread.start();</span>
-<span class="nc" id="L77">  }</span>
+<span class="nc" id="L78">    running = true;</span>
+<span class="nc" id="L79">    thread.start();</span>
+<span class="nc" id="L80">  }</span>
 
   public void stop() {
-<span class="nc" id="L80">    running = false;</span>
-<span class="nc" id="L81">    thread.interrupt();</span>
+<span class="nc" id="L83">    running = false;</span>
+<span class="nc" id="L84">    thread.interrupt();</span>
     try {
-<span class="nc" id="L83">      thread.join(config.intentPollInterval().multipliedBy(2).toMillis());</span>
-<span class="nc" id="L84">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L85">      Thread.currentThread().interrupt();</span>
-<span class="nc" id="L86">    }</span>
-<span class="nc" id="L87">  }</span>
+<span class="nc" id="L86">      thread.join(config.intentPollInterval().multipliedBy(2).toMillis());</span>
+<span class="nc" id="L87">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L88">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L89">    }</span>
+<span class="nc" id="L90">  }</span>
 
   private void run() {
-<span class="nc bnc" id="L90" title="All 2 branches missed.">    while (running) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    while (running) {</span>
       try {
-<span class="nc" id="L92">        pollOnce();</span>
-<span class="nc" id="L93">      } catch (Exception e) {</span>
-<span class="nc" id="L94">        AgentLog.info(&quot;intent poll failed, retrying next tick: &quot; + e.getMessage());</span>
-<span class="nc" id="L95">      }</span>
-<span class="nc" id="L96">      sleep();</span>
+<span class="nc" id="L95">        pollOnce();</span>
+<span class="nc" id="L96">      } catch (Exception e) {</span>
+<span class="nc" id="L97">        AgentLog.info(&quot;intent poll failed, retrying next tick: &quot; + e.getMessage());</span>
+<span class="nc" id="L98">      }</span>
+<span class="nc" id="L99">      sleep();</span>
     }
-<span class="nc" id="L98">  }</span>
+<span class="nc" id="L101">  }</span>
 
   private void pollOnce() throws Exception {
-<span class="nc" id="L101">    Optional&lt;AttachedJvm&gt; target = attachSupervisor.currentTarget();</span>
-<span class="nc bnc" id="L102" title="All 2 branches missed.">    if (target.isEmpty()) {</span>
-<span class="nc" id="L103">      return;</span>
+<span class="nc" id="L104">    Optional&lt;AttachedJvm&gt; target = attachSupervisor.currentTarget();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">    if (target.isEmpty()) {</span>
+<span class="nc" id="L106">      return;</span>
     }
-<span class="nc" id="L105">    AttachedJvm jvm = target.get();</span>
+<span class="nc" id="L108">    AttachedJvm jvm = target.get();</span>
 
-<span class="nc" id="L107">    OptionalLong rssBeforeThisTick = sampleMetrics(jvm);</span>
+<span class="nc" id="L110">    OptionalLong rssBeforeThisTick = sampleMetrics(jvm);</span>
 
-<span class="nc" id="L109">    PodState state = intentReader.read();</span>
-<span class="nc" id="L110">    Optional&lt;Intent&gt; intent = state.intent();</span>
-<span class="nc" id="L111">    OptionalLong currentLimitBytes = state.currentLimitBytes();</span>
-<span class="nc bnc" id="L112" title="All 4 branches missed.">    if (intent.isEmpty() || currentLimitBytes.isEmpty()) {</span>
-<span class="nc" id="L113">      return;</span>
+<span class="nc" id="L112">    PodState state = intentReader.read();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">    if (state.correlatedIntent().isPresent()) {</span>
+      try {
+<span class="nc" id="L115">        applyCorrelated(jvm, state);</span>
+<span class="nc" id="L116">      } catch (InterruptedException e) {</span>
+<span class="nc" id="L117">        throw e;</span>
+<span class="nc" id="L118">      } catch (Exception e) {</span>
+        try {
+<span class="nc" id="L120">          publishFailure(state);</span>
+<span class="nc" id="L121">        } catch (IOException publicationFailure) {</span>
+<span class="nc" id="L122">          AgentLog.info(&quot;could not publish failure evidence; retrying next tick&quot;);</span>
+<span class="nc" id="L123">        }</span>
+<span class="nc" id="L124">        throw e;</span>
+<span class="nc" id="L125">      }</span>
+<span class="nc" id="L126">      return;</span>
+    }
+<span class="nc" id="L128">    Optional&lt;Intent&gt; intent = state.intent();</span>
+<span class="nc" id="L129">    OptionalLong currentLimitBytes = state.currentLimitBytes();</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">    if (intent.isEmpty() || currentLimitBytes.isEmpty()) {</span>
+<span class="nc" id="L131">      return;</span>
     }
 
-<span class="nc" id="L116">    long desiredLimit = intent.get().limitBytes();</span>
-<span class="nc" id="L117">    long currentLimit = currentLimitBytes.getAsLong();</span>
-<span class="nc bnc" id="L118" title="All 2 branches missed.">    if (desiredLimit == currentLimit) {</span>
-<span class="nc" id="L119">      return;</span>
+<span class="nc" id="L134">    long desiredLimit = intent.get().limitBytes();</span>
+<span class="nc" id="L135">    long currentLimit = currentLimitBytes.getAsLong();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">    if (desiredLimit == currentLimit) {</span>
+<span class="nc" id="L137">      return;</span>
     }
 
-<span class="nc" id="L122">    Optional&lt;HeapController&gt; heapOpt = heapResolver.resolve(jvm);</span>
-<span class="nc bnc" id="L123" title="All 2 branches missed.">    if (heapOpt.isEmpty()) {</span>
-<span class="nc" id="L124">      return; // target's collector is unsupported; agent is read-only for it (W-603)</span>
+<span class="nc" id="L140">    Optional&lt;HeapController&gt; heapOpt = heapResolver.resolve(jvm);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">    if (heapOpt.isEmpty()) {</span>
+<span class="nc" id="L142">      return; // target's collector is unsupported; agent is read-only for it (W-603)</span>
     }
-<span class="nc" id="L126">    HeapController heap = heapOpt.get();</span>
-<span class="nc" id="L127">    ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
-<span class="nc" id="L128">    Map&lt;String, CacheHook&gt; cacheHooks = CacheHookLookup.lookupAll(jvm);</span>
-<span class="nc" id="L129">    long requestBytes = intent.get().requestBytes();</span>
+<span class="nc" id="L144">    HeapController heap = heapOpt.get();</span>
+<span class="nc" id="L145">    ResizePort resizeClient = PodResizeClient.forInClusterAgent();</span>
+<span class="nc" id="L146">    Map&lt;String, CacheHook&gt; cacheHooks = CacheHookLookup.lookupAll(jvm);</span>
+<span class="nc" id="L147">    long requestBytes = intent.get().requestBytes();</span>
 
-<span class="nc bnc" id="L131" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
-<span class="nc" id="L132">      ShrinkSequence sequence =</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">    if (desiredLimit &lt; currentLimit) {</span>
+<span class="nc" id="L150">      ShrinkSequence sequence =</span>
           new ShrinkSequence(
               heap,
               resizeClient,
               cacheHooks,
-<span class="nc" id="L137">              config.podName(),</span>
-<span class="nc" id="L138">              config.targetContainerName(),</span>
-<span class="nc" id="L139">              config.gcTimeout(),</span>
-<span class="nc" id="L140">              config.resizeTimeout());</span>
-<span class="nc" id="L141">      ShrinkOutcome outcome = sequence.shrinkTo(requestBytes, desiredLimit);</span>
-<span class="nc" id="L142">      AgentLog.info(&quot;intent-driven shrink: &quot; + outcome);</span>
-<span class="nc" id="L143">      recordShrinkOutcome(outcome, rssBeforeThisTick);</span>
-<span class="nc" id="L144">    } else {</span>
-<span class="nc" id="L145">      GrowSequence sequence =</span>
+<span class="nc" id="L155">              config.podName(),</span>
+<span class="nc" id="L156">              config.targetContainerName(),</span>
+<span class="nc" id="L157">              config.gcTimeout(),</span>
+<span class="nc" id="L158">              config.resizeTimeout());</span>
+<span class="nc" id="L159">      ShrinkOutcome outcome = sequence.shrinkTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L160">      AgentLog.info(&quot;intent-driven shrink: &quot; + outcome);</span>
+<span class="nc" id="L161">      recordShrinkOutcome(outcome, rssBeforeThisTick);</span>
+<span class="nc" id="L162">    } else {</span>
+<span class="nc" id="L163">      GrowSequence sequence =</span>
           new GrowSequence(
-<span class="nc" id="L147">              heap, resizeClient, cacheHooks, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
-<span class="nc" id="L148">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
-<span class="nc" id="L149">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
-<span class="nc" id="L150">      metrics.incrementResize(&quot;grow&quot;);</span>
+<span class="nc" id="L165">              heap, resizeClient, cacheHooks, config.podName(), config.targetContainerName(), config.resizeTimeout());</span>
+<span class="nc" id="L166">      var outcome = sequence.growTo(requestBytes, desiredLimit);</span>
+<span class="nc" id="L167">      AgentLog.info(&quot;intent-driven grow: &quot; + outcome);</span>
+<span class="nc" id="L168">      metrics.incrementResize(&quot;grow&quot;);</span>
     }
-<span class="nc" id="L152">  }</span>
+<span class="nc" id="L170">  }</span>
+
+  private void applyCorrelated(AttachedJvm jvm, PodState state) throws Exception {
+<span class="nc" id="L173">    var intent = state.correlatedIntent().orElseThrow();</span>
+<span class="nc" id="L174">    CorrelatedResize.requireCurrent(intent, state);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">    if (!config.targetContainerName().equals(intent.containerName()))</span>
+<span class="nc" id="L176">      throw new IOException(&quot;correlated intent targets a different container&quot;);</span>
+<span class="nc" id="L177">    Optional&lt;HeapController&gt; resolved = heapResolver.resolve(jvm);</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">    if (resolved.isEmpty()) throw new IOException(&quot;UnsupportedRuntime&quot;);</span>
+<span class="nc" id="L179">    var heap = resolved.get();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">    if (state.acknowledgement() != null) {</span>
+      try {
+<span class="nc" id="L182">        var ack = ResizeAcknowledgement.decode(state.acknowledgement());</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (ack.confirms(intent, state.podUid(), state.containerId(),</span>
+<span class="nc" id="L184">            state.currentRequestBytes().orElse(-1), state.currentLimitBytes().orElse(-1))</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            &amp;&amp; heap.softMaxBytes() == intent.heapBytes()) return;</span>
+<span class="nc" id="L186">      } catch (IllegalArgumentException ignored) {</span>
+        // Invalid evidence is never accepted; replace it only after current preparation succeeds.
+<span class="nc" id="L188">      }</span>
+    }
+<span class="nc" id="L190">    var acknowledgement = CorrelatedResize.execute(intent, config.podName(), heap,</span>
+<span class="nc" id="L191">        PodResizeClient.forInClusterAgent(intent),</span>
+<span class="nc" id="L192">        CacheHookLookup.lookupAll(jvm), config.gcTimeout(), config.resizeTimeout(),</span>
+<span class="nc" id="L193">        intentReader::read, Clock.systemUTC());</span>
+    // Failure to publish does not undo preparation. The next tick observes and retries safely.
+<span class="nc" id="L195">    PodState fresh = intentReader.read();</span>
+<span class="nc" id="L196">    CorrelatedResize.requireCurrent(intent, fresh);</span>
+<span class="nc" id="L197">    intentReader.acknowledge(fresh, acknowledgement);</span>
+<span class="nc" id="L198">  }</span>
+
+  private void publishFailure(PodState attempted) throws IOException, InterruptedException {
+<span class="nc" id="L201">    var intent = attempted.correlatedIntent().orElseThrow();</span>
+<span class="nc" id="L202">    PodState fresh = intentReader.read();</span>
+<span class="nc" id="L203">    CorrelatedResize.requireCurrent(intent, fresh); // A failure for an old instance is also stale.</span>
+<span class="nc" id="L204">    intentReader.acknowledge(fresh, new ResizeAcknowledgement(</span>
+<span class="nc" id="L205">        intent, false, &quot;PreparationFailed&quot;, fresh.currentRequestBytes().orElse(0),</span>
+<span class="nc" id="L206">        fresh.currentLimitBytes().orElse(0), 0, Instant.now()));</span>
+<span class="nc" id="L207">  }</span>
 
   private void recordShrinkOutcome(ShrinkOutcome outcome, OptionalLong rssBeforeThisTick) {
-<span class="nc bnc" id="L155" title="All 2 branches missed.">    switch (outcome) {</span>
-<span class="nc" id="L156">      case ShrinkOutcome.Completed completed -&gt; {</span>
-<span class="nc" id="L157">        metrics.incrementResize(&quot;shrink&quot;);</span>
-<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (rssBeforeThisTick.isPresent()) {</span>
-<span class="nc" id="L159">          metrics.addBytesReclaimed(rssBeforeThisTick.getAsLong() - completed.finalRssBytes());</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">    switch (outcome) {</span>
+<span class="nc" id="L211">      case ShrinkOutcome.Completed completed -&gt; {</span>
+<span class="nc" id="L212">        metrics.incrementResize(&quot;shrink&quot;);</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (rssBeforeThisTick.isPresent()) {</span>
+<span class="nc" id="L214">          metrics.addBytesReclaimed(rssBeforeThisTick.getAsLong() - completed.finalRssBytes());</span>
         }
       }
-<span class="nc" id="L162">      case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; metrics.incrementAborted();</span>
+<span class="nc" id="L217">      case ShrinkOutcome.AbortedVerificationFailed aborted -&gt; metrics.incrementAborted();</span>
     }
-<span class="nc" id="L164">  }</span>
+<span class="nc" id="L219">  }</span>
 
   /**
    * Samples the target's current RSS and cumulative GC stats into {@link #metrics}. Isolated from
@@ -175,35 +230,35 @@ public final class IntentWatcher {
    */
   private OptionalLong sampleMetrics(AttachedJvm jvm) {
     try {
-<span class="nc" id="L178">      Optional&lt;HeapController&gt; heap = heapResolver.resolve(jvm);</span>
-<span class="nc bnc" id="L179" title="All 2 branches missed.">      if (heap.isEmpty()) {</span>
-<span class="nc" id="L180">        return OptionalLong.empty();</span>
+<span class="nc" id="L233">      Optional&lt;HeapController&gt; heap = heapResolver.resolve(jvm);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">      if (heap.isEmpty()) {</span>
+<span class="nc" id="L235">        return OptionalLong.empty();</span>
       }
-<span class="nc" id="L182">      long rss = heap.get().currentRss();</span>
-<span class="nc" id="L183">      metrics.setRss(rss);</span>
+<span class="nc" id="L237">      long rss = heap.get().currentRss();</span>
+<span class="nc" id="L238">      metrics.setRss(rss);</span>
 
-<span class="nc" id="L185">      List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
-<span class="nc" id="L186">          ManagementFactory.getPlatformMXBeans(jvm.mbeanConnection(), GarbageCollectorMXBean.class);</span>
-<span class="nc bnc" id="L187" title="All 2 branches missed.">      for (GarbageCollectorMXBean bean : gcBeans) {</span>
-<span class="nc" id="L188">        long count = bean.getCollectionCount();</span>
-<span class="nc" id="L189">        long time = bean.getCollectionTime();</span>
-<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (count &gt;= 0 &amp;&amp; time &gt;= 0) {</span>
-<span class="nc" id="L191">          metrics.setGcStats(bean.getName(), count, time);</span>
+<span class="nc" id="L240">      List&lt;GarbageCollectorMXBean&gt; gcBeans =</span>
+<span class="nc" id="L241">          ManagementFactory.getPlatformMXBeans(jvm.mbeanConnection(), GarbageCollectorMXBean.class);</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">      for (GarbageCollectorMXBean bean : gcBeans) {</span>
+<span class="nc" id="L243">        long count = bean.getCollectionCount();</span>
+<span class="nc" id="L244">        long time = bean.getCollectionTime();</span>
+<span class="nc bnc" id="L245" title="All 4 branches missed.">        if (count &gt;= 0 &amp;&amp; time &gt;= 0) {</span>
+<span class="nc" id="L246">          metrics.setGcStats(bean.getName(), count, time);</span>
         }
-<span class="nc" id="L193">      }</span>
-<span class="nc" id="L194">      return OptionalLong.of(rss);</span>
-<span class="nc" id="L195">    } catch (Exception e) {</span>
-<span class="nc" id="L196">      AgentLog.info(&quot;metrics sampling failed, continuing: &quot; + e.getMessage());</span>
-<span class="nc" id="L197">      return OptionalLong.empty();</span>
+<span class="nc" id="L248">      }</span>
+<span class="nc" id="L249">      return OptionalLong.of(rss);</span>
+<span class="nc" id="L250">    } catch (Exception e) {</span>
+<span class="nc" id="L251">      AgentLog.info(&quot;metrics sampling failed, continuing: &quot; + e.getMessage());</span>
+<span class="nc" id="L252">      return OptionalLong.empty();</span>
     }
   }
 
   private void sleep() {
     try {
-<span class="nc" id="L203">      Thread.sleep(config.intentPollInterval().toMillis());</span>
-<span class="nc" id="L204">    } catch (InterruptedException e) {</span>
-<span class="nc" id="L205">      Thread.currentThread().interrupt();</span>
-<span class="nc" id="L206">    }</span>
-<span class="nc" id="L207">  }</span>
+<span class="nc" id="L258">      Thread.sleep(config.intentPollInterval().toMillis());</span>
+<span class="nc" id="L259">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L260">      Thread.currentThread().interrupt();</span>
+<span class="nc" id="L261">    }</span>
+<span class="nc" id="L262">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

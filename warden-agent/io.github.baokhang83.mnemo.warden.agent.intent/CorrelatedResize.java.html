@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CorrelatedResize.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.intent</a> &gt; <span class="el_source">CorrelatedResize.java</span></div><h1>CorrelatedResize.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.intent;
+
+import io.github.baokhang83.mnemo.warden.agent.heap.HeapController;
+import io.github.baokhang83.mnemo.warden.agent.resize.ResizePort;
+import io.github.baokhang83.mnemo.warden.agent.sequence.GrowSequence;
+import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkSequence;
+import io.github.baokhang83.mnemo.warden.agent.sequence.ShrinkOutcome;
+import io.github.baokhang83.mnemo.warden.cache.CacheHook;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
+import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Map;
+
+/** Reuses the existing handshake, then gathers fresh evidence for the exact transition. */
+public final class CorrelatedResize {
+  @FunctionalInterface
+  public interface Observation { PodState read() throws IOException, InterruptedException; }
+
+  private CorrelatedResize() {}
+
+  public static ResizeAcknowledgement execute(ResizeIntent intent, String podName,
+      HeapController heap, ResizePort resize, Map&lt;String, CacheHook&gt; hooks,
+      Duration gcTimeout, Duration resizeTimeout, Observation observation, Clock clock)
+      throws IOException, InterruptedException {
+<span class="fc" id="L27">    PodState before = observation.read();</span>
+<span class="fc" id="L28">    requireCurrent(intent, before);</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">    if (!heap.capabilities().supportsSoftMax() || intent.heapBytes() &gt; heap.maxHeapBytes())</span>
+<span class="fc" id="L30">      throw new IOException(&quot;UnsupportedHeapTarget&quot;);</span>
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">    if (before.currentRequestBytes().isEmpty() || before.currentLimitBytes().isEmpty())</span>
+<span class="nc" id="L32">      throw new IOException(&quot;AppliedAllocationUnavailable&quot;);</span>
+
+    // Identity is re-read at the resource mutation boundary; production ResizePort also uses
+    // an API-server resourceVersion/UID precondition so replacement cannot race this check.
+<span class="fc" id="L36">    ResizePort fenced = (pod, container, request, limit, timeout) -&gt; {</span>
+<span class="fc" id="L37">      requireCurrent(intent, observation.read());</span>
+<span class="fc" id="L38">      resize.resizeMemory(pod, container, request, limit, timeout);</span>
+<span class="fc" id="L39">    };</span>
+<span class="fc" id="L40">    long request = before.currentRequestBytes().getAsLong();</span>
+<span class="fc" id="L41">    long limit = before.currentLimitBytes().getAsLong();</span>
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">    if (intent.requestBytes() &lt; request || intent.limitBytes() &lt; limit) {</span>
+<span class="fc" id="L43">      var outcome = new ShrinkSequence(heap, fenced, hooks, podName, intent.containerName(), gcTimeout, resizeTimeout)</span>
+<span class="fc" id="L44">          .shrinkTo(intent.requestBytes(), intent.limitBytes(), intent.heapBytes());</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">      if (!(outcome instanceof ShrinkOutcome.Completed)) throw new IOException(&quot;VerificationFailed&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">    } else if (intent.requestBytes() != request || intent.limitBytes() != limit) {</span>
+<span class="fc" id="L47">      new GrowSequence(heap, fenced, hooks, podName, intent.containerName(), resizeTimeout)</span>
+<span class="fc" id="L48">          .growTo(intent.requestBytes(), intent.limitBytes(), intent.heapBytes());</span>
+    } else {
+      // Equal container resources still require actual JVM preparation for a new transition.
+<span class="fc" id="L51">      heap.setSoftMax(intent.heapBytes());</span>
+    }
+<span class="fc" id="L53">    long observedHeap = heap.softMaxBytes();</span>
+<span class="fc" id="L54">    PodState after = observation.read();</span>
+<span class="fc" id="L55">    requireCurrent(intent, after);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">    if (after.currentRequestBytes().orElse(-1) != intent.requestBytes()</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        || after.currentLimitBytes().orElse(-1) != intent.limitBytes()</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        || observedHeap != intent.heapBytes()) throw new IOException(&quot;PreparationNotConfirmed&quot;);</span>
+<span class="fc" id="L59">    return new ResizeAcknowledgement(intent, true, &quot;Applied&quot;, intent.requestBytes(),</span>
+<span class="fc" id="L60">        intent.limitBytes(), observedHeap, clock.instant());</span>
+  }
+
+  public static void requireCurrent(ResizeIntent intent, PodState state) throws IOException {
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">    if (!intent.podUid().equals(state.podUid()) || !intent.containerId().equals(state.containerId())</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        || state.correlatedIntent().isEmpty() || !intent.equals(state.correlatedIntent().get()))</span>
+<span class="fc" id="L66">      throw new IOException(&quot;StaleTransitionIdentity&quot;);</span>
+<span class="fc" id="L67">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
