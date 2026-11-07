@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BoostRequestClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.boost</a> &gt; <span class="el_source">BoostRequestClient.java</span></div><h1>BoostRequestClient.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.boost;
+
+import io.github.baokhang83.mnemo.warden.agent.resize.InClusterApiServer;
+import io.github.baokhang83.mnemo.warden.agent.resize.MinimalJson;
+import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.security.GeneralSecurityException;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * CRUD against {@code WardenBoost} over the same in-cluster API server connection {@code
+ * PodIntentReader}/{@code PodResizeClient} use, via {@link InClusterApiServer}. B8 reuses the
+ * agent's existing identity (the {@code warden-boost-agent} ServiceAccount) rather than a second
+ * one &amp;mdash; a projected service-account token is always minted for the Pod's own {@code
+ * spec.serviceAccountName}, so a Pod cannot run as two ServiceAccounts at once. The chart grants
+ * this identity {@code get/list/watch/create/patch} on {@code wardenboosts} (never {@code
+ * delete}, never the {@code status} subresource) and the {@code boost-request-guard} admission
+ * policy narrows what it may do with that RBAC to self-pod-bound requests only.
+ */
+public final class BoostRequestClient implements BoostRequestPort {
+
+  private static final String API_GROUP_PATH = &quot;/apis/warden.mnemo.io/v1alpha1/namespaces/&quot;;
+
+  private final InClusterApiServer apiServer;
+  private final HttpClient httpClient;
+
+  /** Builds a client using the pod's own in-cluster credentials. */
+  public static BoostRequestClient forInClusterAgent() throws IOException, GeneralSecurityException {
+<span class="nc" id="L36">    InClusterApiServer apiServer = InClusterApiServer.discover();</span>
+<span class="nc" id="L37">    HttpClient httpClient = HttpClient.newBuilder().sslContext(apiServer.sslContext()).build();</span>
+<span class="nc" id="L38">    return new BoostRequestClient(apiServer, httpClient);</span>
+  }
+
+<span class="nc" id="L41">  BoostRequestClient(InClusterApiServer apiServer, HttpClient httpClient) {</span>
+<span class="nc" id="L42">    this.apiServer = apiServer;</span>
+<span class="nc" id="L43">    this.httpClient = httpClient;</span>
+<span class="nc" id="L44">  }</span>
+
+  /** The named boost, or empty if it doesn't exist (a {@code 404}). */
+  @Override
+  public Optional&lt;BoostSnapshot&gt; get(String name) throws IOException, InterruptedException {
+<span class="nc" id="L49">    HttpRequest request =</span>
+<span class="nc" id="L50">        HttpRequest.newBuilder(boostUri(name))</span>
+<span class="nc" id="L51">            .timeout(Duration.ofSeconds(10))</span>
+<span class="nc" id="L52">            .header(&quot;Authorization&quot;, &quot;Bearer &quot; + apiServer.bearerToken())</span>
+<span class="nc" id="L53">            .GET()</span>
+<span class="nc" id="L54">            .build();</span>
+<span class="nc" id="L55">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">    if (response.statusCode() == 404) {</span>
+<span class="nc" id="L57">      return Optional.empty();</span>
+    }
+<span class="nc bnc" id="L59" title="All 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L60">      throw new IOException(&quot;get boost &quot; + name + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+    }
+<span class="nc" id="L62">    return Optional.of(parseSnapshot(response.body()));</span>
+  }
+
+  /**
+   * Creates the named boost if it doesn't already exist, otherwise returns the existing one
+   * unchanged &amp;mdash; the idempotency &quot;stable ID&quot; acceptance criterion in one call: a caller
+   * retrying {@code acquire} with the same {@code requestId} never double-creates.
+   */
+  @Override
+  public BoostSnapshot getOrCreate(
+      String name, String policyRef, String podName, String podUid, String container, String boost)
+      throws IOException, InterruptedException {
+<span class="nc" id="L74">    Optional&lt;BoostSnapshot&gt; existing = get(name);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">    if (existing.isPresent()) {</span>
+<span class="nc" id="L76">      return existing.get();</span>
+    }
+<span class="nc" id="L78">    String body =</span>
+        &quot;{\&quot;apiVersion\&quot;:\&quot;warden.mnemo.io/v1alpha1\&quot;,\&quot;kind\&quot;:\&quot;WardenBoost\&quot;,&quot;
+<span class="nc" id="L80">            + &quot;\&quot;metadata\&quot;:{\&quot;name\&quot;:&quot; + JsonString.quote(name) + &quot;},&quot;</span>
+<span class="nc" id="L81">            + &quot;\&quot;spec\&quot;:{\&quot;policyRef\&quot;:&quot; + JsonString.quote(policyRef)</span>
+<span class="nc" id="L82">            + &quot;,\&quot;podRef\&quot;:{\&quot;name\&quot;:&quot; + JsonString.quote(podName) + &quot;,\&quot;uid\&quot;:&quot; + JsonString.quote(podUid) + &quot;}&quot;</span>
+<span class="nc" id="L83">            + &quot;,\&quot;container\&quot;:&quot; + JsonString.quote(container)</span>
+<span class="nc" id="L84">            + &quot;,\&quot;boost\&quot;:&quot; + JsonString.quote(boost)</span>
+            + &quot;,\&quot;completionRequested\&quot;:false}}&quot;;
+<span class="nc" id="L86">    HttpRequest request =</span>
+<span class="nc" id="L87">        HttpRequest.newBuilder(collectionUri())</span>
+<span class="nc" id="L88">            .timeout(Duration.ofSeconds(10))</span>
+<span class="nc" id="L89">            .header(&quot;Authorization&quot;, &quot;Bearer &quot; + apiServer.bearerToken())</span>
+<span class="nc" id="L90">            .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
+<span class="nc" id="L91">            .POST(HttpRequest.BodyPublishers.ofString(body))</span>
+<span class="nc" id="L92">            .build();</span>
+<span class="nc" id="L93">    HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">    if (response.statusCode() == 201) {</span>
+<span class="nc" id="L95">      return parseSnapshot(response.body());</span>
+    }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">    if (response.statusCode() == 409) {</span>
+      // Lost a create race against a retried/concurrent caller using the same requestId.
+<span class="nc" id="L99">      return get(name).orElseThrow(() -&gt; new IOException(&quot;boost &quot; + name + &quot; vanished after a create conflict&quot;));</span>
+    }
+<span class="nc" id="L101">    throw new IOException(&quot;create boost &quot; + name + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+  }
+
+  /**
+   * Requests completion (idempotent: the CRD's own validation rule allows true&amp;rarr;true as a
+   * no-op, only true&amp;rarr;false is forbidden). Retries once against a fresh {@code
+   * resourceVersion} if the precondition lost a race.
+   */
+  @Override
+  public BoostSnapshot requestCompletion(String name, String resourceVersion) throws IOException, InterruptedException {
+<span class="nc" id="L111">    String rv = resourceVersion;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">    for (int attempt = 0; attempt &lt; 2; attempt++) {</span>
+<span class="nc" id="L113">      String body =</span>
+<span class="nc" id="L114">          &quot;[{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/resourceVersion\&quot;,\&quot;value\&quot;:&quot; + JsonString.quote(rv)</span>
+              + &quot;},{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:\&quot;/spec/completionRequested\&quot;,\&quot;value\&quot;:true}]&quot;;
+<span class="nc" id="L116">      HttpRequest request =</span>
+<span class="nc" id="L117">          HttpRequest.newBuilder(boostUri(name))</span>
+<span class="nc" id="L118">              .timeout(Duration.ofSeconds(10))</span>
+<span class="nc" id="L119">              .header(&quot;Authorization&quot;, &quot;Bearer &quot; + apiServer.bearerToken())</span>
+<span class="nc" id="L120">              .header(&quot;Content-Type&quot;, &quot;application/json-patch+json&quot;)</span>
+<span class="nc" id="L121">              .method(&quot;PATCH&quot;, HttpRequest.BodyPublishers.ofString(body))</span>
+<span class="nc" id="L122">              .build();</span>
+<span class="nc" id="L123">      HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">      if (response.statusCode() == 200) {</span>
+<span class="nc" id="L125">        return parseSnapshot(response.body());</span>
+      }
+<span class="nc bnc" id="L127" title="All 4 branches missed.">      if (response.statusCode() == 409 &amp;&amp; attempt == 0) {</span>
+<span class="nc" id="L128">        rv = get(name).orElseThrow(() -&gt; new IOException(&quot;boost &quot; + name + &quot; no longer exists&quot;)).resourceVersion();</span>
+<span class="nc" id="L129">        continue;</span>
+      }
+<span class="nc" id="L131">      throw new IOException(&quot;release &quot; + name + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+    }
+<span class="nc" id="L133">    throw new IOException(&quot;release &quot; + name + &quot; failed: resourceVersion kept changing&quot;);</span>
+  }
+
+  @SuppressWarnings(&quot;unchecked&quot;)
+  static BoostSnapshot parseSnapshot(String json) {
+<span class="fc" id="L138">    Map&lt;String, Object&gt; boost = (Map&lt;String, Object&gt;) MinimalJson.parse(json);</span>
+<span class="fc" id="L139">    Map&lt;String, Object&gt; metadata = (Map&lt;String, Object&gt;) boost.get(&quot;metadata&quot;);</span>
+<span class="fc" id="L140">    String name = (String) metadata.get(&quot;name&quot;);</span>
+<span class="fc" id="L141">    String resourceVersion = (String) metadata.get(&quot;resourceVersion&quot;);</span>
+<span class="fc" id="L142">    Map&lt;String, Object&gt; status = (Map&lt;String, Object&gt;) boost.getOrDefault(&quot;status&quot;, Map.of());</span>
+<span class="fc" id="L143">    String phase = (String) status.getOrDefault(&quot;phase&quot;, &quot;Pending&quot;);</span>
+<span class="fc" id="L144">    String message = null;</span>
+<span class="fc" id="L145">    List&lt;Object&gt; conditions = (List&lt;Object&gt;) status.get(&quot;conditions&quot;);</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">    if (conditions != null &amp;&amp; !conditions.isEmpty()) {</span>
+<span class="fc" id="L147">      Map&lt;String, Object&gt; last = (Map&lt;String, Object&gt;) conditions.get(conditions.size() - 1);</span>
+<span class="fc" id="L148">      message = (String) last.get(&quot;message&quot;);</span>
+    }
+<span class="fc" id="L150">    return new BoostSnapshot(name, resourceVersion, phase, message);</span>
+  }
+
+  private URI collectionUri() {
+<span class="nc" id="L154">    return apiServer.baseUri().resolve(API_GROUP_PATH + apiServer.namespace() + &quot;/wardenboosts&quot;);</span>
+  }
+
+  private URI boostUri(String name) {
+<span class="nc" id="L158">    return apiServer.baseUri().resolve(API_GROUP_PATH + apiServer.namespace() + &quot;/wardenboosts/&quot; + name);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

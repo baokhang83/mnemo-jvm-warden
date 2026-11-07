@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BoostSnapshot.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-agent</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.agent.boost</a> &gt; <span class="el_source">BoostSnapshot.java</span></div><h1>BoostSnapshot.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.agent.boost;
+
+/**
+ * One GET/CREATE/PATCH observation of a {@code WardenBoost}, as the local API needs it &amp;mdash;
+ * not the full CRD shape, the same &quot;read only the leaves this caller needs&quot; posture {@code
+ * PodState} already takes for pods.
+ *
+ * @param name the {@code WardenBoost}'s {@code metadata.name} &amp;mdash; the stable request ID
+ * @param resourceVersion fences a later {@code completionRequested} PATCH against races
+ * @param phase the controller-owned lifecycle phase, as a raw string (e.g. {@code &quot;Granted&quot;});
+ *     never parsed into an enum here &amp;mdash; {@code warden-agent} deliberately has no dependency
+ *     on {@code warden-crd-model} (zero-extra-runtime-dependency posture)
+ * @param message the most recent status condition's message, if any, for the caller to surface
+ */
+<span class="fc" id="L15">public record BoostSnapshot(String name, String resourceVersion, String phase, String message) {}</span>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

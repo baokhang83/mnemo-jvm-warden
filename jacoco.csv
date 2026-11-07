@@ -74,9 +74,9 @@ coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,ShrinkSeq
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,GrowOutcome,0,6,0,0,0,1,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.sequence,GrowSequence,5,84,2,4,0,21,2,5,0,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,HealthServer,3,119,2,6,0,28,2,10,0,8
-coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,WardenAgent,81,0,0,0,22,0,2,0,2,0
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,WardenAgent,134,0,6,0,41,0,5,0,2,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentLog,0,7,0,0,0,2,0,1,0,1
-coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentConfig,3,141,4,12,1,30,5,10,1,6
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentConfig,3,214,5,19,1,40,6,15,1,8
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,HealthState,0,23,0,0,0,7,0,4,0,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,Intent,0,9,0,0,0,1,0,1,0,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,IntentWatcher,488,21,38,6,133,4,29,4,10,1
@@ -92,6 +92,10 @@ coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.harness,CrossPodRe
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.harness,LoadTarget,30,44,0,6,6,11,2,5,2,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.harness,ShrinkTrialDriver,128,0,6,0,39,0,5,0,2,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.harness,BoostFaultDemo,190,0,12,0,37,0,14,0,8,0
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.boost,BoostToken,1,57,2,4,1,15,2,5,0,4
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.boost,BoostSnapshot,0,15,0,0,0,1,0,1,0,1
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.boost,BoostRequestClient,269,64,19,3,62,12,19,2,9,1
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.boost,BoostApiServer,130,507,29,55,53,113,28,33,0,19
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.resize,K8sQuantity,0,101,0,8,0,30,0,6,0,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.resize,PodResizeClient,314,177,35,23,67,32,34,11,12,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.resize,MinimalJson,79,381,11,45,11,96,11,36,0,13
