@@ -1,0 +1,18 @@
+{{- $boost := .Values.boost | default dict }}
+{{- $observability := $boost.observability | default dict }}
+{{- if $observability.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "warden.fullname" . }}-boost-metrics
+  labels:
+    {{- include "warden.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "warden.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: boost-metrics
+      port: {{ $observability.port | default 8081 }}
+      targetPort: boost-metrics
+{{- end }}

@@ -54,9 +54,16 @@ The scheduled-only setup above does not need Boost request or acknowledgement pe
 For a Boost evaluation, the agent additionally needs to patch its own Pod metadata, and only
 trusted actors should be able to create or complete requests, change target opt-in labels,
 write status, or forge acknowledgements. RBAC cannot restrict a Pod patch to the acknowledgement
-annotation or enforce self-Pod request fields. The example acknowledgement admission policy is
-not a complete, chart-packaged security solution; B6 and M8 work remains. Review the
-[Boost guide's prerequisites](warden-boost.md#prerequisites-for-a-boost-evaluation) and the
+annotation or enforce self-Pod request fields. The opt-in B6 chart policies add these checks
+for selected namespaces; they require correct namespace labels, role bindings, and a Pod-bound
+agent credential kept from the application. Agent Pods must disable token automounting and
+mount projected service-account token volumes only in the Warden init container. Restrict
+`pods/exec`, `pods/ephemeralcontainers`, `serviceaccounts/token`, and other paths that can
+expose sidecar credentials. Restrict workload creation and modification: a user able to create
+a Pod using the dedicated agent service account can impersonate the agent with another image.
+The older standalone acknowledgement policy is a
+test fixture and can block controller cleanup. Other M8 hardening work remains. Review the
+[Boost security setup](warden-boost.md#enable-the-manual-flow-security-package) and the
 [threat model](threat-model.md) before enabling it.
 
 ## Verify, don't assume

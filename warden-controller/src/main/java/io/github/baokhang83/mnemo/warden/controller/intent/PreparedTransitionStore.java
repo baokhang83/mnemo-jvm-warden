@@ -54,6 +54,10 @@ public final class PreparedTransitionStore {
     WardenBoost saved = client.resources(WardenBoost.class).inNamespace(meta.getNamespace()).withName(meta.getName())
         .subresource("status").patch(PatchContext.of(PatchType.JSON), patch);
     if (!current(saved).equals(intent)) throw new IllegalStateException("persisted transition differs from request");
+    try { io.github.baokhang83.mnemo.warden.controller.boost.BoostTelemetry.changed(client, observed, saved); }
+    catch (RuntimeException e) {
+      org.slf4j.LoggerFactory.getLogger(PreparedTransitionStore.class).warn("Boost telemetry failed: {}", e.getMessage());
+    }
     return saved;
   }
 

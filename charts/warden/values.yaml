@@ -44,3 +44,18 @@ sidecar:
       memory: 64Mi
     limits:
       memory: 256Mi
+
+# -- Optional Boost security resources. Label each participating namespace with the selector
+# below and bind the supplied ClusterRoles in that namespace. Disabled for legacy installations.
+boost:
+  security:
+    enabled: false
+    agentServiceAccountName: warden-boost-agent
+    agentContainerName: warden
+    operatorServiceAccountName: warden-boost-operator
+    namespaceSelector:
+      matchLabels:
+        warden.mnemo.io/boost-enabled: "true"
+  observability:
+    enabled: false
+    port: 8081
