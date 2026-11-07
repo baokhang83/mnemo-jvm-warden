@@ -426,3 +426,6 @@ network policy or monitoring infrastructure: the endpoint is unauthenticated. It
 release duration summaries expose `_sum` and `_count` in seconds. Counters and duration sums
 reset on controller restart; deleted requests leave the gauges. Request and Pod IDs are not
 metric labels. A failed Kubernetes list returns HTTP 503 instead of reporting zero.
+
+For a runnable index rebuild and recorded end-to-end checks on a disposable cluster, see
+[Boost B7 acceptance](validation/warden-boost-b7-kind.md).
