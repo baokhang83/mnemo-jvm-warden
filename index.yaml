@@ -3,6 +3,20 @@ entries:
   warden:
   - apiVersion: v2
     appVersion: 0.1.0
+    created: "2026-11-07T18:04:21.214180985Z"
+    description: Mnemo Warden — a JVM-aware vertical right-sizing controller, plus
+      a reusable native-sidecar template for target workloads.
+    digest: b753705c8feffbd49e4b344e8d8aba5cb762509863b5c7049e9955910c72d900
+    home: https://github.com/baokhang83/mnemo-jvm-warden
+    name: warden
+    sources:
+    - https://github.com/baokhang83/mnemo-jvm-warden
+    type: application
+    urls:
+    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.8/warden-0.1.8.tgz
+    version: 0.1.8
+  - apiVersion: v2
+    appVersion: 0.1.0
     created: "2026-11-07T14:40:08.058150791Z"
     description: Mnemo Warden — a JVM-aware vertical right-sizing controller, plus
       a reusable native-sidecar template for target workloads.
@@ -87,6 +101,22 @@ entries:
     version: 0.1.2
   warden-sidecar:
   - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-11-07T18:04:21.409021563Z"
+    description: 'Reusable `warden.sidecar` named template (the native-sidecar pattern
+      from deploy/example-sidecar.yaml, parameterized) for an operator''s own app
+      chart to include. A library chart: it renders no resources of its own, so depending
+      on it never deploys a second Warden controller alongside your app.'
+    digest: ae875e25d41b5936f06a2a0b84defa8eed89539048d7529ea36242f8b1f8c2bc
+    home: https://github.com/baokhang83/mnemo-jvm-warden
+    name: warden-sidecar
+    sources:
+    - https://github.com/baokhang83/mnemo-jvm-warden
+    type: library
+    urls:
+    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.1.5/warden-sidecar-0.1.5.tgz
+    version: 0.1.5
+  - apiVersion: v2
     appVersion: 0.1.4
     created: "2026-07-24T02:09:33.253118886Z"
     description: 'Reusable `warden.sidecar` named template (the native-sidecar pattern
@@ -118,4 +148,4 @@ entries:
     urls:
     - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.1.2/warden-sidecar-0.1.2.tgz
     version: 0.1.2
-generated: "2026-11-07T14:40:08.058168578Z"
+generated: "2026-11-07T18:04:21.409049174Z"
