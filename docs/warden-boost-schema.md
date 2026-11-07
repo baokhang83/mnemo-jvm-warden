@@ -1,8 +1,8 @@
 # Warden Boost schemas (B2)
 
-The controller can resolve an already-admitted Boost floor during policy reconciliation.
-It does not yet admit requests or issue grants; those belong to B5. Do not start application
-work based on resource creation or a pod patch.
+The controller admits requests, resolves the recorded Boost floor during policy reconciliation,
+and records grants only after matching evidence. Do not start application work based on resource
+creation or a pod patch. Request and acknowledgement authorization remains B6 work.
 
 ## Policy configuration
 

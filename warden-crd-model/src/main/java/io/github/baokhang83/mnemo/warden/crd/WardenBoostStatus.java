@@ -24,6 +24,12 @@ public class WardenBoostStatus {
 
   private String acquisitionDeadline;
 
+  /** Immutable maximum execution duration captured at admission (ISO-8601). */
+  private String maxDuration;
+
+  /** Transition current when completion was recorded; release needs newer evidence. */
+  private String releaseBaselineTransitionId;
+
   private String grantedAt;
 
   private String executionDeadline;
@@ -122,6 +128,14 @@ public class WardenBoostStatus {
   public void setAcquisitionDeadline(String acquisitionDeadline) {
     this.acquisitionDeadline = acquisitionDeadline;
   }
+
+  public String getMaxDuration() { return maxDuration; }
+
+  public void setMaxDuration(String maxDuration) { this.maxDuration = maxDuration; }
+
+  public String getReleaseBaselineTransitionId() { return releaseBaselineTransitionId; }
+
+  public void setReleaseBaselineTransitionId(String value) { this.releaseBaselineTransitionId = value; }
 
   public String getGrantedAt() {
     return grantedAt;

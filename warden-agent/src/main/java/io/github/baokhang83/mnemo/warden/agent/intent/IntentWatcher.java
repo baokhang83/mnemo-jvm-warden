@@ -117,7 +117,7 @@ public final class IntentWatcher {
         throw e;
       } catch (Exception e) {
         try {
-          publishFailure(state);
+          publishFailure(state, e);
         } catch (IOException publicationFailure) {
           AgentLog.info("could not publish failure evidence; retrying next tick");
         }
@@ -197,13 +197,20 @@ public final class IntentWatcher {
     intentReader.acknowledge(fresh, acknowledgement);
   }
 
-  private void publishFailure(PodState attempted) throws IOException, InterruptedException {
+  private void publishFailure(PodState attempted, Exception failure) throws IOException, InterruptedException {
     var intent = attempted.correlatedIntent().orElseThrow();
     PodState fresh = intentReader.read();
     CorrelatedResize.requireCurrent(intent, fresh); // A failure for an old instance is also stale.
     intentReader.acknowledge(fresh, new ResizeAcknowledgement(
-        intent, false, "PreparationFailed", fresh.currentRequestBytes().orElse(0),
+        intent, false, failureReason(failure), fresh.currentRequestBytes().orElse(0),
         fresh.currentLimitBytes().orElse(0), 0, Instant.now()));
+  }
+
+  static String failureReason(Exception failure) {
+    String message = failure.getMessage();
+    if ("UnsupportedRuntime".equals(message) || "UnsupportedHeapTarget".equals(message)) return "UnsupportedJvm";
+    if ("VerificationFailed".equals(message)) return "VerificationFailed";
+    return "PreparationFailed";
   }
 
   private void recordShrinkOutcome(ShrinkOutcome outcome, OptionalLong rssBeforeThisTick) {

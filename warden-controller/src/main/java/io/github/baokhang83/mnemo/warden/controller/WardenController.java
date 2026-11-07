@@ -17,6 +17,7 @@ public final class WardenController {
     ControllerConfig config = ControllerConfig.fromEnv();
     Operator operator = new Operator();
     operator.register(new WardenPolicyReconciler(config));
+    operator.register(new io.github.baokhang83.mnemo.warden.controller.boost.WardenBoostReconciler());
     operator.start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(operator::stop, "warden-controller-shutdown"));
