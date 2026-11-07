@@ -346,6 +346,10 @@ acknowledgements and does not validate a deployed JVM. The packaged-controller p
 See the [protocol verification notes](../docs/warden-boost-protocol.md#b5-lifecycle-and-target-claims)
 for the boundaries of these checks.
 
+For an end-to-end index rebuild with the real controller, sidecar, JVM, and resize API, see
+[Boost B7 acceptance](../docs/validation/warden-boost-b7-kind.md). This separate test is
+for disposable clusters and does not change the scheduled-only setup.
+
 ## `verify-rbac-boundaries.sh` — the shipped RBAC grants exactly what's documented, and nothing else (W-804)
 
 Verifies, against a real cluster, that `docs/rbac-mapping.md`'s two tables are accurate: installs

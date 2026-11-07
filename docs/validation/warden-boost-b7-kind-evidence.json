@@ -1,0 +1,4031 @@
+{
+  "agentImage": "warden-b7-agent:final",
+  "baseline": {
+    "allocation": {
+      "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+      "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+      "resources": {
+        "limits": {
+          "memory": "320Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "restartCount": 0
+    },
+    "description": "unboosted control rebuild",
+    "queryLatencyMillis": [
+      2.706,
+      2.151,
+      2.158,
+      2.421,
+      3.045,
+      2.484,
+      2.725,
+      3.162,
+      2.085,
+      2.283
+    ],
+    "sidecarCgroup": {
+      "cgroup": "0::/\n",
+      "cpuStat": "usage_usec 712050\nuser_usec 654531\nsystem_usec 57519\nnice_usec 0\nnr_periods 0\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+      "memoryCurrentBytes": 111374336
+    },
+    "workload": {
+      "buildMillis": 33,
+      "checksum": 48136769973160,
+      "elapsedMillis": 2042,
+      "entries": 120000,
+      "heapCommittedBytes": 48234496,
+      "heapUsedBytes": 35651584,
+      "javaVersion": "21.0.13",
+      "preparedRuns": 1,
+      "retainedMiB": 0,
+      "rssBytes": 194609152,
+      "running": false,
+      "runs": 1,
+      "scanPasses": 301,
+      "softMaxBytes": 67108864
+    }
+  },
+  "cluster": {
+    "buildDate": "2026-05-12T09:51:34Z",
+    "compiler": "gc",
+    "emulationMajor": "1",
+    "emulationMinor": "36",
+    "gitCommit": "756939600b9a7180fc2df6550a4585b638875e67",
+    "gitTreeState": "clean",
+    "gitVersion": "v1.36.1",
+    "goVersion": "go1.26.2",
+    "major": "1",
+    "minCompatibilityMajor": "1",
+    "minCompatibilityMinor": "35",
+    "minor": "36",
+    "platform": "linux/arm64"
+  },
+  "context": "kind-warden-b7-acceptance",
+  "controllerImage": "warden-b7-controller:local",
+  "finalObservation": {
+    "containers": [
+      {
+        "lastState": {
+          "terminated": {
+            "containerID": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+            "exitCode": 143,
+            "finishedAt": "2026-11-07T16:19:52Z",
+            "reason": "Error",
+            "startedAt": "2026-11-07T16:17:22Z"
+          }
+        },
+        "name": "app",
+        "restartCount": 1
+      },
+      {
+        "lastState": {
+          "terminated": {
+            "containerID": "containerd://133a35a1270618cad876d9033f3e053c3dc8302314c5a08664bf9e9675631265",
+            "exitCode": 143,
+            "finishedAt": "2026-11-07T16:18:15Z",
+            "reason": "Error",
+            "startedAt": "2026-11-07T16:17:22Z"
+          }
+        },
+        "name": "warden",
+        "restartCount": 1
+      }
+    ],
+    "events": [
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:22:15Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:22:15Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=23bfd8de-6ebd-4b26-8df3-7576fa98f68f phase=Releasing reason=Releasing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:22:15Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-4b8rd",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6693",
+          "uid": "961d7b7a-053a-413f-9578-b202b8c61117"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:22:05Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:22:05Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=23bfd8de-6ebd-4b26-8df3-7576fa98f68f phase=Failed reason=AcquisitionTimeout",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:22:05Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-54n5g",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6672",
+          "uid": "a12703d8-42c1-4bcc-9572-3e10a251e0c8"
+        },
+        "reason": "BoostFailed",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:09Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:09Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=81185fa6-2d08-36db-a937-e6bd560b7597 phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:09Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-5hml6",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6089",
+          "uid": "00e5fb43-a377-4afd-9af1-e113bba9ed83"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:52Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:52Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=32ab11aa-f698-4dd3-aa89-78199ed98a76 phase=Preparing reason=AwaitingEvidence",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:52Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-5tzgk",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6018",
+          "uid": "59f0a20a-10a7-49bc-9033-fd7e8ecb1f8b"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:01Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:01Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=32ab11aa-f698-4dd3-aa89-78199ed98a76 phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:01Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-65rwp",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6039",
+          "uid": "c0424c04-a482-43b6-9c00-60dcc7523b15"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:22:04Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:22:04Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=23bfd8de-6ebd-4b26-8df3-7576fa98f68f phase=Preparing reason=AwaitingEvidence",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:22:04Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-65zjr",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6669",
+          "uid": "b52cee4e-73b6-48c3-9abe-aaf36cf91ed2"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:25:01Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:25:01Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=04baf0f9-5b7c-410d-a9b6-886bd98640f9 phase=Preparing reason=AwaitingEvidence",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:25:01Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-6sqkz",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7047",
+          "uid": "7e7e425a-6dac-42be-88e3-a0643ac91ec8"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:24:31Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:24:31Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=acc202cc-1caf-4ec7-a33d-a8146a2a3bb3 phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:24:31Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-7b8d2",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6996",
+          "uid": "876941a4-5d12-4c40-a143-a7cb3f649d83"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:21:35Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:21:35Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=4ffe1caa-24a2-45aa-b64c-e7c1a8e12e17 phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:21:35Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-7l4vz",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6623",
+          "uid": "15a8c513-1fe7-461b-aaf4-2c0330e5cb80"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:57Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:57Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=81185fa6-2d08-36db-a937-e6bd560b7597 phase=Releasing reason=Releasing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:57Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-7rmvn",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6247",
+          "uid": "c364c99c-fb6b-48aa-a586-7b24695ef567"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:22:35Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:22:35Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=ca342e27-9673-30ec-a439-93d44a4be396 phase=Completed reason=Completed",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:22:35Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-95kj6",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6738",
+          "uid": "8a99d21d-c3da-413f-8f52-a2617499a0da"
+        },
+        "reason": "BoostCompleted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:21:22Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:21:22Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=af2317fd-82be-33b0-a524-c437685c0335 phase=Completed reason=Completed",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:21:22Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-btjfw",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6597",
+          "uid": "d33473a9-8f84-44d2-aa4e-b8db1d81550c"
+        },
+        "reason": "BoostCompleted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:15Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:15Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=945faf78-2973-4b5d-86e0-a53d94ae7cbd phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:15Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-cf296",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6477",
+          "uid": "d977af77-9691-41ad-9152-fcabc3ed0143"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:07Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:07Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=9d1928ff-5b5e-3519-b3e4-732b9c1353f3 phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:07Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-cnpv4",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6064",
+          "uid": "7a2a89e7-eaff-4269-9232-d14e0512b7b2"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:45Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:45Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=af2317fd-82be-33b0-a524-c437685c0335 phase=Releasing reason=ReleasePending",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:45Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-fgrfb",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6531",
+          "uid": "94c7f50d-1e55-4c1c-9df5-f52c08a06667"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:04Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:04Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=34094f51-8dc1-378b-8244-650346018897 phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:04Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-frczd",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6050",
+          "uid": "3269826d-9a67-4688-96b3-d41aa75d6039"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:25:11Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:25:11Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=04baf0f9-5b7c-410d-a9b6-886bd98640f9 phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:25:11Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-g7hlz",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7069",
+          "uid": "1d1dfcc5-7cc9-41af-ba22-4315108e7860"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:59Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "restarted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "f6719ec0-2a85-49c3-972d-fffc4733d48c"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:59Z",
+        "message": "requestUid=f6719ec0-2a85-49c3-972d-fffc4733d48c transitionId=08feae2c-6139-41e3-8a97-daf5e8540aed phase=Orphaned reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:59Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-gdt67",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6443",
+          "uid": "2c5b5c8f-e812-46bc-ae31-a9f71b39aa17"
+        },
+        "reason": "BoostOrphaned",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:22Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:22Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=945faf78-2973-4b5d-86e0-a53d94ae7cbd phase=Releasing reason=Releasing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:22Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-jcdgr",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6494",
+          "uid": "0fa203d4-ab83-4718-9c45-b7f9b3359328"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:22:34Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:22:34Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=ca342e27-9673-30ec-a439-93d44a4be396 phase=Releasing reason=ReleaseBlocked",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:22:34Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-k424m",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6734",
+          "uid": "0bc30cdf-d130-4bd4-9796-4f600af9de72"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:22:25Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:22:25Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=23bfd8de-6ebd-4b26-8df3-7576fa98f68f phase=Releasing reason=ReleaseBlocked",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:22:25Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-k7f2w",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6714",
+          "uid": "235fd3b7-e596-41e3-9011-027342f7ef06"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:20Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:20Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=945faf78-2973-4b5d-86e0-a53d94ae7cbd phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:20Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-krk5k",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6489",
+          "uid": "2d676a6b-eb2e-4243-800a-216fa4846832"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:27Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:27Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=cfedfb35-1e7c-3fa8-b604-54e11f6274f8 phase=Completed reason=Completed",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:27Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-lj5p9",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6333",
+          "uid": "6bc9f8b8-94ee-45d8-ad68-929abc5d6e35"
+        },
+        "reason": "BoostCompleted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:26:00Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:26:00Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=04baf0f9-5b7c-410d-a9b6-886bd98640f9 phase=Orphaned reason=Blackout",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:26:00Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-mqbk6",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7154",
+          "uid": "d303276b-f945-4144-b151-e99f95c4fb62"
+        },
+        "reason": "BoostOrphaned",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:07Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:07Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=81185fa6-2d08-36db-a937-e6bd560b7597 phase=Releasing reason=ReleasePending",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:07Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-nc77b",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6270",
+          "uid": "7df0aac7-9d25-4fb0-b1ea-bdf334879e16"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:21:45Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "denied",
+          "namespace": "warden-b7-acceptance",
+          "uid": "6bb758ed-f115-4c56-bca0-84ccd233169a"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:21:45Z",
+        "message": "requestUid=6bb758ed-f115-4c56-bca0-84ccd233169a transitionId=4ffe1caa-24a2-45aa-b64c-e7c1a8e12e17 phase=Preparing reason=AwaitingEvidence",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:21:45Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-nwfsl",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6639",
+          "uid": "8d8eb747-446c-4bb7-b209-aea273c755c3"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:45Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "restarted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "f6719ec0-2a85-49c3-972d-fffc4733d48c"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:45Z",
+        "message": "requestUid=f6719ec0-2a85-49c3-972d-fffc4733d48c transitionId=08feae2c-6139-41e3-8a97-daf5e8540aed phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:45Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-pkrxg",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6405",
+          "uid": "409c2e1b-972c-47bd-b389-17a97a04a67b"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:25:50Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:25:50Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=04baf0f9-5b7c-410d-a9b6-886bd98640f9 phase=Releasing reason=Blackout",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:25:50Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-pqvmw",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7128",
+          "uid": "1be0c48b-c1e5-4572-885f-3248660fb701"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:04Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "competitor",
+          "namespace": "warden-b7-acceptance",
+          "uid": "8bf4b29c-67e4-418e-aba8-435fbda417d9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:04Z",
+        "message": "requestUid=8bf4b29c-67e4-418e-aba8-435fbda417d9 transitionId=null phase=Rejected reason=ExistingCorrelatedIntent",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:04Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-prsxm",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6047",
+          "uid": "85664cd0-5e42-4c9c-9328-43430613cbea"
+        },
+        "reason": "BoostRejected",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:25:40Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:25:40Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=04baf0f9-5b7c-410d-a9b6-886bd98640f9 phase=Releasing reason=Releasing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:25:40Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-pvxjb",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7112",
+          "uid": "795b0799-d642-45ef-a942-43a0850aa96c"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:17Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:17Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=cfedfb35-1e7c-3fa8-b604-54e11f6274f8 phase=Releasing reason=StaleAcknowledgement",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:17Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-r4lkq",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6298",
+          "uid": "877eba77-a9b2-4d69-8146-ad44ea5ee351"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:24:41Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "policy-deleted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "fc83f635-0232-4d4b-9864-8fb9b2eb8780"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:24:41Z",
+        "message": "requestUid=fc83f635-0232-4d4b-9864-8fb9b2eb8780 transitionId=acc202cc-1caf-4ec7-a33d-a8146a2a3bb3 phase=Preparing reason=AwaitingEvidence",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:24:41Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-rdhns",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7017",
+          "uid": "2cb753c6-b61a-4dea-8ac7-adf0b8f165e2"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:52Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:52Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=af2317fd-82be-33b0-a524-c437685c0335 phase=Releasing reason=ReleaseBlocked",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:52Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-sfsrx",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6545",
+          "uid": "8b67213d-fa6b-452d-8d2b-79073faa996b"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:39Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "restarted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "f6719ec0-2a85-49c3-972d-fffc4733d48c"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:39Z",
+        "message": "requestUid=f6719ec0-2a85-49c3-972d-fffc4733d48c transitionId=5065cd8f-fa06-4a31-b5e2-72ca9ed37cb9 phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:39Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-sh5sr",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6392",
+          "uid": "815e1fca-474d-4d5b-a124-be8246f6515a"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:10Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:10Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=48c6382c-8d1b-4d5c-8f51-eb1fbb0285ff phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:10Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-v5t7p",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6469",
+          "uid": "3dbc8c4f-ee20-42b0-8b37-7c4d91c5fc41"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:41Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:41Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=99b7e487-04d0-4e0d-85cc-fc2fc6ae9079 phase=Preparing reason=AwaitingEvidence",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:41Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-w54tp",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5998",
+          "uid": "e0b23e9f-1704-41db-b0bc-89fe85321b63"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:15Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:15Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=cfedfb35-1e7c-3fa8-b604-54e11f6274f8 phase=Releasing reason=ReleasePending",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:15Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-wm7nb",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6291",
+          "uid": "5b3bea8a-79a8-4955-84cc-f93cf45c78e6"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:49Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "restarted",
+          "namespace": "warden-b7-acceptance",
+          "uid": "f6719ec0-2a85-49c3-972d-fffc4733d48c"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:49Z",
+        "message": "requestUid=f6719ec0-2a85-49c3-972d-fffc4733d48c transitionId=08feae2c-6139-41e3-8a97-daf5e8540aed phase=Granted reason=Prepared",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:49Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-wq67n",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6417",
+          "uid": "c2536ea9-02a0-4b8b-ae5b-5dba1d615d56"
+        },
+        "reason": "BoostGranted",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:32Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "blocked",
+          "namespace": "warden-b7-acceptance",
+          "uid": "ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:32Z",
+        "message": "requestUid=ef44c58c-8dd8-40b3-b79f-81d5fb6f7a73 transitionId=945faf78-2973-4b5d-86e0-a53d94ae7cbd phase=Releasing reason=ReleasePending",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:32Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-wzhtl",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6511",
+          "uid": "0aa9f3ab-7bc7-44fa-83a4-c247f954b7a3"
+        },
+        "reason": "BoostReleasing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:55Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:55Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=81185fa6-2d08-36db-a937-e6bd560b7597 phase=Expired reason=ExecutionExpired",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:55Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-x928p",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6240",
+          "uid": "bb9c182a-0ba2-4b55-b4ea-1eadb1592aa8"
+        },
+        "reason": "BoostExpired",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:31Z",
+        "involvedObject": {
+          "apiVersion": "warden.mnemo.io/v1alpha1",
+          "kind": "WardenBoost",
+          "name": "expiry",
+          "namespace": "warden-b7-acceptance",
+          "uid": "a377b797-a5a6-4637-965d-0c97c4445dc9"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:31Z",
+        "message": "requestUid=a377b797-a5a6-4637-965d-0c97c4445dc9 transitionId=99b7e487-04d0-4e0d-85cc-fc2fc6ae9079 phase=Preparing reason=Preparing",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:31Z",
+          "generateName": "warden-boost-",
+          "name": "warden-boost-xq2np",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5960",
+          "uid": "b9498886-0585-40fc-8275-1760f9ab0ed1"
+        },
+        "reason": "BoostPreparing",
+        "reportingComponent": "",
+        "reportingInstance": "",
+        "source": {
+          "component": "warden-controller"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5824",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:22Z",
+        "message": "Successfully assigned warden-b7-acceptance/worker to warden-b7-acceptance-control-plane",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8f9bfec949",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5826",
+          "uid": "3a8f13d6-da00-421f-93c9-3828ff140eb0"
+        },
+        "reason": "Scheduled",
+        "reportingComponent": "default-scheduler",
+        "reportingInstance": "",
+        "source": {
+          "component": "default-scheduler"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.initContainers{warden}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:16Z",
+        "message": "Container image \"warden-b7-agent:final\" already present on machine and can be accessed by the pod",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb2fbc135",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6152",
+          "uid": "c44d4c59-4115-4f17-b56d-b9ac7e29f399"
+        },
+        "reason": "Pulled",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.initContainers{warden}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:16Z",
+        "message": "Container created",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb36de00d",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6156",
+          "uid": "cc448031-5a91-4715-9213-117daaa15642"
+        },
+        "reason": "Created",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.initContainers{warden}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:16Z",
+        "message": "Container started",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb62e20a0",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6157",
+          "uid": "37343528-8864-4b8f-bb00-e5853b7763ae"
+        },
+        "reason": "Started",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 3,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.initContainers{warden}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:25:56Z",
+        "message": "Readiness probe failed: Get \"http://10.244.0.35:8080/readyz\": dial tcp 10.244.0.35:8080: connect: connection refused",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb64afcf8",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7142",
+          "uid": "4c723d77-04ec-4806-a538-798e24395cf7"
+        },
+        "reason": "Unhealthy",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.containers{app}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:53Z",
+        "message": "Container image \"warden-b7-agent:final\" already present on machine and can be accessed by the pod",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb64e22cc",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6426",
+          "uid": "968df810-7271-4305-8fe5-46cf4a784b64"
+        },
+        "reason": "Pulled",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.containers{app}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:53Z",
+        "message": "Container created",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb6cdd416",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6430",
+          "uid": "3e8b5721-9799-420b-9e8a-fd2f6a248d43"
+        },
+        "reason": "Created",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.containers{app}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:53Z",
+        "message": "Container started",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fb96bd709",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6431",
+          "uid": "992f7a17-cfeb-4fb4-90b5-1bbdd2e406b2"
+        },
+        "reason": "Started",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 2,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:22Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "fieldPath": "spec.initContainers{warden}",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:22Z",
+        "message": "Readiness probe failed: HTTP probe failed with statuscode: 503",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "name": "worker.18e5cf8fbad73197",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5845",
+          "uid": "0854fe12-ccaf-4896-b5e6-9bd46fd01632"
+        },
+        "reason": "Unhealthy",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:53Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:53Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":2}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:53Z",
+          "name": "worker.18e5cf96d29f939d",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6021",
+          "uid": "7da0d0e0-4af1-4a56-a5f1-59f1c4f52319"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:17:53Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:17:53Z",
+        "message": "Pod resize completed: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":2}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:17:53Z",
+          "name": "worker.18e5cf96d3486d33",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6023",
+          "uid": "0fc7bdf5-17ac-4482-a03f-a6bb58199d49"
+        },
+        "reason": "ResizeCompleted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:05Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:05Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"314572800\"}}}],\"generation\":3}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:05Z",
+          "name": "worker.18e5cf99b58037c0",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6057",
+          "uid": "a21875a5-eee0-4f02-aaf5-797f2855472e"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:05Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:05Z",
+        "message": "Pod resize completed: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"314572800\"}}}],\"generation\":3}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:05Z",
+          "name": "worker.18e5cf99b617b3dd",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6059",
+          "uid": "da5b34e4-cdb6-4202-85e9-9f97fc3244ea"
+        },
+        "reason": "ResizeCompleted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:07Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:07Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"738197504\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"314572800\"}}}],\"generation\":4}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:07Z",
+          "name": "worker.18e5cf9a40560bc4",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6071",
+          "uid": "756ccac7-0b9e-4d90-a7f0-567b2f292e07"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:08Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:08Z",
+        "message": "Pod resize completed: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"738197504\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"314572800\"}}}],\"generation\":4}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:08Z",
+          "name": "worker.18e5cf9a41152b56",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6073",
+          "uid": "30e0db41-223d-48c4-b9e6-7db2ed596f39"
+        },
+        "reason": "ResizeCompleted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:12Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:12Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":5}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:12Z",
+          "name": "worker.18e5cf9b6385d46f",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6098",
+          "uid": "23a011fd-dd4f-46c0-abd2-d2f8f8b8cd9b"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:18:12Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:18:12Z",
+        "message": "Pod resize completed: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":5}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:18:12Z",
+          "name": "worker.18e5cf9b6488775f",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6100",
+          "uid": "b4ef43ac-6a99-4353-851b-44a32fba9381"
+        },
+        "reason": "ResizeCompleted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:19Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:19Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"335544320\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"134217728\"}}}],\"generation\":6}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:19Z",
+          "name": "worker.18e5cfab006f3a14",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6312",
+          "uid": "3a6de61d-7e07-4fdf-acbc-0cd84924de47"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:19Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:19Z",
+        "message": "Pod resize completed: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"335544320\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"134217728\"}}}],\"generation\":6}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:19Z",
+          "name": "worker.18e5cfab0150e12b",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6314",
+          "uid": "c55fe2eb-e528-46c6-990e-ad05a5959dee"
+        },
+        "reason": "ResizeCompleted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:46Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:46Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":7}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:46Z",
+          "name": "worker.18e5cfb12ccb2246",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6408",
+          "uid": "10108b5d-ed25-43e1-bd99-7e137f1254b8"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:19:46Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:19:46Z",
+        "message": "Pod resize completed: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":7}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:19:46Z",
+          "name": "worker.18e5cfb12d9d3e32",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6410",
+          "uid": "ab9cc57e-62c5-4f01-9bc5-8d9be2602554"
+        },
+        "reason": "ResizeCompleted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:55Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:55Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"335544320\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"134217728\"}}}],\"generation\":8}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:55Z",
+          "name": "worker.18e5cfc13cbcf66d",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6549",
+          "uid": "a4b16f55-3850-4782-afbe-d0f8f62dc7ca"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:20:55Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:20:55Z",
+        "message": "Pod resize error: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"335544320\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"134217728\"}}}],\"generation\":8,\"error\":\"cannot decrease memory limits: attempting to set pod memory limit (603979776) below current usage (620204032)\"}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:20:55Z",
+          "name": "worker.18e5cfc13ce547b7",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6550",
+          "uid": "0e83dc5a-0e1e-462c-9556-1a529317de99"
+        },
+        "reason": "ResizeError",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:21:06Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:21:06Z",
+        "message": "Pod resize error: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"335544320\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"134217728\"}}}],\"generation\":8,\"error\":\"cannot decrease memory limits: missing container \\\"app\\\" memory usage\"}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:21:06Z",
+          "name": "worker.18e5cfc3eb9f5680",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "6568",
+          "uid": "6eefc4c5-e44b-4997-a882-14e0c6594831"
+        },
+        "reason": "ResizeError",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Warning"
+      },
+      {
+        "apiVersion": "v1",
+        "count": 1,
+        "eventTime": null,
+        "firstTimestamp": "2026-11-07T16:25:01Z",
+        "involvedObject": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "5825",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "kind": "Event",
+        "lastTimestamp": "2026-11-07T16:25:01Z",
+        "message": "Pod resize started: {\"initContainers\":[{\"name\":\"warden\",\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"25m\",\"memory\":\"64Mi\"}}}],\"containers\":[{\"name\":\"app\",\"resources\":{\"limits\":{\"memory\":\"671088640\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"268435456\"}}}],\"generation\":9}",
+        "metadata": {
+          "creationTimestamp": "2026-11-07T16:25:01Z",
+          "name": "worker.18e5cffa9d4e9c26",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7050",
+          "uid": "b728c5a6-445e-47d3-84c8-5d581f978435"
+        },
+        "reason": "ResizeStarted",
+        "reportingComponent": "kubelet",
+        "reportingInstance": "warden-b7-acceptance-control-plane",
+        "source": {
+          "component": "kubelet",
+          "host": "warden-b7-acceptance-control-plane"
+        },
+        "type": "Normal"
+      }
+    ],
+    "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+  },
+  "finishedAt": "2026-11-07T16:26:02.429149+00:00",
+  "node": {
+    "architecture": "arm64",
+    "bootID": "4621a38f-b96c-40a1-b3c7-ff261c7f3f3d",
+    "containerRuntimeVersion": "containerd://2.3.1",
+    "kernelVersion": "6.12.76-linuxkit",
+    "kubeProxyVersion": "",
+    "kubeletVersion": "v1.36.1",
+    "machineID": "582434733dac4aa5aa9784d09f8a5d39",
+    "operatingSystem": "linux",
+    "osImage": "Debian GNU/Linux 13 (trixie)",
+    "swap": {
+      "capacity": 1073737728
+    },
+    "systemUUID": "582434733dac4aa5aa9784d09f8a5d39"
+  },
+  "result": "PASS",
+  "scenarios": {
+    "application-restart-invalidates-grant": {
+      "after": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "268435456"
+          }
+        },
+        "restartCount": 1
+      },
+      "before": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "durationSeconds": 31.698,
+      "oldGrant": {
+        "acquisitionDeadline": "2026-11-07T16:21:39Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:19:49.245027258Z",
+            "message": "Prepared",
+            "reason": "Prepared",
+            "status": "True",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "executionDeadline": "2026-11-07T16:20:34.245027258Z",
+        "grantedAt": "2026-11-07T16:19:49.245027258Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Granted",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 4,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MDhmZWFlMmMtNjEzOS00MWUzLThhOTctZGFmNWU4NTQwYWVk.ZjY3MTllYzAtMmE4NS00OWMzLTk3MmQtZmZmYzQ3MzNkNDhj.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovLzBlZDAwMjEyNjQ1YjczODdhMDliNWE5YzAwM2NlYjVlNDc1NTk1YTY0ZjExZWM0M2VhNzBmNTZmZTg0MThlZWQ.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "08feae2c-6139-41e3-8a97-daf5e8540aed"
+      },
+      "orphaned": {
+        "acquisitionDeadline": "2026-11-07T16:21:39Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:19:49.245027258Z",
+            "message": "Prepared",
+            "reason": "Prepared",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:19:59.278335721Z",
+            "message": "TargetInstanceChanged",
+            "reason": "TargetInstanceChanged",
+            "status": "False",
+            "type": "TargetPresent"
+          }
+        ],
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "executionDeadline": "2026-11-07T16:20:34.245027258Z",
+        "grantedAt": "2026-11-07T16:19:49.245027258Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Orphaned",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 4,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MDhmZWFlMmMtNjEzOS00MWUzLThhOTctZGFmNWU4NTQwYWVk.ZjY3MTllYzAtMmE4NS00OWMzLTk3MmQtZmZmYzQ3MzNkNDhj.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovLzBlZDAwMjEyNjQ1YjczODdhMDliNWE5YzAwM2NlYjVlNDc1NTk1YTY0ZjExZWM0M2VhNzBmNTZmZTg0MThlZWQ.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "08feae2c-6139-41e3-8a97-daf5e8540aed"
+      },
+      "replacementContainerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+      "result": "PASS"
+    },
+    "denied-growth": {
+      "after": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 1
+      },
+      "agentLogTail": "2026-11-07T16:18:16.108459714Z INFO  warden-agent - starting (health port 8080, pod worker)\n2026-11-07T16:18:16.121176464Z INFO  warden-agent - health server listening on :8080 (/healthz, /readyz, /metrics)\n2026-11-07T16:18:16.121915631Z INFO  warden-agent - attach supervisor started; waiting for target JVM\n2026-11-07T16:18:16.159750006Z INFO  warden-agent - attached to target pid 32\n2026-11-07T16:18:16.179186256Z INFO  warden-agent - intent watcher started; polling own pod every PT2S\n2026-11-07T16:19:52.754224509Z INFO  warden-agent - metrics sampling failed, continuing: /host-cgroup/kubelet.slice/kubelet-kubepods.slice/kubelet-kubepods-burstable.slice/kubelet-kubepods-burstable-pod21a8bae5_4658_4f05_b692_aef3223eb8a5.slice/cri-containerd-0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed.scope/memory.current\n2026-11-07T16:19:52.772559968Z INFO  warden-agent - intent poll failed, retrying next tick: null\n2026-11-07T16:19:54.273568427Z INFO  warden-agent - target detached; retrying\n2026-11-07T16:19:54.288147802Z INFO  warden-agent - attached to target pid 211\n2026-11-07T16:19:54.823932719Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:19:54.823990635Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:19:56.840453928Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:19:56.840536553Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:19:58.859058345Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:19:58.859164595Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:20:00.879539763Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:20:00.879744930Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:20:02.897789583Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:20:02.897917083Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:20:04.919565667Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:20:04.919654584Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:20:06.939064335Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:20:06.939197043Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:20:08.958866003Z INFO  warden-agent - could not publish failure evidence; retrying next tick\n2026-11-07T16:20:08.958989878Z INFO  warden-agent - intent poll failed, retrying next tick: StaleTransitionIdentity\n2026-11-07T16:20:49.301245633Z INFO  warden-agent - intent poll failed, retrying next tick: VerificationFailed\n2026-11-07T16:22:06.435660168Z INFO  warden-agent - intent poll failed, retrying next tick: resize PATCH for worker/app failed: HTTP 403 {\"kind\":\"Status\",\"apiVersion\":\"v1\",\"metadata\":{},\"status\":\"Failure\",\"message\":\"pods \\\"worker\\\" is forbidden: exceeded quota: deny-growth, requested: requests.memory=134217728, used: requests.memory=201326592, limited: requests.memory=200Mi\",\"reason\":\"Forbidden\",\"details\":{\"name\":\"worker\",\"kind\":\"pods\"},\"code\":403}\n\n",
+      "before": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 1
+      },
+      "cleaned": {
+        "acquisitionDeadline": "2026-11-07T16:22:00Z",
+        "appliedHeapTarget": "67108864",
+        "appliedLimit": "335544320",
+        "appliedRequest": "134217728",
+        "completedAt": "2026-11-07T16:22:35.223238084Z",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:22:15.179787672Z",
+            "message": "CleanupRequested",
+            "reason": "CleanupRequested",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:22:35.223238084Z",
+            "message": "Applied",
+            "reason": "Applied",
+            "status": "True",
+            "type": "Released"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:22:35.223238084Z",
+            "message": "Completed",
+            "reason": "Completed",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Completed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 5,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.Y2EzNDJlMjctOTY3My0zMGVjLWE0MzktOTNkNDRhNGJlMzk2.NmJiNzU4ZWQtZjExNS00YzU2LWJjYTAtODRjY2QyMzMxNjlh.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ",
+        "releaseBaselineTransitionId": "23bfd8de-6ebd-4b26-8df3-7576fa98f68f",
+        "requestFloor": "268435456",
+        "transitionId": "ca342e27-9673-30ec-a439-93d44a4be396"
+      },
+      "durationSeconds": 72.927,
+      "observedPhases": [
+        "Preparing",
+        "Failed"
+      ],
+      "quota": {
+        "hard": {
+          "limits.memory": "1Gi",
+          "requests.memory": "200Mi"
+        },
+        "used": {
+          "limits.memory": "603979776",
+          "requests.memory": "201326592"
+        }
+      },
+      "result": "PASS",
+      "terminalObservation": {
+        "acquisitionDeadline": "2026-11-07T16:22:00Z",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:22:05.148521501Z",
+            "message": "AcquisitionTimeout",
+            "reason": "AcquisitionTimeout",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Failed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 5,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MjNiZmQ4ZGUtNmViZC00YjI2LThkZjMtNzU3NmZhOThmNjhm.NmJiNzU4ZWQtZjExNS00YzU2LWJjYTAtODRjY2QyMzMxNjlh.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "23bfd8de-6ebd-4b26-8df3-7576fa98f68f"
+      },
+      "workload": {
+        "buildMillis": 0,
+        "checksum": 0,
+        "elapsedMillis": 0,
+        "entries": 1,
+        "heapCommittedBytes": 18874368,
+        "heapUsedBytes": 18874368,
+        "javaVersion": "21.0.13",
+        "preparedRuns": 0,
+        "retainedMiB": 0,
+        "rssBytes": 159260672,
+        "running": false,
+        "runs": 0,
+        "scanPasses": 0,
+        "softMaxBytes": 67108864
+      }
+    },
+    "failed-shrink-and-recovery": {
+      "after": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 1
+      },
+      "afterWorkload": {
+        "buildMillis": 0,
+        "checksum": 0,
+        "elapsedMillis": 0,
+        "entries": 1,
+        "heapCommittedBytes": 16777216,
+        "heapUsedBytes": 16777216,
+        "javaVersion": "21.0.13",
+        "preparedRuns": 0,
+        "retainedMiB": 0,
+        "rssBytes": 159739904,
+        "running": false,
+        "runs": 0,
+        "scanPasses": 0,
+        "softMaxBytes": 67108864
+      },
+      "allocated": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "268435456"
+          }
+        },
+        "restartCount": 1
+      },
+      "before": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "268435456"
+          }
+        },
+        "restartCount": 1
+      },
+      "blocked": {
+        "acquisitionDeadline": "2026-11-07T16:22:10Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:20:22.209999592Z",
+            "message": "WorkFinished",
+            "reason": "WorkFinished",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:20:52.269963426Z",
+            "message": "ReleaseBlocked",
+            "reason": "ReleaseBlocked",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "executionDeadline": "2026-11-07T16:21:05.950780300Z",
+        "grantedAt": "2026-11-07T16:20:20.950780300Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Releasing",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 4,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.YWYyMzE3ZmQtODJiZS0zM2IwLWE1MjQtYzQzNzY4NWMwMzM1.ZWY0NGM1OGMtOGRkOC00MGIzLWI3OWYtODFkNWZiNmY3YTcz.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ",
+        "releaseBaselineTransitionId": "945faf78-2973-4b5d-86e0-a53d94ae7cbd",
+        "requestFloor": "268435456",
+        "transitionId": "af2317fd-82be-33b0-a524-c437685c0335"
+      },
+      "completed": {
+        "acquisitionDeadline": "2026-11-07T16:22:10Z",
+        "appliedHeapTarget": "67108864",
+        "appliedLimit": "335544320",
+        "appliedRequest": "134217728",
+        "completedAt": "2026-11-07T16:21:22.329031717Z",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:20:22.209999592Z",
+            "message": "WorkFinished",
+            "reason": "WorkFinished",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:21:22.329031717Z",
+            "message": "Applied",
+            "reason": "Applied",
+            "status": "True",
+            "type": "Released"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:21:22.329031717Z",
+            "message": "Completed",
+            "reason": "Completed",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "executionDeadline": "2026-11-07T16:21:05.950780300Z",
+        "grantedAt": "2026-11-07T16:20:20.950780300Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Completed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 4,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.YWYyMzE3ZmQtODJiZS0zM2IwLWE1MjQtYzQzNzY4NWMwMzM1.ZWY0NGM1OGMtOGRkOC00MGIzLWI3OWYtODFkNWZiNmY3YTcz.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ",
+        "releaseBaselineTransitionId": "945faf78-2973-4b5d-86e0-a53d94ae7cbd",
+        "requestFloor": "268435456",
+        "transitionId": "af2317fd-82be-33b0-a524-c437685c0335"
+      },
+      "durationSeconds": 83.776,
+      "grant": {
+        "acquisitionDeadline": "2026-11-07T16:22:10Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:20:20.950780300Z",
+            "message": "Prepared",
+            "reason": "Prepared",
+            "status": "True",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "executionDeadline": "2026-11-07T16:21:05.950780300Z",
+        "grantedAt": "2026-11-07T16:20:20.950780300Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Granted",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 4,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.OTQ1ZmFmNzgtMjk3My00YjVkLTg2ZTAtYTUzZDk0YWU3Y2Jk.ZWY0NGM1OGMtOGRkOC00MGIzLWI3OWYtODFkNWZiNmY3YTcz.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "945faf78-2973-4b5d-86e0-a53d94ae7cbd"
+      },
+      "held": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "268435456"
+          }
+        },
+        "restartCount": 1
+      },
+      "result": "PASS",
+      "retainedWorkload": {
+        "buildMillis": 0,
+        "checksum": 0,
+        "elapsedMillis": 0,
+        "entries": 1,
+        "heapCommittedBytes": 387973120,
+        "heapUsedBytes": 383778816,
+        "javaVersion": "21.0.13",
+        "preparedRuns": 0,
+        "retainedMiB": 320,
+        "rssBytes": 506269696,
+        "running": false,
+        "runs": 0,
+        "scanPasses": 0,
+        "softMaxBytes": 402653184
+      }
+    },
+    "jvm-preparation-fails-after-growth": {
+      "completed": {
+        "acquisitionDeadline": "2026-11-07T16:23:48Z",
+        "appliedHeapTarget": "67108864",
+        "appliedLimit": "335544320",
+        "appliedRequest": "134217728",
+        "completedAt": "2026-11-07T16:24:29.020159679Z",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:23:58.954199471Z",
+            "message": "CleanupRequested",
+            "reason": "CleanupRequested",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:24:29.020159679Z",
+            "message": "Applied",
+            "reason": "Applied",
+            "status": "True",
+            "type": "Released"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:24:29.020159679Z",
+            "message": "Completed",
+            "reason": "Completed",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://dd8bbece73449e4230707d99db31cdc93925a62cef5fa0d6c0ce97a26163bb10",
+        "heapTarget": "268435456",
+        "limitFloor": "536870912",
+        "maxDuration": "PT2M",
+        "observedGeneration": 1,
+        "phase": "Completed",
+        "podUid": "ecf8f61c-a712-4e62-81d5-35c139d4675e",
+        "policyGeneration": 1,
+        "policyUid": "dad5a1c0-91a7-483b-ae28-e25c409a467d",
+        "preparedIntent": "v1.YjU1OWFlN2QtNjNhOC0zMzVlLWI5MWItOWMxNDgzNTdhYTAy.NjIyNGNkY2UtYmUwMy00ZTg3LWFjODgtZmM1YzVkOTQ5YjRl.ZWNmOGY2MWMtYTcxMi00ZTYyLTgxZDUtMzVjMTM5ZDQ2NzVl.YXBw.Y29udGFpbmVyZDovL2RkOGJiZWNlNzM0NDllNDIzMDcwN2Q5OWRiMzFjZGM5MzkyNWE2MmNlZjVmYTBkNmMwY2U5N2EyNjE2M2JiMTA.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ",
+        "releaseBaselineTransitionId": "75e587ce-53b9-4cc6-ae85-6a14eec2faa1",
+        "requestFloor": "268435456",
+        "transitionId": "b559ae7d-63a8-335e-b91b-9c148357aa02"
+      },
+      "durationSeconds": 103.556,
+      "finalPod": {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "warden.mnemo.io/boost-claim": "6224cdce-be03-4e87-ac88-fc5c5d949b4e",
+            "warden.mnemo.io/resize-ack": "v1.djEuWWpVMU9XRmxOMlF0TmpOaE9DMHpNelZsTFdJNU1XSXRPV014TkRnek5UZGhZVEF5Lk5qSXlOR05rWTJVdFltVXdNeTAwWlRnM0xXRmpPRGd0Wm1NMVl6VmtPVFE1WWpSbC5aV05tT0dZMk1XTXRZVGN4TWkwMFpUWXlMVGd4WkRVdE16VmpNVE01WkRRMk56VmwuWVhCdy5ZMjl1ZEdGcGJtVnlaRG92TDJSa09HSmlaV05sTnpNME5EbGxOREl6TURjd04yUTVPV1JpTXpGalpHTTVNemt5TldFMk1tTmxaalZtWVRCa05tTXdZMlU1TjJFeU5qRTJNMkppTVRBLk1UTTBNakUzTnpJNC5Nek0xTlRRME16SXcuTmpjeE1EZzROalE.dHJ1ZQ.QXBwbGllZA.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ.MjAyNi0xMS0wN1QxNjoyNDozMC4yOTkzMjEzMDRa",
+            "warden.mnemo.io/resize-intent": "v1.YjU1OWFlN2QtNjNhOC0zMzVlLWI5MWItOWMxNDgzNTdhYTAy.NjIyNGNkY2UtYmUwMy00ZTg3LWFjODgtZmM1YzVkOTQ5YjRl.ZWNmOGY2MWMtYTcxMi00ZTYyLTgxZDUtMzVjMTM5ZDQ2NzVl.YXBw.Y29udGFpbmVyZDovL2RkOGJiZWNlNzM0NDllNDIzMDcwN2Q5OWRiMzFjZGM5MzkyNWE2MmNlZjVmYTBkNmMwY2U5N2EyNjE2M2JiMTA.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ",
+            "warden.mnemo.io/target-limit-bytes": "335544320",
+            "warden.mnemo.io/target-request-bytes": "134217728"
+          },
+          "creationTimestamp": "2026-11-07T16:22:48Z",
+          "generation": 3,
+          "labels": {
+            "warden.mnemo.io/policy-uid": "dad5a1c0-91a7-483b-ae28-e25c409a467d"
+          },
+          "name": "fault",
+          "namespace": "warden-b7-fault",
+          "resourceVersion": "6987",
+          "uid": "ecf8f61c-a712-4e62-81d5-35c139d4675e"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "java",
+                "-XX:+UseZGC",
+                "-Xmx384m",
+                "-Xms16m",
+                "-XX:SoftMaxHeapSize=64m",
+                "-cp",
+                "/app/warden-agent.jar",
+                "io.github.baokhang83.mnemo.warden.agent.harness.BoostFaultDemo"
+              ],
+              "env": [
+                {
+                  "name": "WARDEN_POD_NAME",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.name"
+                    }
+                  }
+                }
+              ],
+              "image": "warden-b7-agent:final",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "app",
+              "resizePolicy": [
+                {
+                  "resourceName": "memory",
+                  "restartPolicy": "NotRequired"
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "memory": "335544320"
+                },
+                "requests": {
+                  "memory": "134217728"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-tm7l5",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "warden-b7-acceptance-control-plane",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "fault-agent",
+          "serviceAccountName": "fault-agent",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-tm7l5",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "memory": "134217728"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:22:48Z",
+              "observedGeneration": 3,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:22:48Z",
+              "observedGeneration": 3,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:22:48Z",
+              "observedGeneration": 3,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:22:48Z",
+              "observedGeneration": 3,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:22:48Z",
+              "observedGeneration": 3,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "memory": "134217728"
+              },
+              "containerID": "containerd://dd8bbece73449e4230707d99db31cdc93925a62cef5fa0d6c0ce97a26163bb10",
+              "image": "docker.io/library/warden-b7-agent:final",
+              "imageID": "docker.io/library/import-2026-11-07@sha256:ff02b61d204c5e1cd22d6fdac14272536b1e1b7591c353723c96d65b3315ab65",
+              "lastState": {},
+              "name": "app",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "memory": "320Mi"
+                },
+                "requests": {
+                  "memory": "128Mi"
+                }
+              },
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-11-07T16:22:48Z"
+                }
+              },
+              "user": {
+                "linux": {
+                  "gid": 999,
+                  "supplementalGroups": [
+                    999
+                  ],
+                  "uid": 999
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-tm7l5",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "172.18.0.3",
+          "hostIPs": [
+            {
+              "ip": "172.18.0.3"
+            }
+          ],
+          "observedGeneration": 3,
+          "phase": "Running",
+          "podIP": "10.244.0.38",
+          "podIPs": [
+            {
+              "ip": "10.244.0.38"
+            }
+          ],
+          "qosClass": "Burstable",
+          "resources": {
+            "limits": {
+              "memory": "320Mi"
+            },
+            "requests": {
+              "memory": "128Mi"
+            }
+          },
+          "startTime": "2026-11-07T16:22:48Z"
+        }
+      },
+      "injectedAfterRealGrowth": {
+        "log": "FAULT_DEMO_READY\nINJECTED_AFTER_GROWTH 268435456 536870912\n",
+        "pod": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "metadata": {
+            "annotations": {
+              "warden.mnemo.io/boost-claim": "6224cdce-be03-4e87-ac88-fc5c5d949b4e",
+              "warden.mnemo.io/resize-ack": "v1.djEuTnpWbE5UZzNZMlV0TlROaU9TMDBZMk0yTFdGbE9EVXRObUV4TkdWbFl6Sm1ZV0V4Lk5qSXlOR05rWTJVdFltVXdNeTAwWlRnM0xXRmpPRGd0Wm1NMVl6VmtPVFE1WWpSbC5aV05tT0dZMk1XTXRZVGN4TWkwMFpUWXlMVGd4WkRVdE16VmpNVE01WkRRMk56VmwuWVhCdy5ZMjl1ZEdGcGJtVnlaRG92TDJSa09HSmlaV05sTnpNME5EbGxOREl6TURjd04yUTVPV1JpTXpGalpHTTVNemt5TldFMk1tTmxaalZtWVRCa05tTXdZMlU1TjJFeU5qRTJNMkppTVRBLk1qWTRORE0xTkRVMi5OVE0yT0Rjd09URXkuTWpZNE5ETTFORFUy.ZmFsc2U.SW5qZWN0ZWRKdm1GYWlsdXJl.MjY4NDM1NDU2.NTM2ODcwOTEy.MA.MjAyNi0xMS0wN1QxNjoyMzoyMS4xOTQ4MjY5Njda",
+              "warden.mnemo.io/resize-intent": "v1.NzVlNTg3Y2UtNTNiOS00Y2M2LWFlODUtNmExNGVlYzJmYWEx.NjIyNGNkY2UtYmUwMy00ZTg3LWFjODgtZmM1YzVkOTQ5YjRl.ZWNmOGY2MWMtYTcxMi00ZTYyLTgxZDUtMzVjMTM5ZDQ2NzVl.YXBw.Y29udGFpbmVyZDovL2RkOGJiZWNlNzM0NDllNDIzMDcwN2Q5OWRiMzFjZGM5MzkyNWE2MmNlZjVmYTBkNmMwY2U5N2EyNjE2M2JiMTA.MjY4NDM1NDU2.NTM2ODcwOTEy.MjY4NDM1NDU2",
+              "warden.mnemo.io/target-limit-bytes": "536870912",
+              "warden.mnemo.io/target-request-bytes": "268435456"
+            },
+            "creationTimestamp": "2026-11-07T16:22:48Z",
+            "generation": 2,
+            "labels": {
+              "warden.mnemo.io/policy-uid": "dad5a1c0-91a7-483b-ae28-e25c409a467d"
+            },
+            "name": "fault",
+            "namespace": "warden-b7-fault",
+            "resourceVersion": "6837",
+            "uid": "ecf8f61c-a712-4e62-81d5-35c139d4675e"
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "java",
+                  "-XX:+UseZGC",
+                  "-Xmx384m",
+                  "-Xms16m",
+                  "-XX:SoftMaxHeapSize=64m",
+                  "-cp",
+                  "/app/warden-agent.jar",
+                  "io.github.baokhang83.mnemo.warden.agent.harness.BoostFaultDemo"
+                ],
+                "env": [
+                  {
+                    "name": "WARDEN_POD_NAME",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.name"
+                      }
+                    }
+                  }
+                ],
+                "image": "warden-b7-agent:final",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "app",
+                "resizePolicy": [
+                  {
+                    "resourceName": "memory",
+                    "restartPolicy": "NotRequired"
+                  }
+                ],
+                "resources": {
+                  "limits": {
+                    "memory": "536870912"
+                  },
+                  "requests": {
+                    "memory": "268435456"
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                    "name": "kube-api-access-tm7l5",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "enableServiceLinks": true,
+            "nodeName": "warden-b7-acceptance-control-plane",
+            "preemptionPolicy": "PreemptLowerPriority",
+            "priority": 0,
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "fault-agent",
+            "serviceAccountName": "fault-agent",
+            "terminationGracePeriodSeconds": 30,
+            "tolerations": [
+              {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/not-ready",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+              },
+              {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/unreachable",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+              }
+            ],
+            "volumes": [
+              {
+                "name": "kube-api-access-tm7l5",
+                "projected": {
+                  "defaultMode": 420,
+                  "sources": [
+                    {
+                      "serviceAccountToken": {
+                        "expirationSeconds": 3607,
+                        "path": "token"
+                      }
+                    },
+                    {
+                      "configMap": {
+                        "items": [
+                          {
+                            "key": "ca.crt",
+                            "path": "ca.crt"
+                          }
+                        ],
+                        "name": "kube-root-ca.crt"
+                      }
+                    },
+                    {
+                      "downwardAPI": {
+                        "items": [
+                          {
+                            "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.namespace"
+                            },
+                            "path": "namespace"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "status": {
+            "allocatedResources": {
+              "memory": "268435456"
+            },
+            "conditions": [
+              {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-11-07T16:22:48Z",
+                "observedGeneration": 2,
+                "status": "True",
+                "type": "PodReadyToStartContainers"
+              },
+              {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-11-07T16:22:48Z",
+                "observedGeneration": 2,
+                "status": "True",
+                "type": "Initialized"
+              },
+              {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-11-07T16:22:48Z",
+                "observedGeneration": 2,
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-11-07T16:22:48Z",
+                "observedGeneration": 2,
+                "status": "True",
+                "type": "ContainersReady"
+              },
+              {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-11-07T16:22:48Z",
+                "observedGeneration": 2,
+                "status": "True",
+                "type": "PodScheduled"
+              }
+            ],
+            "containerStatuses": [
+              {
+                "allocatedResources": {
+                  "memory": "268435456"
+                },
+                "containerID": "containerd://dd8bbece73449e4230707d99db31cdc93925a62cef5fa0d6c0ce97a26163bb10",
+                "image": "docker.io/library/warden-b7-agent:final",
+                "imageID": "docker.io/library/import-2026-11-07@sha256:ff02b61d204c5e1cd22d6fdac14272536b1e1b7591c353723c96d65b3315ab65",
+                "lastState": {},
+                "name": "app",
+                "ready": true,
+                "resources": {
+                  "limits": {
+                    "memory": "512Mi"
+                  },
+                  "requests": {
+                    "memory": "256Mi"
+                  }
+                },
+                "restartCount": 0,
+                "started": true,
+                "state": {
+                  "running": {
+                    "startedAt": "2026-11-07T16:22:48Z"
+                  }
+                },
+                "user": {
+                  "linux": {
+                    "gid": 999,
+                    "supplementalGroups": [
+                      999
+                    ],
+                    "uid": 999
+                  }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                    "name": "kube-api-access-tm7l5",
+                    "readOnly": true,
+                    "recursiveReadOnly": "Disabled"
+                  }
+                ]
+              }
+            ],
+            "hostIP": "172.18.0.3",
+            "hostIPs": [
+              {
+                "ip": "172.18.0.3"
+              }
+            ],
+            "observedGeneration": 2,
+            "phase": "Running",
+            "podIP": "10.244.0.38",
+            "podIPs": [
+              {
+                "ip": "10.244.0.38"
+              }
+            ],
+            "qosClass": "Burstable",
+            "resources": {
+              "limits": {
+                "memory": "512Mi"
+              },
+              "requests": {
+                "memory": "128Mi"
+              }
+            },
+            "startTime": "2026-11-07T16:22:48Z"
+          }
+        },
+        "status": {
+          "acquisitionDeadline": "2026-11-07T16:23:48Z",
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-11-07T16:22:58.839091554Z",
+              "message": "AwaitingEvidence",
+              "reason": "AwaitingEvidence",
+              "status": "False",
+              "type": "Ready"
+            }
+          ],
+          "containerId": "containerd://dd8bbece73449e4230707d99db31cdc93925a62cef5fa0d6c0ce97a26163bb10",
+          "heapTarget": "268435456",
+          "limitFloor": "536870912",
+          "maxDuration": "PT2M",
+          "observedGeneration": 1,
+          "phase": "Preparing",
+          "podUid": "ecf8f61c-a712-4e62-81d5-35c139d4675e",
+          "policyGeneration": 1,
+          "policyUid": "dad5a1c0-91a7-483b-ae28-e25c409a467d",
+          "preparedIntent": "v1.NzVlNTg3Y2UtNTNiOS00Y2M2LWFlODUtNmExNGVlYzJmYWEx.NjIyNGNkY2UtYmUwMy00ZTg3LWFjODgtZmM1YzVkOTQ5YjRl.ZWNmOGY2MWMtYTcxMi00ZTYyLTgxZDUtMzVjMTM5ZDQ2NzVl.YXBw.Y29udGFpbmVyZDovL2RkOGJiZWNlNzM0NDllNDIzMDcwN2Q5OWRiMzFjZGM5MzkyNWE2MmNlZjVmYTBkNmMwY2U5N2EyNjE2M2JiMTA.MjY4NDM1NDU2.NTM2ODcwOTEy.MjY4NDM1NDU2",
+          "requestFloor": "268435456",
+          "transitionId": "75e587ce-53b9-4cc6-ae85-6a14eec2faa1"
+        }
+      },
+      "observedPhases": [
+        "Preparing"
+      ],
+      "result": "PASS",
+      "scope": "production correlated sequence with test-only heap fault, separate from B6 security test"
+    },
+    "policy-and-target-deletion": {
+      "before": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 1
+      },
+      "durationSeconds": 91.508,
+      "grant": {
+        "acquisitionDeadline": "2026-11-07T16:26:31Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:25:11.523695296Z",
+            "message": "Prepared",
+            "reason": "Prepared",
+            "status": "True",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "executionDeadline": "2026-11-07T16:25:56.523695296Z",
+        "grantedAt": "2026-11-07T16:25:11.523695296Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Granted",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 6,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MDRiYWYwZjktNWI3Yy00MTBkLWE5YjYtODg2YmQ5ODY0MGY5.ZmM4M2Y2MzUtMDIzMi00ZDRiLTk4NjQtOGZiOWIyZWI4Nzgw.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "04baf0f9-5b7c-410d-a9b6-886bd98640f9"
+      },
+      "held": {
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "256Mi"
+          }
+        },
+        "restartCount": 1
+      },
+      "orphaned": {
+        "acquisitionDeadline": "2026-11-07T16:26:31Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:25:40.152505670Z",
+            "message": "WorkFinished",
+            "reason": "WorkFinished",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:25:50.169430091Z",
+            "message": "Blackout",
+            "reason": "Blackout",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:26:00.192645554Z",
+            "message": "TargetInstanceChanged",
+            "reason": "TargetInstanceChanged",
+            "status": "False",
+            "type": "TargetPresent"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "executionDeadline": "2026-11-07T16:25:56.523695296Z",
+        "grantedAt": "2026-11-07T16:25:11.523695296Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Orphaned",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 6,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MDRiYWYwZjktNWI3Yy00MTBkLWE5YjYtODg2YmQ5ODY0MGY5.ZmM4M2Y2MzUtMDIzMi00ZDRiLTk4NjQtOGZiOWIyZWI4Nzgw.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "releaseBaselineTransitionId": "04baf0f9-5b7c-410d-a9b6-886bd98640f9",
+        "requestFloor": "268435456",
+        "transitionId": "04baf0f9-5b7c-410d-a9b6-886bd98640f9"
+      },
+      "podBeforeDeletion": {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "warden.mnemo.io/boost-claim": "fc83f635-0232-4d4b-9864-8fb9b2eb8780",
+            "warden.mnemo.io/resize-ack": "v1.djEuTURSaVlXWXdaamt0TldJM1l5MDBNVEJrTFdFNVlqWXRPRGcyWW1RNU9EWTBNR1k1LlptTTRNMlkyTXpVdE1ESXpNaTAwWkRSaUxUazROalF0T0daaU9XSXlaV0k0Tnpndy5NakZoT0dKaFpUVXRORFkxT0MwMFpqQTFMV0kyT1RJdFlXVm1Nekl5TTJWaU9HRTEuWVhCdy5ZMjl1ZEdGcGJtVnlaRG92TDJKaU16WXpOakU1TWpoall6QTJZVEZqTmpVeVpUYzJPV1F4TUdZMllqYzFZbVV3WXpjMk9XSTBZV1k1WkdVd1lqSXpZVEJpWWpJMlptTTJPVEE1TlRVLk1qWTRORE0xTkRVMi5OamN4TURnNE5qUXcuTkRBeU5qVXpNVGcw.dHJ1ZQ.QXBwbGllZA.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0.MjAyNi0xMS0wN1QxNjoyNTowMi4xMjg3MTAwNTVa",
+            "warden.mnemo.io/resize-intent": "v1.MDRiYWYwZjktNWI3Yy00MTBkLWE5YjYtODg2YmQ5ODY0MGY5.ZmM4M2Y2MzUtMDIzMi00ZDRiLTk4NjQtOGZiOWIyZWI4Nzgw.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+            "warden.mnemo.io/target-limit-bytes": "671088640",
+            "warden.mnemo.io/target-request-bytes": "268435456"
+          },
+          "creationTimestamp": "2026-11-07T16:17:22Z",
+          "generation": 9,
+          "labels": {
+            "app": "worker",
+            "warden.mnemo.io/policy-uid": "f30ace13-f764-422d-b9d1-1a2c921edf08"
+          },
+          "name": "worker",
+          "namespace": "warden-b7-acceptance",
+          "resourceVersion": "7053",
+          "uid": "21a8bae5-4658-4f05-b692-aef3223eb8a5"
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "command": [
+                "java",
+                "-XX:+UseZGC",
+                "-XX:ZUncommitDelay=1",
+                "-Xmx768m",
+                "-Xms16m",
+                "-XX:SoftMaxHeapSize=64m",
+                "-Dcom.sun.management.jmxremote.port=9999",
+                "-Dcom.sun.management.jmxremote.rmi.port=9999",
+                "-Dcom.sun.management.jmxremote.host=127.0.0.1",
+                "-Dcom.sun.management.jmxremote.authenticate=false",
+                "-Dcom.sun.management.jmxremote.ssl=false",
+                "-Djava.rmi.server.hostname=127.0.0.1",
+                "-cp",
+                "/app/warden-agent.jar",
+                "io.github.baokhang83.mnemo.warden.agent.harness.BoostIndexDemo"
+              ],
+              "image": "warden-b7-agent:final",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "app",
+              "ports": [
+                {
+                  "containerPort": 8089,
+                  "protocol": "TCP"
+                }
+              ],
+              "resizePolicy": [
+                {
+                  "resourceName": "memory",
+                  "restartPolicy": "NotRequired"
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "memory": "671088640"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "268435456"
+                }
+              },
+              "securityContext": {
+                "runAsGroup": 10001,
+                "runAsNonRoot": true,
+                "runAsUser": 10001
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File"
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "initContainers": [
+            {
+              "env": [
+                {
+                  "name": "WARDEN_POD_NAME",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.name"
+                    }
+                  }
+                },
+                {
+                  "name": "WARDEN_TARGET_CONTAINER_NAME",
+                  "value": "app"
+                },
+                {
+                  "name": "WARDEN_INTENT_POLL_INTERVAL_SECONDS",
+                  "value": "2"
+                },
+                {
+                  "name": "WARDEN_GC_TIMEOUT_SECONDS",
+                  "value": "15"
+                },
+                {
+                  "name": "WARDEN_RESIZE_TIMEOUT_SECONDS",
+                  "value": "25"
+                }
+              ],
+              "image": "warden-b7-agent:final",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "warden",
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 3,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "25m",
+                  "memory": "64Mi"
+                }
+              },
+              "restartPolicy": "Always",
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "warden-api",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/host-cgroup",
+                  "name": "host-cgroup",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "nodeName": "warden-b7-acceptance-control-plane",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "warden-boost-agent",
+          "serviceAccountName": "warden-boost-agent",
+          "shareProcessNamespace": true,
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "warden-api",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3600,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "hostPath": {
+                "path": "/sys/fs/cgroup",
+                "type": "Directory"
+              },
+              "name": "host-cgroup"
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "cpu": "125m",
+            "memory": "335544320"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:17:22Z",
+              "observedGeneration": 9,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:17:22Z",
+              "observedGeneration": 9,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:19:53Z",
+              "observedGeneration": 9,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:19:53Z",
+              "observedGeneration": 9,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-07T16:17:22Z",
+              "observedGeneration": 9,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "100m",
+                "memory": "268435456"
+              },
+              "containerID": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+              "image": "docker.io/library/warden-b7-agent:final",
+              "imageID": "docker.io/library/import-2026-11-07@sha256:ff02b61d204c5e1cd22d6fdac14272536b1e1b7591c353723c96d65b3315ab65",
+              "lastState": {
+                "terminated": {
+                  "containerID": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+                  "exitCode": 143,
+                  "finishedAt": "2026-11-07T16:19:52Z",
+                  "reason": "Error",
+                  "startedAt": "2026-11-07T16:17:22Z"
+                }
+              },
+              "name": "app",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "memory": "640Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "256Mi"
+                }
+              },
+              "restartCount": 1,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-11-07T16:19:53Z"
+                }
+              },
+              "user": {
+                "linux": {
+                  "gid": 10001,
+                  "supplementalGroups": [
+                    10001
+                  ],
+                  "uid": 10001
+                }
+              }
+            }
+          ],
+          "hostIP": "172.18.0.3",
+          "hostIPs": [
+            {
+              "ip": "172.18.0.3"
+            }
+          ],
+          "initContainerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "25m",
+                "memory": "64Mi"
+              },
+              "containerID": "containerd://07909a93b4aead64a31285a3a3c96048e08ef46a2bf1198c264dd8d8dd9ab555",
+              "image": "docker.io/library/warden-b7-agent:final",
+              "imageID": "docker.io/library/import-2026-11-07@sha256:ff02b61d204c5e1cd22d6fdac14272536b1e1b7591c353723c96d65b3315ab65",
+              "lastState": {
+                "terminated": {
+                  "containerID": "containerd://133a35a1270618cad876d9033f3e053c3dc8302314c5a08664bf9e9675631265",
+                  "exitCode": 143,
+                  "finishedAt": "2026-11-07T16:18:15Z",
+                  "reason": "Error",
+                  "startedAt": "2026-11-07T16:17:22Z"
+                }
+              },
+              "name": "warden",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "25m",
+                  "memory": "64Mi"
+                }
+              },
+              "restartCount": 1,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-11-07T16:18:16Z"
+                }
+              },
+              "user": {
+                "linux": {
+                  "gid": 999,
+                  "supplementalGroups": [
+                    999
+                  ],
+                  "uid": 999
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "warden-api",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                },
+                {
+                  "mountPath": "/host-cgroup",
+                  "name": "host-cgroup",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "observedGeneration": 9,
+          "phase": "Running",
+          "podIP": "10.244.0.35",
+          "podIPs": [
+            {
+              "ip": "10.244.0.35"
+            }
+          ],
+          "qosClass": "Burstable",
+          "resources": {
+            "limits": {
+              "memory": "896Mi"
+            },
+            "requests": {
+              "cpu": "104m",
+              "memory": "192Mi"
+            }
+          },
+          "startTime": "2026-11-07T16:17:22Z"
+        }
+      },
+      "releasing": {
+        "acquisitionDeadline": "2026-11-07T16:26:31Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:25:40.152505670Z",
+            "message": "WorkFinished",
+            "reason": "WorkFinished",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:25:40.152505670Z",
+            "message": "Releasing",
+            "reason": "Releasing",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://bb36361928cc06a1c652e769d10f6b75be0c769b4af9de0b23a0bb26fc690955",
+        "executionDeadline": "2026-11-07T16:25:56.523695296Z",
+        "grantedAt": "2026-11-07T16:25:11.523695296Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Releasing",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 6,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MDRiYWYwZjktNWI3Yy00MTBkLWE5YjYtODg2YmQ5ODY0MGY5.ZmM4M2Y2MzUtMDIzMi00ZDRiLTk4NjQtOGZiOWIyZWI4Nzgw.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovL2JiMzYzNjE5MjhjYzA2YTFjNjUyZTc2OWQxMGY2Yjc1YmUwYzc2OWI0YWY5ZGUwYjIzYTBiYjI2ZmM2OTA5NTU.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "releaseBaselineTransitionId": "04baf0f9-5b7c-410d-a9b6-886bd98640f9",
+        "requestFloor": "268435456",
+        "transitionId": "04baf0f9-5b7c-410d-a9b6-886bd98640f9"
+      },
+      "result": "PASS"
+    },
+    "security-boundaries": {
+      "error": "",
+      "output": "PASS: packaged controller, operator grant/release, protected cleanup, events, and metrics (synthetic agent evidence)\nPASS: opt-in RBAC/admission, bound agent isolation, controller cleanup, and operator/status protection\n",
+      "result": "PASS"
+    },
+    "success-and-expiry": {
+      "acquisitionSeconds": 30.528,
+      "after": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "afterSidecarCgroup": {
+        "cgroup": "0::/\n",
+        "cpuStat": "usage_usec 1734498\nuser_usec 1597762\nsystem_usec 136735\nnice_usec 0\nnr_periods 0\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+        "memoryCurrentBytes": 118603776
+      },
+      "afterWorkload": {
+        "buildMillis": 7,
+        "checksum": 48136769973160,
+        "elapsedMillis": 54783,
+        "entries": 120000,
+        "heapCommittedBytes": 39845888,
+        "heapUsedBytes": 39845888,
+        "javaVersion": "21.0.13",
+        "preparedRuns": 2,
+        "retainedMiB": 0,
+        "rssBytes": 188112896,
+        "running": false,
+        "runs": 2,
+        "scanPasses": 8310,
+        "softMaxBytes": 67108864
+      },
+      "agentRestartsBefore": 0,
+      "before": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "320Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "competitor": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:18:04.468587876Z",
+            "message": "ExistingCorrelatedIntent",
+            "reason": "ExistingCorrelatedIntent",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "phase": "Rejected"
+      },
+      "completed": {
+        "acquisitionDeadline": "2026-11-07T16:19:31Z",
+        "appliedHeapTarget": "67108864",
+        "appliedLimit": "335544320",
+        "appliedRequest": "134217728",
+        "completedAt": "2026-11-07T16:19:27.163174470Z",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:18:57.090050220Z",
+            "message": "WorkFinished",
+            "reason": "WorkFinished",
+            "status": "True",
+            "type": "WorkFinished"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:19:27.163174470Z",
+            "message": "Applied",
+            "reason": "Applied",
+            "status": "True",
+            "type": "Released"
+          },
+          {
+            "lastTransitionTime": "2026-11-07T16:19:27.163174470Z",
+            "message": "Completed",
+            "reason": "Completed",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "executionDeadline": "2026-11-07T16:18:46.379800513Z",
+        "grantedAt": "2026-11-07T16:18:01.379800513Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Completed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 1,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.Y2ZlZGZiMzUtMWU3Yy0zZmE4LWI2MDQtNTRlMTFmNjI3NGY4.YTM3N2I3OTctYTVhNi00NjM3LTk2NWQtMGM5N2M0NDQ1ZGM5.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovLzBlZDAwMjEyNjQ1YjczODdhMDliNWE5YzAwM2NlYjVlNDc1NTk1YTY0ZjExZWM0M2VhNzBmNTZmZTg0MThlZWQ.MTM0MjE3NzI4.MzM1NTQ0MzIw.NjcxMDg4NjQ",
+        "releaseBaselineTransitionId": "81185fa6-2d08-36db-a937-e6bd560b7597",
+        "requestFloor": "268435456",
+        "transitionId": "cfedfb35-1e7c-3fa8-b604-54e11f6274f8"
+      },
+      "controllerGenerationBeforeRestart": 1,
+      "crossedAllocation": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "300Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "durationSeconds": 127.858,
+      "emergencyAllocation": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "704Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "300Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "expired": {
+        "acquisitionDeadline": "2026-11-07T16:19:31Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:18:55.835707719Z",
+            "message": "ExecutionExpired",
+            "reason": "ExecutionExpired",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "executionDeadline": "2026-11-07T16:18:46.379800513Z",
+        "grantedAt": "2026-11-07T16:18:01.379800513Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Expired",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 1,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.ODExODVmYTYtMmQwOC0zNmRiLWE5MzctZTZiZDU2MGI3NTk3.YTM3N2I3OTctYTVhNi00NjM3LTk2NWQtMGM5N2M0NDQ1ZGM5.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovLzBlZDAwMjEyNjQ1YjczODdhMDliNWE5YzAwM2NlYjVlNDc1NTk1YTY0ZjExZWM0M2VhNzBmNTZmZTg0MThlZWQ.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "81185fa6-2d08-36db-a937-e6bd560b7597"
+      },
+      "grant": {
+        "acquisitionDeadline": "2026-11-07T16:19:31Z",
+        "appliedHeapTarget": "402653184",
+        "appliedLimit": "671088640",
+        "appliedRequest": "268435456",
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-07T16:18:01.379800513Z",
+            "message": "Prepared",
+            "reason": "Prepared",
+            "status": "True",
+            "type": "Ready"
+          }
+        ],
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "executionDeadline": "2026-11-07T16:18:46.379800513Z",
+        "grantedAt": "2026-11-07T16:18:01.379800513Z",
+        "heapTarget": "402653184",
+        "limitFloor": "671088640",
+        "maxDuration": "PT45S",
+        "observedGeneration": 1,
+        "phase": "Granted",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "policyGeneration": 1,
+        "policyUid": "f30ace13-f764-422d-b9d1-1a2c921edf08",
+        "preparedIntent": "v1.MzJhYjExYWEtZjY5OC00ZGQzLWFhODktNzgxOTllZDk4YTc2.YTM3N2I3OTctYTVhNi00NjM3LTk2NWQtMGM5N2M0NDQ1ZGM5.MjFhOGJhZTUtNDY1OC00ZjA1LWI2OTItYWVmMzIyM2ViOGE1.YXBw.Y29udGFpbmVyZDovLzBlZDAwMjEyNjQ1YjczODdhMDliNWE5YzAwM2NlYjVlNDc1NTk1YTY0ZjExZWM0M2VhNzBmNTZmZTg0MThlZWQ.MjY4NDM1NDU2.NjcxMDg4NjQw.NDAyNjUzMTg0",
+        "requestFloor": "268435456",
+        "transitionId": "32ab11aa-f698-4dd3-aa89-78199ed98a76"
+      },
+      "grantedAllocation": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "256Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "grantedSidecarCgroup": {
+        "cgroup": "0::/\n",
+        "cpuStat": "usage_usec 1266342\nuser_usec 1166502\nsystem_usec 99840\nnice_usec 0\nnr_periods 0\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+        "memoryCurrentBytes": 123035648
+      },
+      "grantedWorkload": {
+        "buildMillis": 33,
+        "checksum": 48136769973160,
+        "elapsedMillis": 2042,
+        "entries": 120000,
+        "heapCommittedBytes": 46137344,
+        "heapUsedBytes": 46137344,
+        "javaVersion": "21.0.13",
+        "preparedRuns": 1,
+        "retainedMiB": 0,
+        "rssBytes": 185753600,
+        "running": false,
+        "runs": 1,
+        "scanPasses": 301,
+        "softMaxBytes": 402653184
+      },
+      "heldAllocation": {
+        "containerId": "containerd://0ed00212645b7387a09b5a9c003ceb5e475595a64f11ec43ea70f56fe8418eed",
+        "podUid": "21a8bae5-4658-4f05-b692-aef3223eb8a5",
+        "resources": {
+          "limits": {
+            "memory": "640Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "256Mi"
+          }
+        },
+        "restartCount": 0
+      },
+      "queryLatencyMillis": [
+        5.874,
+        3.558,
+        2.474,
+        2.555,
+        2.496,
+        2.674,
+        2.372,
+        1.97,
+        1.671,
+        1.59
+      ],
+      "result": "PASS",
+      "workload": {
+        "buildMillis": 7,
+        "checksum": 48136769973160,
+        "elapsedMillis": 54783,
+        "entries": 120000,
+        "heapCommittedBytes": 54525952,
+        "heapUsedBytes": 54525952,
+        "javaVersion": "21.0.13",
+        "preparedRuns": 2,
+        "retainedMiB": 0,
+        "rssBytes": 188571648,
+        "running": false,
+        "runs": 2,
+        "scanPasses": 8310,
+        "softMaxBytes": 402653184
+      }
+    }
+  },
+  "startedAt": "2026-11-07T16:15:57.453141+00:00"
+}
