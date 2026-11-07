@@ -11,6 +11,12 @@ lowers the Pod's resource footprint — reclaiming idle infrastructure without
 killing the pod, dropping its warm state, or risking your high-availability
 posture.
 
+Warden also has an **experimental Boost** path for temporarily increasing a pod's memory
+headroom for operator-approved work, such as an index rebuild. It prepares the allocation and
+JVM before recording a grant, then returns to the current policy target after completion.
+See [Warden Boost](docs/warden-boost.md) for its current capabilities and security limits.
+Scheduled right-sizing remains usable without creating a Boost request.
+
 ---
 
 ## The gap Warden fills
@@ -185,12 +191,15 @@ if you're working on the charts themselves.)
 helm install warden warden/warden
 ```
 
-This is the one-shot, cluster-wide install: it applies the `WardenPolicy` CRD (once — Helm's
-`crds/` directory is never touched again by `helm upgrade`, see `charts/warden/crds/`), a
-`ClusterRole`/`ClusterRoleBinding` scoped to exactly what the controller reads and writes (watch
-`WardenPolicy`, patch its `status`, read `Deployment`/`StatefulSet`, read/patch `Pod`
-annotations), and the controller `Deployment` itself (hardcoded to `replicas: 1` — there's no
-leader election yet, so a second replica would double-reconcile every policy).
+This cluster-wide install includes the `WardenPolicy` and `WardenBoost` CRDs, controller RBAC,
+and the controller Deployment. The controller runs one replica with a `Recreate` rollout;
+there is no leader election yet. Helm does not update installed CRDs on `helm upgrade`.
+Existing installations must apply the updated CRDs before upgrading the controller; see the
+[upgrade notes](docs/warden-boost.md#upgrading-an-existing-installation). The chart update can
+briefly stop the controller during rollout.
+
+The controller can watch and patch Boost requests and their status as well as policy status and
+Pod annotations. See the [RBAC mapping](docs/rbac-mapping.md) for the exact permissions.
 
 Values worth knowing (`charts/warden/values.yaml`):
 
@@ -295,12 +304,19 @@ Maven Central), and the full schedule → shrink/grow → verify flow works end 
 cluster. It has not yet been battle-tested under production load, and APIs may still change —
 issues and feedback welcome.
 
+**Boost is experimental.** Admission, claims, grant and release reconciliation are implemented,
+but hardened request/acknowledgement permissions and a full deployed JVM acceptance flow are
+still in progress. There is no application-facing Boost API or Java lease client yet. Use the
+[Boost guide](docs/warden-boost.md) for trusted, controlled evaluation.
+
 ## Requirements
 
 - Kubernetes **1.35+** (in-place Pod resize is GA; on earlier versions it needs the
   `InPlacePodVerticalScaling` feature gate)
 - A JVM with runtime-tunable heap commit: **ZGC**, **Shenandoah**, or **G1**
-  with periodic GC enabled
+  with periodic GC enabled. Boost's explicit heap target additionally requires runtime
+  `SoftMaxHeapSize` support (ZGC or Shenandoah); the existing G1 scheduled-resize path remains
+  available.
 - Cluster Autoscaler (or equivalent node consolidation) to realize cost savings
   from reduced requests
 
