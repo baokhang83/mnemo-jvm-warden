@@ -83,17 +83,20 @@ public final class IntentEmitter {
   }
 
   private static void annotate(KubernetesClient client, String namespace, String podName, long requestBytes, long limitBytes) {
-    client
-        .pods()
-        .inNamespace(namespace)
-        .withName(podName)
-        .edit(
-            (Pod pod) ->
-                new PodBuilder(pod)
-                    .editMetadata()
-                    .addToAnnotations(ANNOTATION_REQUEST_BYTES, String.valueOf(requestBytes))
-                    .addToAnnotations(ANNOTATION_LIMIT_BYTES, String.valueOf(limitBytes))
-                    .endMetadata()
-                    .build());
+    client.pods().inNamespace(namespace).withName(podName)
+        .edit(pod -> applyScheduled(pod, requestBytes, limitBytes));
+  }
+
+  /** Keep the correlated target intact until the Boost lifecycle safely releases it. */
+  static Pod applyScheduled(Pod pod, long requestBytes, long limitBytes) {
+    var annotations = pod.getMetadata().getAnnotations();
+    if (annotations != null && annotations.containsKey(
+        io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION)) {
+      return pod;
+    }
+    return new PodBuilder(pod).editMetadata()
+        .addToAnnotations(ANNOTATION_REQUEST_BYTES, String.valueOf(requestBytes))
+        .addToAnnotations(ANNOTATION_LIMIT_BYTES, String.valueOf(limitBytes))
+        .endMetadata().build();
   }
 }
