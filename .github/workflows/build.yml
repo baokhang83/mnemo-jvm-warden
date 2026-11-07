@@ -27,13 +27,14 @@ jobs:
 
       - name: Check charts/warden/crds is in sync with the generated CRD
         run: |
-          diff -u charts/warden/crds/wardenpolicy-crd.yaml \
-                  warden-crd-model/target/classes/META-INF/fabric8/wardenpolicies.warden.mnemo.io-v1.yml || {
-            echo "::error::charts/warden/crds/wardenpolicy-crd.yaml is stale — regenerate it from" \
-                 "warden-crd-model/target/classes/META-INF/fabric8/wardenpolicies.warden.mnemo.io-v1.yml" \
-                 "(mvn -pl warden-crd-model process-classes) and commit the copy."
-            exit 1
-          }
+          for resource in wardenpolicy wardenboost; do
+            if [ "$resource" = wardenpolicy ]; then plural=wardenpolicies; else plural=wardenboosts; fi
+            diff -u "charts/warden/crds/${resource}-crd.yaml" \
+                    "warden-crd-model/target/classes/META-INF/fabric8/${plural}.warden.mnemo.io-v1.yml" || {
+              echo "::error::${resource} CRD is stale; regenerate with mvn -pl warden-crd-model process-classes and copy into charts/warden/crds."
+              exit 1
+            }
+          done
 
       - name: Generate JaCoCo badge
         uses: cicirello/jacoco-badge-generator@v2

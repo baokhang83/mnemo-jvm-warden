@@ -12,7 +12,7 @@
 
   <artifactId>warden-crd-model</artifactId>
   <name>warden-crd-model</name>
-  <description>Java model of the WardenPolicy custom resource. No internal dependencies.</description>
+  <description>Java models of WardenPolicy and WardenBoost custom resources. No internal dependencies.</description>
 
   <dependencies>
     <dependency>
