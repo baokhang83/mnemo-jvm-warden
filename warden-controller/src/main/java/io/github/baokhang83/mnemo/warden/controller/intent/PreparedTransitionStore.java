@@ -68,9 +68,18 @@ public final class PreparedTransitionStore {
     WardenBoost saved = prepare(client, observed, intent);
     var latest = client.resources(WardenBoost.class).inNamespace(saved.getMetadata().getNamespace())
         .withName(saved.getMetadata().getName()).get();
-    if (latest == null || !current(latest).equals(intent))
-      throw new IllegalStateException("prepared transition was superseded before publication");
+    requireUnchanged(saved, latest, intent);
     pods.patch(PatchContext.of(PatchType.JSON), patch);
+  }
+
+  /** Fail closed on any intervening lifecycle or status change, even when target bytes match. */
+  static void requireUnchanged(WardenBoost saved, WardenBoost latest, ResizeIntent intent) {
+    if (latest == null || latest.getMetadata() == null || saved.getMetadata() == null
+        || !Objects.equals(saved.getMetadata().getUid(), latest.getMetadata().getUid())
+        || saved.getMetadata().getResourceVersion() == null
+        || !saved.getMetadata().getResourceVersion().equals(latest.getMetadata().getResourceVersion())
+        || !current(latest).equals(intent))
+      throw new IllegalStateException("prepared transition was superseded before publication");
   }
 
   /** Fail closed on missing, stale, or partially persisted evidence. */
