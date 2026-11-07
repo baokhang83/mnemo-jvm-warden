@@ -1,8 +1,8 @@
 # Correlated resize transport (B3)
 
-B3 adds the transport and evidence path used by later Boost reconciliation. It does not
-watch WardenBoost requests, grant leases, resolve active floors, or enable application work.
-Admission and grant lifecycle remain B5–B6; B4 resolves and persists targets for admitted requests. Ordinary scheduled intent uses the existing two annotations.
+B3 introduced the transport and evidence path. B4 resolves admitted floors, and B5
+reconciles request admission and grants. B6 still needs to harden the request and evidence
+paths for untrusted callers. Ordinary scheduled intent uses the existing two annotations.
 
 ## Shared wire contract
 
@@ -27,8 +27,8 @@ noncanonical base64, missing identities, invalid quantities, and invalid timesta
 
 The producer supplies a durable transition ID. Repeated emission must reuse it. A new
 request or transition must get a new identity even when its numeric targets are unchanged.
-Acknowledgements are evidence, not a grant. B5 will validate deadlines and lifecycle before
-recording permission in WardenBoost status.
+Acknowledgements are evidence, not a grant. The B5 reconciler checks deadlines and lifecycle
+before recording permission in WardenBoost status.
 
 ## Controller boundary
 
@@ -38,9 +38,8 @@ intent and legacy target annotations to agree, the acknowledgement to match that
 and current applied container resources to equal the acknowledged allocation.
 
 Desired pod spec, WardenPolicy.currentProfile, absent status, a stopped/replaced container,
-and a stale acknowledgement cannot satisfy the evidence reader. B4/B5 must resolve ownership
-and authorization before calling the emitter; B3 does not wire a second competing intent
-writer into the normal policy reconciler.
+and a stale acknowledgement cannot satisfy the evidence reader. B5 validates target ownership
+before admission; the existing policy reconciler remains the sole intent writer.
 
 ## Agent preparation
 
@@ -139,8 +138,8 @@ The two-resource handoff still requires serialized target ownership: a later sta
 can race between the final status read and the pod patch. Consumers must compare evidence
 against current status and must not infer a grant from a pod patch. The Helm controller role
 can list/get WardenBoosts and patch their status; those permissions are cluster-wide, with
-normal resolution restricted to the policy namespace. B5 still owns exclusive claim creation,
-status-authoritative grants, and final completion.
+normal resolution restricted to the policy namespace. B5 implements exclusive claims,
+status-authoritative grants, and completion.
 A release target is eligible only when the controller records WorkFinished=True; otherwise
 the floor remains active. During a release, shrink veto compares both target dimensions to
 actual container resources. The existing agent performs the verified shrink sequence.
@@ -171,3 +170,56 @@ preserves the last target's non-heap allowance and refuses a target too small fo
 The schema bounds policies to 64 profiles and 32 Boost definitions for CEL validation cost.
 A policy above either bound requires revision before CRD upgrade. Helm does not update
 CRDs in its `crds/` directory during upgrade; apply the updated policy CRD explicitly.
+
+## B5 lifecycle and target claims
+
+The Boost reconciler requires each target Pod to opt in to its policy by carrying the
+`warden.mnemo.io/policy-uid` label with the current WardenPolicy UID. It also verifies that
+the Pod is selected by the referenced policy, that its UID matches the request, and that the
+named application container is running. This label is an operational ownership marker;
+cluster permissions must prevent untrusted workloads from setting it or forging status and
+acknowledgements. Production admission packaging remains B6/M8 work.
+
+A compare-and-set claim on the Pod serializes admission. This implementation permits one
+active Boost per Pod, including when it has multiple application containers. A finalizer is
+installed before reconciliation. A crash after the claim and before the admission snapshot is
+persisted is retried by the same request; the policy writer holds ordinary writes during that
+gap. The snapshot records the policy and container identities, resource floors, acquisition
+deadline, and execution duration. Policy changes during preparation fail that acquisition;
+active grants retain the admitted floor.
+
+Preparing becomes Granted only with an acknowledgement for the current persisted transition,
+matching the bound Pod and container and applied resources, before the acquisition deadline
+and outside blackout. The grant names a specific instance; consumers must not reuse it after
+that instance changes. Resource status and Pod status are distinct API objects, so they cannot
+be read and updated as one atomic Kubernetes transaction. A later reconciliation detects an
+instance change; admission and acknowledgement authentication are required before enabling
+untrusted requesters.
+
+Completion records `WorkFinished` and a release baseline. The policy writer computes the
+current policy target and creates a fresh transition even if its quantities are unchanged;
+only matching fresh evidence can complete release. A failed acquisition that never granted
+permission is cleaned up through the same guarded release path. Expiry of granted work holds
+the floor until explicit completion. Deleting an active request does not imply completion;
+the finalizer retains it until safe cleanup or the bound Pod disappears. Force-removing a
+finalizer bypasses that protection. If the policy disappears, release remains pending for
+operator recovery. Pod/container replacement is recorded as orphaning; a replacement cannot
+inherit the old request's permission.
+
+The Helm controller now watches and patches WardenBoost resources in addition to status.
+Upgrade the WardenBoost CRD explicitly before upgrading the controller: Helm does not update
+existing CRDs automatically. The acceptance probes in `deploy/verify-boost-claim.py`,
+`deploy/verify-boost-lifecycle.py`, and `deploy/verify-boost-operator.py` require a disposable
+Kubernetes cluster. The lifecycle probe supplies synthetic acknowledgement evidence; it does
+not prove real JVM preparation, agent identity enforcement, or production security. B6 and B7
+cover the hardened request flow and end-to-end deployed JVM acceptance respectively.
+
+Because the controller does not currently use leader election, the Helm Deployment uses one
+replica and a `Recreate` rollout. New admissions and grants require the configured controller
+Deployment to report one replica and the `Recreate` strategy. The chart supplies its name and
+namespace through `WARDEN_CONTROLLER_DEPLOYMENT` and `WARDEN_CONTROLLER_NAMESPACE`; a custom
+installation must provide those variables and equivalent Deployment configuration. If the
+check fails or its API lookup is unavailable, new permission is held; existing Boost floors
+and guarded release remain in effect. Do not run additional controller instances outside that
+Deployment. Moving to highly available controller replicas requires leader election and its
+own deployment and concurrency tests.

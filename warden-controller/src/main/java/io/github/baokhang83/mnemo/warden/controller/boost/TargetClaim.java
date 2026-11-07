@@ -42,6 +42,27 @@ public final class TargetClaim {
         .patch(PatchContext.of(PatchType.JSON), patch.toString());
   }
 
+  /** Clear a completed request's protocol annotations and claim in one fenced pod patch. */
+  public static void finish(KubernetesClient client, Pod pod, String requestUid, String expectedIntent) {
+    if (!requestUid.equals(owner(pod))) throw new IllegalStateException("claim ownership changed");
+    var annotations = pod.getMetadata().getAnnotations();
+    String actual = annotations.get(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION);
+    if (actual != null && !actual.equals(expectedIntent)) throw new IllegalStateException("intent changed");
+    StringBuilder patch = preconditions(pod).append(",{\"op\":\"test\",\"path\":")
+        .append(JsonString.quote(PATH)).append(",\"value\":").append(JsonString.quote(requestUid)).append("}");
+    if (actual != null) {
+      String path = "/metadata/annotations/warden.mnemo.io~1resize-intent";
+      patch.append(",{\"op\":\"test\",\"path\":").append(JsonString.quote(path))
+          .append(",\"value\":").append(JsonString.quote(actual)).append("}")
+          .append(",{\"op\":\"remove\",\"path\":").append(JsonString.quote(path)).append("}");
+    }
+    if (annotations.containsKey(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ACK_ANNOTATION))
+      patch.append(",{\"op\":\"remove\",\"path\":\"/metadata/annotations/warden.mnemo.io~1resize-ack\"}");
+    patch.append(",{\"op\":\"remove\",\"path\":").append(JsonString.quote(PATH)).append("}]");
+    client.pods().inNamespace(pod.getMetadata().getNamespace()).withName(pod.getMetadata().getName())
+        .patch(PatchContext.of(PatchType.JSON), patch.toString());
+  }
+
   private static StringBuilder preconditions(Pod pod) {
     var meta = Objects.requireNonNull(pod.getMetadata());
     return new StringBuilder("[{\"op\":\"test\",\"path\":\"/metadata/uid\",\"value\":")

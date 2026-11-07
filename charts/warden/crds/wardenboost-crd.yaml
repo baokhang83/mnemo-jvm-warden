@@ -107,6 +107,8 @@ spec:
                 type: "string"
               limitFloor:
                 type: "string"
+              maxDuration:
+                type: "string"
               observedGeneration:
                 type: "integer"
               phase:
@@ -129,6 +131,8 @@ spec:
                 type: "string"
               preparedIntent:
                 maxLength: 8192
+                type: "string"
+              releaseBaselineTransitionId:
                 type: "string"
               requestFloor:
                 type: "string"

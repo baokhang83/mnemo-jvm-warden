@@ -138,7 +138,8 @@ public final class IntentEmitter {
           && b.getStatus() != null && b.getStatus().getPhase() != null
           && b.getStatus().getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Pending
           && b.getStatus().getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Rejected
-          && !(b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Completed
+          && !((b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Completed
+              || b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Orphaned)
               && b.getStatus().getConditions() != null && b.getStatus().getConditions().stream()
                   .anyMatch(c -> "Released".equals(c.getType()) && "True".equals(c.getStatus()))))
           .toList();
@@ -149,9 +150,15 @@ public final class IntentEmitter {
         if (claim != null && !claim.equals(boost.getMetadata().getUid())) return;
         if (encoded == null) {
           // A durable intent can survive a crash before the first pod annotation.
-          if (boost.getStatus().getPreparedIntent() == null
-              || !policy.getMetadata().getUid().equals(boost.getStatus().getPolicyUid())
+          if (!policy.getMetadata().getUid().equals(boost.getStatus().getPolicyUid())
               || !policy.getMetadata().getName().equals(boost.getSpec().getPolicyRef())) return;
+          if (boost.getStatus().getPreparedIntent() == null) {
+            // Only the policy writer can construct the first intent, so it includes the
+            // current schedule/emergency target. Unknown prior heap requires quiet traffic.
+            if (!shrinkAllowed) return;
+            prepareInitial(client, observed, boost, policy, requestBytes, limitBytes, profileHeap, scheduledFloor);
+            return;
+          }
           var prepared = PreparedTransitionStore.current(boost);
           if (!shrinkAllowed && reducesObserved(observed, prepared, prepared.requestBytes(), prepared.limitBytes())) return;
           PreparedTransitionStore.prepareAndPublish(client, boost, prepared);
@@ -183,6 +190,37 @@ public final class IntentEmitter {
     patch.append("]");
     resource.patch(io.fabric8.kubernetes.client.dsl.base.PatchContext.of(
         io.fabric8.kubernetes.client.dsl.base.PatchType.JSON), patch.toString());
+  }
+
+  private static void prepareInitial(KubernetesClient client, Pod pod, WardenBoost boost,
+      WardenPolicy policy, long request, long limit, String profileHeap, ResourceProfile scheduledFloor) {
+    var status = boost.getStatus();
+    if (status.getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Preparing) return;
+    var floor = AdmittedBoostFloor.read(boost, policy.getMetadata().getUid(), pod.getMetadata().getUid(),
+        boost.getSpec().getContainer(), status.getContainerId()).orElseThrow();
+    if (pod.getStatus() == null || pod.getStatus().getContainerStatuses() == null) return;
+    var container = pod.getStatus().getContainerStatuses().stream().filter(c ->
+        boost.getSpec().getContainer().equals(c.getName()) && status.getContainerId().equals(c.getContainerID())
+        && c.getState() != null && c.getState().getRunning() != null).findFirst();
+    if (container.isEmpty() || container.get().getResources() == null
+        || container.get().getResources().getRequests() == null || container.get().getResources().getLimits() == null
+        || container.get().getResources().getRequests().get("memory") == null
+        || container.get().getResources().getLimits().get("memory") == null) return;
+    request = Math.max(Math.max(request, floor.memory().request()),
+        ResourceQuantity.parseBytes(container.get().getResources().getRequests().get("memory").toString()));
+    limit = Math.max(Math.max(limit, floor.memory().limit()),
+        ResourceQuantity.parseBytes(container.get().getResources().getLimits().get("memory").toString()));
+    long heap = Math.max(floor.heapBytes(), profileHeap == null ? 0 : ResourceQuantity.parseBytes(profileHeap));
+    if (scheduledFloor != null) {
+      request = Math.max(request, ResourceQuantity.parseBytes(scheduledFloor.getRequest()));
+      limit = Math.max(limit, ResourceQuantity.parseBytes(scheduledFloor.getLimit()));
+      if (scheduledFloor.getHeapTarget() != null)
+        heap = Math.max(heap, ResourceQuantity.parseBytes(scheduledFloor.getHeapTarget()));
+    }
+    if (heap >= limit) return;
+    var intent = new ResizeIntent(java.util.UUID.randomUUID().toString(), boost.getMetadata().getUid(),
+        pod.getMetadata().getUid(), boost.getSpec().getContainer(), status.getContainerId(), request, limit, heap);
+    PreparedTransitionStore.prepareAndPublish(client, boost, intent);
   }
 
   /** Fail closed if the admitted request or its exact bound pod instance cannot be proven. */
@@ -249,7 +287,8 @@ public final class IntentEmitter {
     }
     if (!shrinkAllowed && heldHeap < existing.heapBytes()) return;
     if (heldRequest == existing.requestBytes() && heldLimit == existing.limitBytes()
-        && heldHeap == existing.heapBytes()) return;
+        && heldHeap == existing.heapBytes()
+        && !(releasing && existing.transitionId().equals(boost.getStatus().getReleaseBaselineTransitionId()))) return;
     String seed = existing.encode() + ":" + heldRequest + ":" + heldLimit + ":" + heldHeap;
     String transition = java.util.UUID.nameUUIDFromBytes(seed.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
     var next = new ResizeIntent(transition, existing.requestUid(), existing.podUid(), existing.containerName(),

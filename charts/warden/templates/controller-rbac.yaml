@@ -21,7 +21,7 @@ rules:
   # Correlated policy writes resolve and update the admitted Boost transition.
   - apiGroups: ["warden.mnemo.io"]
     resources: ["wardenboosts"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch", "patch"]
   - apiGroups: ["warden.mnemo.io"]
     resources: ["wardenboosts/status"]
     verbs: ["get", "patch"]
