@@ -81,29 +81,45 @@ public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {
 <span class="nc" id="L81">    Optional&lt;String&gt; emergencyGrowProfile = Optional.empty();</span>
 <span class="nc" id="L82">    Optional&lt;String&gt; scheduleCandidate = Optional.empty();</span>
 <span class="nc" id="L83">    boolean shrinkVetoed = false;</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">    if (!blackedOut) {</span>
-<span class="nc" id="L85">      emergencyGrowProfile = EmergencyGrowEvaluator.emergencyProfile(policy.getSpec(), metricValue);</span>
-<span class="nc bnc" id="L86" title="All 2 branches missed.">      if (emergencyGrowProfile.isEmpty()) {</span>
-<span class="nc" id="L87">        scheduleCandidate = ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now);</span>
-<span class="nc" id="L88">        shrinkVetoed =</span>
-<span class="nc bnc" id="L89" title="All 2 branches missed.">            scheduleCandidate.isPresent()</span>
-<span class="nc bnc" id="L90" title="All 2 branches missed.">                &amp;&amp; ShrinkVetoEvaluator.vetoesShrink(</span>
-<span class="nc" id="L91">                    policy.getSpec(), previousProfile, scheduleCandidate.get(), metricValue);</span>
+<span class="nc" id="L84">    boolean correlatedScheduleUnavailable = false;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    if (!blackedOut) {</span>
+<span class="nc" id="L86">      emergencyGrowProfile = EmergencyGrowEvaluator.emergencyProfile(policy.getSpec(), metricValue);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">      if (emergencyGrowProfile.isEmpty()) {</span>
+<span class="nc" id="L88">        scheduleCandidate = ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now);</span>
+<span class="nc" id="L89">        shrinkVetoed =</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            scheduleCandidate.isPresent()</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                &amp;&amp; ShrinkVetoEvaluator.vetoesShrink(</span>
+<span class="nc" id="L92">                    policy.getSpec(), previousProfile, scheduleCandidate.get(), metricValue);</span>
+      } else {
+        // Legacy workloads keep emergency precedence. Correlated workloads also need the
+        // scheduled floor, since resource profiles can be crossed component-wise.
+        try {
+<span class="nc" id="L97">          scheduleCandidate = ScheduleEvaluator.currentProfileWithLeadTime(policy.getSpec(), now);</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">          if (scheduleCandidate.isPresent() &amp;&amp; (policy.getSpec().getProfiles() == null</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">              || !policy.getSpec().getProfiles().containsKey(scheduleCandidate.get())))</span>
+<span class="nc" id="L100">            correlatedScheduleUnavailable = true;</span>
+<span class="nc" id="L101">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L102">          correlatedScheduleUnavailable = true;</span>
+<span class="nc" id="L103">          log.warn(&quot;could not evaluate scheduled floor for correlated emergency target; holding Boost targets&quot;, e);</span>
+<span class="nc" id="L104">        }</span>
       }
     }
 
-<span class="nc" id="L95">    Optional&lt;String&gt; resolved = PrecedenceEngine.resolve(blackedOut, emergencyGrowProfile, scheduleCandidate, shrinkVetoed);</span>
-<span class="nc bnc" id="L96" title="All 2 branches missed.">    if (resolved.isPresent()) {</span>
-<span class="nc" id="L97">      applyResolvedProfile(policy, context, resolved.get(), emergencyGrowProfile.isPresent(), metricValue);</span>
-<span class="nc bnc" id="L98" title="All 2 branches missed.">    } else if (shrinkVetoed) {</span>
-<span class="nc" id="L99">      log.info(</span>
+<span class="nc" id="L108">    Optional&lt;String&gt; resolved = PrecedenceEngine.resolve(blackedOut, emergencyGrowProfile, scheduleCandidate, shrinkVetoed);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">    if (resolved.isPresent()) {</span>
+<span class="nc" id="L110">      applyResolvedProfile(policy, context, resolved.get(), emergencyGrowProfile.isPresent(), metricValue, scheduleCandidate, correlatedScheduleUnavailable);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">    } else if (shrinkVetoed) {</span>
+      // The merged Boost floor may turn a profile-level shrink into a grow.
+      // Evaluate it per pod while preserving the legacy policy-wide veto.
+<span class="nc" id="L114">      emitIntent(policy, context, scheduleCandidate.orElseThrow(), metricValue, Optional.empty(), false, true);</span>
+<span class="nc" id="L115">      log.info(</span>
           &quot;guardrail vetoed shrink for WardenPolicy {}/{}: metric={} not verified below shrinkBelow, staying on {}&quot;,
-<span class="nc" id="L101">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L102">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L117">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L118">          policy.getMetadata().getName(),</span>
           metricValue,
           previousProfile);
     }
-<span class="nc" id="L106">    return UpdateControl.patchStatus(policy);</span>
+<span class="nc" id="L122">    return UpdateControl.patchStatus(policy);</span>
   }
 
   private void applyResolvedProfile(
@@ -111,33 +127,38 @@ public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {
       Context&lt;WardenPolicy&gt; context,
       String resolvedProfile,
       boolean isEmergencyGrow,
-      Double metricValue) {
-<span class="nc" id="L115">    ensureStatus(policy);</span>
-<span class="nc bnc" id="L116" title="All 2 branches missed.">    if (isEmergencyGrow) {</span>
-<span class="nc" id="L117">      log.info(</span>
+      Double metricValue, Optional&lt;String&gt; scheduleCandidate, boolean correlatedScheduleUnavailable) {
+<span class="nc" id="L131">    ensureStatus(policy);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">    if (isEmergencyGrow) {</span>
+<span class="nc" id="L133">      log.info(</span>
           &quot;guardrail forced emergency grow for WardenPolicy {}/{}: metric={} exceeds emergencyGrowAbove, growing to {}&quot;,
-<span class="nc" id="L119">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L120">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L135">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L136">          policy.getMetadata().getName(),</span>
           metricValue,
           resolvedProfile);
     }
-<span class="nc" id="L124">    policy.getStatus().setCurrentProfile(resolvedProfile);</span>
-<span class="nc" id="L125">    emitIntent(policy, context, resolvedProfile);</span>
-<span class="nc" id="L126">  }</span>
+<span class="nc" id="L140">    policy.getStatus().setCurrentProfile(resolvedProfile);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">    emitIntent(policy, context, resolvedProfile, metricValue, isEmergencyGrow ? scheduleCandidate : Optional.empty(), correlatedScheduleUnavailable, false);</span>
+<span class="nc" id="L142">  }</span>
 
-  private void emitIntent(WardenPolicy policy, Context&lt;WardenPolicy&gt; context, String currentProfile) {
+  private void emitIntent(WardenPolicy policy, Context&lt;WardenPolicy&gt; context, String currentProfile, Double metricValue, Optional&lt;String&gt; scheduleCandidate, boolean correlatedScheduleUnavailable, boolean legacyVetoed) {
     try {
       ResourceProfile profile =
-<span class="nc bnc" id="L131" title="All 2 branches missed.">          policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);</span>
-<span class="nc" id="L132">      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile);</span>
-<span class="nc" id="L133">    } catch (RuntimeException e) {</span>
-<span class="nc" id="L134">      log.warn(</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">          policy.getSpec().getProfiles() == null ? null : policy.getSpec().getProfiles().get(currentProfile);</span>
+<span class="nc" id="L148">      var guardrail = policy.getSpec().getGuardrail();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">      String threshold = guardrail == null ? null : guardrail.getShrinkBelow();</span>
+<span class="nc bnc" id="L150" title="All 6 branches missed.">      boolean shrinkAllowed = threshold == null || threshold.isBlank()</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">          || (metricValue != null &amp;&amp; Double.isFinite(metricValue) &amp;&amp; metricValue &lt; Double.parseDouble(threshold));</span>
+<span class="nc" id="L152">      ResourceProfile schedule = scheduleCandidate.map(name -&gt; policy.getSpec().getProfiles().get(name)).orElse(null);</span>
+<span class="nc" id="L153">      IntentEmitter.emit(context.getClient(), policy.getMetadata().getNamespace(), policy.getSpec().getTargetRef(), profile, policy, shrinkAllowed, schedule, correlatedScheduleUnavailable, legacyVetoed);</span>
+<span class="nc" id="L154">    } catch (RuntimeException e) {</span>
+<span class="nc" id="L155">      log.warn(</span>
           &quot;failed to emit intent for WardenPolicy {}/{} (status.currentProfile still updated): {}&quot;,
-<span class="nc" id="L136">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L137">          policy.getMetadata().getName(),</span>
-<span class="nc" id="L138">          e.getMessage());</span>
-<span class="nc" id="L139">    }</span>
-<span class="nc" id="L140">  }</span>
+<span class="nc" id="L157">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L158">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L159">          e.getMessage());</span>
+<span class="nc" id="L160">    }</span>
+<span class="nc" id="L161">  }</span>
 
   /**
    * Returns this reconcile's freshly evaluated metric value (also recorded to {@code
@@ -146,35 +167,35 @@ public class WardenPolicyReconciler implements Reconciler&lt;WardenPolicy&gt; {
    * quiet,&quot; not &quot;no reading needed.&quot;
    */
   private Double evaluateMetric(WardenPolicy policy) {
-<span class="nc bnc" id="L149" title="All 2 branches missed.">    if (config.prometheusUri().isEmpty()) {</span>
-<span class="nc" id="L150">      return null;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">    if (config.prometheusUri().isEmpty()) {</span>
+<span class="nc" id="L171">      return null;</span>
     }
-<span class="nc bnc" id="L152" title="All 2 branches missed.">    String promQl = policy.getSpec().getGuardrail() == null ? null : policy.getSpec().getGuardrail().getMetric();</span>
-<span class="nc bnc" id="L153" title="All 4 branches missed.">    if (promQl == null || promQl.isBlank()) {</span>
-<span class="nc" id="L154">      return null;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">    String promQl = policy.getSpec().getGuardrail() == null ? null : policy.getSpec().getGuardrail().getMetric();</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">    if (promQl == null || promQl.isBlank()) {</span>
+<span class="nc" id="L175">      return null;</span>
     }
     try {
-<span class="nc" id="L157">      OptionalDouble result = PrometheusMetricSource.query(httpClient, config.prometheusUri().get(), promQl);</span>
-<span class="nc bnc" id="L158" title="All 2 branches missed.">      if (result.isEmpty()) {</span>
-<span class="nc" id="L159">        return null;</span>
+<span class="nc" id="L178">      OptionalDouble result = PrometheusMetricSource.query(httpClient, config.prometheusUri().get(), promQl);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">      if (result.isEmpty()) {</span>
+<span class="nc" id="L180">        return null;</span>
       }
-<span class="nc" id="L161">      ensureStatus(policy);</span>
-<span class="nc" id="L162">      policy.getStatus().setCurrentMetricValue(result.getAsDouble());</span>
-<span class="nc" id="L163">      return result.getAsDouble();</span>
-<span class="nc" id="L164">    } catch (Exception e) {</span>
-<span class="nc" id="L165">      log.warn(</span>
+<span class="nc" id="L182">      ensureStatus(policy);</span>
+<span class="nc" id="L183">      policy.getStatus().setCurrentMetricValue(result.getAsDouble());</span>
+<span class="nc" id="L184">      return result.getAsDouble();</span>
+<span class="nc" id="L185">    } catch (Exception e) {</span>
+<span class="nc" id="L186">      log.warn(</span>
           &quot;failed to evaluate guardrail metric for WardenPolicy {}/{} (status.currentProfile still updated): {}&quot;,
-<span class="nc" id="L167">          policy.getMetadata().getNamespace(),</span>
-<span class="nc" id="L168">          policy.getMetadata().getName(),</span>
-<span class="nc" id="L169">          e.getMessage());</span>
-<span class="nc" id="L170">      return null;</span>
+<span class="nc" id="L188">          policy.getMetadata().getNamespace(),</span>
+<span class="nc" id="L189">          policy.getMetadata().getName(),</span>
+<span class="nc" id="L190">          e.getMessage());</span>
+<span class="nc" id="L191">      return null;</span>
     }
   }
 
   private static void ensureStatus(WardenPolicy policy) {
-<span class="nc bnc" id="L175" title="All 2 branches missed.">    if (policy.getStatus() == null) {</span>
-<span class="nc" id="L176">      policy.setStatus(new WardenPolicyStatus());</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">    if (policy.getStatus() == null) {</span>
+<span class="nc" id="L197">      policy.setStatus(new WardenPolicyStatus());</span>
     }
-<span class="nc" id="L178">  }</span>
+<span class="nc" id="L199">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

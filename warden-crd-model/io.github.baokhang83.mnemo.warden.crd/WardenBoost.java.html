@@ -9,11 +9,11 @@ import io.fabric8.kubernetes.model.annotation.Version;
 /** A namespaced temporary-memory request. Only confirmed status may authorize work. */
 @Group(&quot;warden.mnemo.io&quot;)
 @Version(&quot;v1alpha1&quot;)
-<span class="nc" id="L12">public class WardenBoost extends CustomResource&lt;WardenBoostSpec, WardenBoostStatus&gt; implements Namespaced {</span>
+<span class="fc" id="L12">public class WardenBoost extends CustomResource&lt;WardenBoostSpec, WardenBoostStatus&gt; implements Namespaced {</span>
   @Override
   @Required
   public WardenBoostSpec getSpec() {
-<span class="nc" id="L16">    return super.getSpec();</span>
+<span class="fc" id="L16">    return super.getSpec();</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

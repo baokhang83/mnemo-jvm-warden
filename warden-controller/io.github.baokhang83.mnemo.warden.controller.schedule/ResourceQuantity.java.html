@@ -42,8 +42,8 @@ public final class ResourceQuantity {
 
   public static long parseBytes(String quantity) {
 <span class="fc" id="L44">    Matcher matcher = QUANTITY.matcher(quantity.trim());</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">    if (!matcher.matches()) {</span>
-<span class="nc" id="L46">      throw new IllegalArgumentException(&quot;not a recognized Quantity: &quot; + quantity);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">    if (!matcher.matches()) {</span>
+<span class="fc" id="L46">      throw new IllegalArgumentException(&quot;not a recognized Quantity: &quot; + quantity);</span>
     }
 
 <span class="fc" id="L49">    BigDecimal number = new BigDecimal(matcher.group(1));</span>

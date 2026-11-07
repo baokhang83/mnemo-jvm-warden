@@ -19,7 +19,7 @@ final class WireCodec {
   }
 
   static String[] decode(String encoded, int count) {
-<span class="pc bpc" id="L22" title="1 of 4 branches missed.">    if (encoded == null || encoded.length() &gt; 8192) throw new IllegalArgumentException(&quot;invalid protocol payload size&quot;);</span>
+<span class="fc bfc" id="L22" title="All 4 branches covered.">    if (encoded == null || encoded.length() &gt; 8192) throw new IllegalArgumentException(&quot;invalid protocol payload size&quot;);</span>
 <span class="fc" id="L23">    String[] parts = encoded.split(&quot;\\.&quot;, -1);</span>
 <span class="fc bfc" id="L24" title="All 4 branches covered.">    if (parts.length != count + 1 || !parts[0].equals(&quot;v1&quot;))</span>
 <span class="fc" id="L25">      throw new IllegalArgumentException(&quot;unsupported protocol version or field count&quot;);</span>
