@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WardenBoostSpec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-crd-model</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.crd</a> &gt; <span class="el_source">WardenBoostSpec.java</span></div><h1>WardenBoostSpec.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.crd;
+
+import io.fabric8.generator.annotation.Required;
+import io.fabric8.generator.annotation.Size;
+import io.fabric8.generator.annotation.ValidationRule;
+
+/** A request for a named boost; completion is monotonic. */
+<span class="nc" id="L8">public class WardenBoostSpec {</span>
+
+  @Required
+  @Size(min = 1, max = 253)
+  @ValidationRule(value = &quot;self == oldSelf&quot;, message = &quot;request identity is immutable&quot;)
+  private String policyRef;
+
+  @Required
+  @ValidationRule(value = &quot;self == oldSelf&quot;, message = &quot;request identity is immutable&quot;)
+  private BoostPodRef podRef;
+
+  @Required
+  @Size(min = 1, max = 253)
+  @ValidationRule(value = &quot;self == oldSelf&quot;, message = &quot;request identity is immutable&quot;)
+  private String container;
+
+  @Required
+  @Size(min = 1, max = 253)
+  @ValidationRule(value = &quot;self == oldSelf&quot;, message = &quot;request identity is immutable&quot;)
+  private String boost;
+
+  @Required
+  @io.fabric8.generator.annotation.Default(&quot;false&quot;)
+  @ValidationRule(value = &quot;!oldSelf || self&quot;, message = &quot;completionRequested cannot change from true to false&quot;)
+  private Boolean completionRequested;
+
+  public String getPolicyRef() {
+<span class="nc" id="L35">    return policyRef;</span>
+  }
+
+  public void setPolicyRef(String policyRef) {
+<span class="nc" id="L39">    this.policyRef = policyRef;</span>
+<span class="nc" id="L40">  }</span>
+
+  public BoostPodRef getPodRef() {
+<span class="nc" id="L43">    return podRef;</span>
+  }
+
+  public void setPodRef(BoostPodRef podRef) {
+<span class="nc" id="L47">    this.podRef = podRef;</span>
+<span class="nc" id="L48">  }</span>
+
+  public String getContainer() {
+<span class="nc" id="L51">    return container;</span>
+  }
+
+  public void setContainer(String container) {
+<span class="nc" id="L55">    this.container = container;</span>
+<span class="nc" id="L56">  }</span>
+
+  public String getBoost() {
+<span class="nc" id="L59">    return boost;</span>
+  }
+
+  public void setBoost(String boost) {
+<span class="nc" id="L63">    this.boost = boost;</span>
+<span class="nc" id="L64">  }</span>
+
+  public Boolean getCompletionRequested() {
+<span class="nc" id="L67">    return completionRequested;</span>
+  }
+
+  public void setCompletionRequested(Boolean completionRequested) {
+<span class="nc" id="L71">    this.completionRequested = completionRequested;</span>
+<span class="nc" id="L72">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
