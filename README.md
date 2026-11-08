@@ -4,7 +4,7 @@
 
 [![build](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml/badge.svg)](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml)
 [![coverage](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/refs/heads/gh-pages/badges/jacoco.svg)](https://baokhang83.github.io/mnemo-jvm-warden/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.baokhang83.mnemo/warden-boost-client?label=warden-boost-client)](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client)
+[![maven central](https://img.shields.io/maven-central/v/io.github.baokhang83.mnemo/warden-boost-client.svg?label=maven%20central)](https://central.sonatype.com/search?q=g:io.github.baokhang83.mnemo%20%20a:warden-boost-client)
 
 **JVM-aware vertical right-sizing for Kubernetes.** Warden makes a running JVM give memory
 back to the OS during predictable low-traffic windows, then safely lowers the Pod's resource
