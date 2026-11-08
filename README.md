@@ -4,6 +4,7 @@
 
 [![build](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml/badge.svg)](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml)
 [![coverage](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/refs/heads/gh-pages/badges/jacoco.svg)](https://baokhang83.github.io/mnemo-jvm-warden/)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.baokhang83.mnemo/warden-boost-client?label=warden-boost-client)](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client)
 
 **JVM-aware vertical right-sizing for Kubernetes.** Warden makes a running JVM give memory
 back to the OS during predictable low-traffic windows, then safely lowers the Pod's resource
@@ -114,9 +115,19 @@ spec:
       maxDuration: 20m
 ```
 
-Then the application takes a lease. `warden-boost-client` (Maven Central, Java 21, no
-third-party dependencies) talks only to a loopback API served by the Warden sidecar — the app
-never holds Kubernetes credentials:
+Then the application takes a lease. `warden-boost-client` (Java 21, no third-party
+dependencies) is published on [Maven Central](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client):
+
+```xml
+<dependency>
+  <groupId>io.github.baokhang83.mnemo</groupId>
+  <artifactId>warden-boost-client</artifactId>
+  <version>0.2.0</version> <!-- see the Maven Central badge above for the latest -->
+</dependency>
+```
+
+It talks only to a loopback API served by the Warden sidecar — the app never holds Kubernetes
+credentials:
 
 ```java
 WardenBoostClient warden = WardenBoostClient.discover();

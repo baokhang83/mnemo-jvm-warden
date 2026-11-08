@@ -519,7 +519,7 @@ path — those come from the sidecar's own configuration, never from the app's r
 `warden-boost-client` wraps the local API above in the shape application code actually wants.
 It requires Java 21. The dependency below uses the version of an application release that
 contains B9. The client is included in release `0.2.0`; it is not present in the older `v0.1.4`
-release. Verify that Maven Central has published the artifact before using it:
+release. It is published on [Maven Central](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client):
 
 ```xml
 <dependency>
