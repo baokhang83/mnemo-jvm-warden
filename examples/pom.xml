@@ -27,6 +27,11 @@
     </dependency>
     <dependency>
       <groupId>io.github.baokhang83.mnemo</groupId>
+      <artifactId>warden-boost-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.baokhang83.mnemo</groupId>
       <artifactId>mnemo-cache</artifactId>
     </dependency>
     <dependency>

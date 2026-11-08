@@ -45,6 +45,7 @@
     <module>warden-protocol</module>
     <module>warden-crd-model</module>
     <module>warden-cache-api</module>
+    <module>warden-boost-client</module>
     <module>warden-controller</module>
     <module>warden-agent</module>
     <module>examples</module>

@@ -1,4 +1,4 @@
-package io.github.baokhang83.mnemo.warden.agent.resize;
+package io.github.baokhang83.mnemo.warden.protocol;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;

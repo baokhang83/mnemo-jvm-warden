@@ -1,8 +1,8 @@
 package io.github.baokhang83.mnemo.warden.agent.boost;
 
 import io.github.baokhang83.mnemo.warden.agent.resize.InClusterApiServer;
-import io.github.baokhang83.mnemo.warden.agent.resize.MinimalJson;
 import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import io.github.baokhang83.mnemo.warden.protocol.MinimalJson;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;

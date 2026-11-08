@@ -11,6 +11,7 @@ COPY pom.xml ./
 COPY warden-protocol/pom.xml warden-protocol/pom.xml
 COPY warden-crd-model/pom.xml warden-crd-model/pom.xml
 COPY warden-cache-api/pom.xml warden-cache-api/pom.xml
+COPY warden-boost-client/pom.xml warden-boost-client/pom.xml
 COPY warden-controller/pom.xml warden-controller/pom.xml
 COPY warden-agent/pom.xml warden-agent/pom.xml
 COPY examples/pom.xml examples/pom.xml

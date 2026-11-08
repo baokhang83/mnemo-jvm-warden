@@ -10,11 +10,13 @@ emergency targets and keeps the existing shrink guard and blackout rules.
 deployed JVM acceptance is verified
 ([B7](https://github.com/baokhang83/mnemo-jvm-warden/issues/111)). The chart can opt into scoped
 admission, RBAC roles, events, and metrics for the manual Kubernetes flow. A pod-bound,
-authenticated [application-facing local API](#application-facing-local-api-b8) now lets the app
+authenticated [application-facing local API](#application-facing-local-api-b8) lets the app
 container itself acquire/release a boost
-([B8](https://github.com/baokhang83/mnemo-jvm-warden/issues/112)) — there is no Java lease
-client (`warden-boost-client`) yet; that's a separate, later milestone (B9). Treat the manual
-flow below as an evaluation for a trusted operator in a controlled cluster, not as a
+([B8](https://github.com/baokhang83/mnemo-jvm-warden/issues/112)), and the
+[`warden-boost-client` Java lease client](#java-lease-client-b9)
+([B9](https://github.com/baokhang83/mnemo-jvm-warden/issues/113)) wraps that API in the
+try-with-resources `BoostLease` shape application code actually uses. Treat the manual flow
+below as an evaluation for a trusted operator in a controlled cluster, not as a
 production-ready multi-tenant interface.
 
 If you only use scheduled right-sizing, you do not need a `boosts` section, a `WardenBoost`
@@ -504,3 +506,41 @@ caching it for the process lifetime.
 All three respond with `{"requestId":"...","phase":"...","message":"..."}` (`message` may be
 `null`). The app never supplies a Pod name, container name, policy name, or any Kubernetes API
 path — those come from the sidecar's own configuration, never from the app's request body.
+
+## Java lease client (B9)
+
+`warden-boost-client` wraps the local API above in the shape application code actually wants:
+
+```java
+try (BoostLease lease = WardenBoostClient.discover().acquireBoost(
+        "index-rebuild", Duration.ofMinutes(2))) {
+    rebuildIndex();
+}
+```
+
+`discover()` reads `WARDEN_BOOST_PORT`/`WARDEN_BOOST_TOKEN_PATH` from the environment, matching
+the agent's own defaults — an app container typically needs **no** extra env vars, only the
+shared token volume mount (see `deploy/example-sidecar-boost.yaml`). It needs no Kubernetes
+credentials: every call stays on the loopback local API.
+
+`acquireBoost` returns only once the request reaches `Granted` — never for a merely `Pending`
+one. It can fail two different ways, and they mean different things:
+
+- **`BoostRejectedException`** — the controller decided the request will never be granted (it
+  reached a terminal phase other than `Granted`). A definite failure; nothing to reconcile.
+- **`BoostAcquisitionTimeoutException`** — this call gave up waiting before the request
+  settled. This is **not** a failure — the grant may still be racing server-side. The client
+  deliberately does not release or otherwise touch the request on this path; it carries
+  `requestId()` so the caller can retry acquisition with the same ID later
+  (`acquireBoost(boost, requestId, timeout)`) or look it up directly (`inspect(requestId)`) to
+  reconcile what actually happened, rather than assuming the operation could not have started.
+
+`BoostLease.close()` requests completion and is idempotent — call it more than once freely —
+and does not block until memory is actually reclaimed; `lease.status()` re-fetches the current
+phase if a caller needs that confirmation. Application code should close the lease only after
+the boosted operation and its child work finish; there is no async/cancellation convenience
+wrapper (deferred, per the dev plan).
+
+See `examples/src/main/java/.../examples/boost/IndexRebuildExample.java` for a complete,
+runnable example of both code paths, and `deploy/verify-boost-client.py` for a real-cluster
+check that a client-side timeout genuinely never releases the uncertain request.

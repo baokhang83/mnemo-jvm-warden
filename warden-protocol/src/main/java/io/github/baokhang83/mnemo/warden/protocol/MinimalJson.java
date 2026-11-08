@@ -1,4 +1,4 @@
-package io.github.baokhang83.mnemo.warden.agent.resize;
+package io.github.baokhang83.mnemo.warden.protocol;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -6,14 +6,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A minimal JSON reader: enough to navigate the Kubernetes API's response shape ({@code
- * status.containerStatuses[].resources}) and nothing more &mdash; no writer, no streaming, no
- * generic (de)serialization.
+ * A minimal JSON reader: enough to navigate a small, known response shape (a Kubernetes API
+ * object's status/metadata leaves) and nothing more &mdash; no writer, no streaming, no generic
+ * (de)serialization.
  *
- * <p>Exists in preference to a JSON library because {@link PodResizeClient} only ever needs to
- * read a handful of string leaves out of a known response shape; a dependency-free ~150-line
- * reader keeps that need in proportion, matching the agent's zero-runtime-dependency
- * architecture (the same reasoning that ruled out Fabric8 for the HTTP layer itself).
+ * <p>Exists in preference to a JSON library because every caller only ever needs to read a
+ * handful of string leaves out of a known response shape; a dependency-free ~150-line reader
+ * keeps that need in proportion, matching the agent's and client's zero-runtime-dependency
+ * architecture (the same reasoning that ruled out Fabric8 for either HTTP layer).
  *
  * <p>Parses into plain JDK types: {@link Map}&lt;String,Object&gt; for objects, {@link
  * List}&lt;Object&gt; for arrays, {@link String}, {@link Double}, {@link Boolean}, or {@code
@@ -26,9 +26,10 @@ import java.util.Map;
  * instead (caught by a test feeding truncated JSON &mdash; an object literal missing its
  * closing brace).
  *
- * <p>Public, not package-private: {@code io.github.baokhang83.mnemo.warden.agent.intent}
- * (W-306) reads the same API server response shape (a pod's annotations and container status)
- * and reuses this rather than duplicating a second minimal JSON reader in the same module.
+ * <p>Lives in {@code warden-protocol} (dependency-free) rather than {@code warden-agent}
+ * because {@code warden-boost-client} (B9) needs the same reader for the same Boost-request
+ * response shape the agent's local API returns, and this keeps that to one implementation
+ * instead of a second copy per consuming module.
  */
 public final class MinimalJson {
 
