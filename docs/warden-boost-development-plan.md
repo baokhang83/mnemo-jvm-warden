@@ -305,6 +305,7 @@ Milestone: [Warden Boost](https://github.com/baokhang83/mnemo-jvm-warden/milesto
 | B8 | [#112](https://github.com/baokhang83/mnemo-jvm-warden/issues/112) |
 | B9 | [#113](https://github.com/baokhang83/mnemo-jvm-warden/issues/113) |
 | B10 | [#114](https://github.com/baokhang83/mnemo-jvm-warden/issues/114) |
+| B11 | [#130](https://github.com/baokhang83/mnemo-jvm-warden/issues/130) |
 
 ## B1 contract
 
@@ -351,3 +352,31 @@ block for reclamation. See [the Java lease client](warden-boost.md#java-lease-cl
 the full contract, `examples/.../boost/IndexRebuildExample.java` for the application example,
 and `deploy/verify-boost-client.py` for the real-cluster check that a client-side timeout
 genuinely never releases an uncertain request.
+
+## B11 G1 support
+
+G1 is now a boost-eligible collector. `CorrelatedResize` previously rejected any JVM without a
+live soft max (`GcCapabilities.supportsSoftMax()`), which excluded G1 unconditionally; it now
+enforces only the launch-time `-Xmx` ceiling that already applied to ZGC/Shenandoah, and reads
+back preparation evidence from a soft-max readback only when the collector has one — for G1,
+the evidence is the allocation transition itself, since there is nothing to push live. A real
+disposable-cluster run (`deploy/verify-boost-g1.py`) against an actual controller and G1 JVM
+surfaced a second unconditional readback that the same fix needed: `IntentWatcher`'s own
+idempotency short-circuit (skip redoing a transition already confirmed) also called
+`heap.softMaxBytes()` unconditionally, and only throws once a G1 correlated resize has actually
+succeeded once — which the first fix alone made possible for the first time, so no unit test
+had ever exercised it. Both are fixed; `CorrelatedResizeTest` covers the first, the real-cluster
+run covers the second. The shrink/release *mechanics* (`ShrinkSequence`, `DeepGc`) needed no
+change: both were already collector-blind and `DeepGc`'s forced `GC.run` + committed-size
+polling already covers G1.
+
+The real gap this leaves, documented in [the Boost guide](warden-boost.md#prerequisites-for-a-boost-evaluation):
+a G1 workload must launch with `-Xmx` already covering its largest `heapTarget`, since G1 has
+no runtime knob to raise that ceiling on demand the way ZGC/Shenandoah's `SoftMaxHeapSize`
+does. Tracked as [#130](https://github.com/baokhang83/mnemo-jvm-warden/issues/130).
+
+Building the real-cluster check also surfaced an unrelated, pre-existing, collector-agnostic
+gap: once a Boost enters `Releasing`, nothing republishes a lower correlated resize-intent, so
+the floor stays held past that point regardless of collector — traced through
+`WardenPolicyReconciler`/`IntentEmitter`/`PreparedTransitionStore`, none of which reference
+collector type. Not a B11 issue; filed separately.

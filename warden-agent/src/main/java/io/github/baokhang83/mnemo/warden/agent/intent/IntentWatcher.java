@@ -180,9 +180,13 @@ public final class IntentWatcher {
     if (state.acknowledgement() != null) {
       try {
         var ack = ResizeAcknowledgement.decode(state.acknowledgement());
+        // G1 has no soft max to read back (B11); a confirmed allocation transition is already
+        // the only evidence CorrelatedResize itself requires for it, so re-verifying here would
+        // just throw on a collector that was never asked to push a live ceiling in the first
+        // place.
         if (ack.confirms(intent, state.podUid(), state.containerId(),
             state.currentRequestBytes().orElse(-1), state.currentLimitBytes().orElse(-1))
-            && heap.softMaxBytes() == intent.heapBytes()) return;
+            && (!heap.capabilities().supportsSoftMax() || heap.softMaxBytes() == intent.heapBytes())) return;
       } catch (IllegalArgumentException ignored) {
         // Invalid evidence is never accepted; replace it only after current preparation succeeds.
       }

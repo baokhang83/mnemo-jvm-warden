@@ -89,14 +89,41 @@ class CorrelatedResizeTest {
     assertThrows(IOException.class, this::run);
   }
 
+  // B11: G1 has no runtime soft max — GcCapabilities.supportsSoftMax() is false — so these prove
+  // CorrelatedResize never calls HeapController.softMaxBytes() on that path (the real
+  // AttachedHeapController throws UnsupportedOperationException for it, mirrored below) and
+  // still enforces the launch-time -Xmx ceiling without the removed supportsSoftMax() gate.
+  @Test void g1GrantUsesLaunchCeilingNotSoftMaxReadback() throws Exception {
+    heap.caps = new GcCapabilities(Collector.G1, false, true);
+    state = state(100, 400);
+    assertTrue(run().applied());
+  }
+  @Test void g1ShrinkNeverReadsBackSoftMax() throws Exception {
+    heap.caps = new GcCapabilities(Collector.G1, false, true);
+    state = state(200, 400);
+    assertTrue(run().applied());
+    assertEquals(List.of("heap", "gc", "rss", "resize"), order);
+  }
+  @Test void g1RejectsHeapTargetAboveLaunchCeiling() {
+    heap.caps = new GcCapabilities(Collector.G1, false, true);
+    heap.max = 150;
+    state = state(50, 300);
+    assertThrows(IOException.class, this::run);
+    assertTrue(order.isEmpty());
+  }
+
   class Heap implements HeapController {
     long soft = 50, max = 1000, rss = 10;
     boolean ignoreSet;
+    GcCapabilities caps = new GcCapabilities(Collector.ZGC, true, true);
     public long currentRss() { order.add("rss"); return rss; }
-    public void setSoftMax(long bytes) { order.add("heap"); if (!ignoreSet) soft = bytes; }
+    public void setSoftMax(long bytes) { order.add("heap"); if (!ignoreSet && caps.supportsSoftMax()) soft = bytes; }
     public void deepGcAndUncommit(Duration timeout) { order.add("gc"); }
-    public GcCapabilities capabilities() { return new GcCapabilities(Collector.ZGC, true, true); }
-    public long softMaxBytes() { return soft; }
+    public GcCapabilities capabilities() { return caps; }
+    public long softMaxBytes() {
+      if (!caps.supportsSoftMax()) throw new UnsupportedOperationException("collector has no soft max");
+      return soft;
+    }
     public long maxHeapBytes() { return max; }
   }
 }

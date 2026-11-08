@@ -84,10 +84,13 @@ sidecar permissions for scheduled-only resizing remain unchanged.
 - A working Warden-managed Pod with the normal sidecar, in-place resize support, and cgroup v2.
   Follow the [existing sidecar guide](../deploy/README.md#example-sidecaryaml--warden-as-a-native-sidecar)
   first; Boost does not replace its JMX, process namespace, cgroup mount, or resize requirements.
-- A target JVM whose runtime supports `SoftMaxHeapSize`, currently ZGC or Shenandoah in Warden.
-  The correlated agent rejects unsupported JVMs or a heap target above launch-time `-Xmx`.
-  G1 remains supported by the existing scheduled path, but not by this explicit Boost heap
-  preparation. Runtime support and available node capacity must be verified on the target setup.
+- A target JVM running ZGC, Shenandoah, or G1. The correlated agent rejects a heap target above
+  launch-time `-Xmx` regardless of collector. ZGC and Shenandoah push that target live via
+  `SoftMaxHeapSize`; **G1 has no such knob**, so a G1 Boost only ever has evidence that the
+  allocation transition landed, never a soft-max readback — in practice this means a G1
+  workload that wants Boost must already launch with `-Xmx` covering the largest `heapTarget`
+  it will ever request, since there is nothing to raise later. Runtime support and available
+  node capacity must be verified on the target setup.
 - A current controller and agent image with Boost support. The target container name in the
   request must match the sidecar's `WARDEN_TARGET_CONTAINER_NAME`.
 - The agent must be able to **patch its own Pod's metadata** to publish
