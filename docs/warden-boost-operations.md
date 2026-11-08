@@ -19,7 +19,8 @@ The recorded [B7 run](validation/warden-boost-b7-kind.md) used Kubernetes 1.36.1
 cgroup v2, containerd 2.3.1 and Temurin 21.0.13/ZGC. It tests a manual request against a real
 controller, sidecar, JVM and resize API. Its fault fixture and security matrix have the explicit
 limits described there. B8's local API and B9's Java client have separate disposable-cluster
-checks; B9's test deliberately uses no controller and verifies uncertain timeout retention. A
+checks; these probes scale their chart controller to zero, and B9 verifies uncertain timeout
+retention without a policy or controller reconciliation. A
 single real-client-to-grant-to-reclaim integration test and a Shenandoah deployment have not
 been established by that evidence. No performance or cost savings are implied.
 

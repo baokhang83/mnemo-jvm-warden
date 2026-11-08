@@ -3,8 +3,8 @@
 
 Runs the actual `IndexRebuildExample` application code (not raw curl) as the `app` container,
 talking to a real agent (B8's local API) over the real shared bearer token, with real
-Kubernetes admission/RBAC installed. No controller is installed, so no request can ever reach
-`Granted` — that path (the wire format and happy-path logic) is already covered by
+Kubernetes admission/RBAC installed. The chart controller is scaled to zero and no matching
+policy is installed, so the request cannot reach `Granted` — that path (the wire format and happy-path logic) is already covered by
 `deploy/verify-boost-local-api.py` (raw curl against the same real API) and
 `WardenBoostClientTest` (the client's own logic against a protocol-faithful fake server); a
 real controller's full grant mechanics are `verify-boost-acceptance.py`'s territory, not
@@ -56,6 +56,9 @@ try:
     k('label', 'namespace', ns, 'warden.mnemo.io/boost-enabled=true')
     run(['helm', 'install', release, str(root / 'charts/warden'), '--kube-context', args.context,
          '--namespace', ns, '--set', 'boost.security.enabled=true'])
+    # These probes require pending requests; do not let the chart's controller reconcile them.
+    k('scale', 'deployment/' + release + '-warden-controller', '-n', ns, '--replicas=0')
+    k('rollout', 'status', 'deployment/' + release + '-warden-controller', '-n', ns, '--timeout=120s')
     k('create', 'serviceaccount', 'warden-boost-agent', '-n', ns)
     k('create', 'rolebinding', 'boost-agent', '-n', ns,
       '--clusterrole=' + release + '-warden-boost-agent', '--serviceaccount=' + ns + ':warden-boost-agent')
@@ -71,7 +74,7 @@ try:
 
     # Same shape as verify-boost-local-api.py's probe pod, but the `app` container now runs the
     # real IndexRebuildExample instead of `sleep infinity` + curl. A short acquisition timeout
-    # (no controller is installed, so nothing can ever reach Granted) exercises exactly the
+    # (the chart controller is scaled to zero) exercises the
     # uncertain-grant-retention path quickly instead of waiting out the example's 2-minute default.
     pod = {
         'apiVersion': 'v1', 'kind': 'Pod',

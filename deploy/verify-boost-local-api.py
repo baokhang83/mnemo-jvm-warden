@@ -63,6 +63,9 @@ try:
     k('label', 'namespace', ns, 'warden.mnemo.io/boost-enabled=true')
     run(['helm', 'install', release, str(root / 'charts/warden'), '--kube-context', args.context,
          '--namespace', ns, '--set', 'boost.security.enabled=true'])
+    # These probes require pending requests; do not let the chart's controller reconcile them.
+    k('scale', 'deployment/' + release + '-warden-controller', '-n', ns, '--replicas=0')
+    k('rollout', 'status', 'deployment/' + release + '-warden-controller', '-n', ns, '--timeout=120s')
     k('create', 'serviceaccount', 'warden-boost-agent', '-n', ns)
     k('create', 'rolebinding', 'boost-agent', '-n', ns,
       '--clusterrole=' + release + '-warden-boost-agent', '--serviceaccount=' + ns + ':warden-boost-agent')
