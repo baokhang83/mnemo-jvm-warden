@@ -4,9 +4,9 @@ This document describes the internal design of **mnemo-jvm-warden**: its
 components, how they interact with the JVM and the Kubernetes control plane, and
 the state machine that guarantees a resize never OOMKills a pod.
 
-> For the *why* — the market gap, the requests-vs-limits argument, and the vs-VPA
-> positioning — see the [README](../README.md). This document assumes that
-> context and focuses on *how*.
+> For the *why* — the market gap, the requests-vs-limits argument, and the JVM
+> knobs — see [why-warden.md](why-warden.md); for the vs-VPA positioning, the
+> [README](../README.md). This document assumes that context and focuses on *how*.
 
 ---
 

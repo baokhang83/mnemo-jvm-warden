@@ -5,117 +5,57 @@
 [![build](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml/badge.svg)](https://github.com/baokhang83/mnemo-jvm-warden/actions/workflows/build.yml)
 [![coverage](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/refs/heads/gh-pages/badges/jacoco.svg)](https://baokhang83.github.io/mnemo-jvm-warden/)
 
-**JVM-aware vertical right-sizing for Kubernetes.** Warden makes a running JVM
-give memory back to the OS during predictable low-traffic windows, then safely
-lowers the Pod's resource footprint — reclaiming idle infrastructure without
-killing the pod, dropping its warm state, or risking your high-availability
-posture.
+**JVM-aware vertical right-sizing for Kubernetes.** Warden makes a running JVM give memory
+back to the OS during predictable low-traffic windows, then safely lowers the Pod's resource
+footprint — reclaiming idle infrastructure without killing the pod, dropping its warm state, or
+risking your high-availability posture.
 
-Warden also has an **experimental Boost** path for temporarily increasing a pod's memory
-headroom for operator-approved work, such as an index rebuild. It prepares the allocation and
-JVM before recording a grant, then returns to the current policy target after completion.
-See [Warden Boost](docs/warden-boost.md) for its current capabilities and security limits.
-Scheduled right-sizing remains usable without creating a Boost request.
+And when an application needs that memory back for a bounded piece of work, it can **ask for
+it in Java** — no `kubectl`, no Kubernetes credentials:
 
----
-
-## The gap Warden fills
-
-In ~95% of production environments, [Horizontal Pod Autoscaling
-(HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-is the right answer: scale from 10 replicas to 2 when traffic drops, and you
-save money. Warden does **not** compete with that.
-
-But there are three well-known scenarios where *removing replicas* is not an option, and 
-shrinking the pods you keep is the only lever left:
-
-### 1. Minimum-replica HA baselines
-
-High-availability architectures often can't scale below a floor — e.g. 3
-sub-services × 3 replicas across 3 Availability Zones. If each JVM needs 4 GB at
-peak, that's **36 GB reserved overnight to serve zero requests**. HPA can't
-touch it; the floor is there for failover, not for load.
-
-Warden keeps all 9 replicas alive for availability but shrinks each one's
-footprint during the off-peak window — turning a 36 GB idle reservation into
-~9 GB, **without reducing replica count**.
-
-### 2. Slow-booting monoliths
-
-Many enterprise Java apps (older Spring Boot, WebSphere, large multi-module
-builds) take 2–5 minutes to boot and pass readiness. If HPA scales you down to 2
-pods overnight and a sharp spike hits at 06:00, the new pods sit in
-`ContainerCreating`/unready for minutes while the surviving 2 get slammed, spike
-CPU, and cascade into an outage.
-
-Warden keeps the pods **warm** — JVM up, classes loaded, connection pools
-primed. Raising the footprint back to peak is a sub-second resize, not a cold
-start.
-
-### 3. Stateful nodes & distributed caches
-
-For an in-memory data grid, a stateful worker queue, or a distributed cache
-(this is [mnemo-cache](https://github.com/baokhang83/mnemo-cache)'s home turf),
-you *can't* just kill a replica to save money — termination forces data
-rebalancing, purges local cache, and thrashes surviving nodes with replication
-overhead.
-
-Warden instead **shrinks in place**: it flushes expired/evictable entries and
-idle pages, runs a deep GC, uncommits the freed pages back to the OS, and keeps
-the node running at a lower price point — with its hot working set intact.
+```java
+try (BoostLease lease = WardenBoostClient.discover().acquireBoost(
+        "index-rebuild", Duration.ofMinutes(2))) {
+    rebuildIndex();
+}
+```
 
 ---
 
-## How it actually works (and where the money comes from)
+## When you need it
 
-A few load-bearing truths that shape the entire design:
+In ~95% of production environments, [Horizontal Pod
+Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) is the
+right answer, and Warden does **not** compete with it. Warden is for the cases where removing
+replicas isn't an option and shrinking the pods you keep is the only lever left:
 
-**Cost lives in `requests`, not `limits`.** Lowering a Pod's memory *limit*
-saves nothing — you still pay for the node. Kubernetes cost is driven by
-*requests*, because that's what the scheduler bin-packs against and what
-[Cluster
-Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler)
-uses to decide it can drain and delete a node.
+- **Minimum-replica HA baselines** — 3 services × 3 replicas × 3 AZs can't scale to zero. At
+  4 GB per JVM that's 36 GB reserved overnight to serve no requests. Warden shrinks each
+  replica instead of removing any.
+- **Slow-booting monoliths** — a 2–5 minute boot makes scale-to-few a liability at the next
+  traffic spike. Warden keeps pods warm (JVM up, pools primed) and resizes in under a second.
+- **Stateful nodes & distributed caches** — killing a replica forces rebalancing and cache
+  loss. Warden shrinks in place, keeping the hot working set intact.
 
-**Warden's action boundary ends at "lower the request."** It resizes an existing
-pod in place — it never changes the number of pods (that's HPA) or the number of
-nodes (that's the autoscaler). Everything past the request change is *emergent
-cluster behaviour that Warden enables but does not perform*, and does not
-guarantee:
+Savings are real only if something consolidates the freed capacity: Warden lowers the Pod's
+*request*, which frees schedulable room, but a [Cluster
+Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (or
+equivalent) is what turns that into a smaller bill.
 
-<p align="center">
-  <img src="docs/assets/savings-boundary.svg" width="900"
-       alt="Two zones separated by a hand-off. WARDEN does: release JVM memory (GC + uncommit), verify RSS actually dropped (safety gate), lower the pod's memory request in place — Warden's responsibility ends at the request change. KUBERNETES does (requires a Cluster Autoscaler, not Warden's action): scheduler bin-packs the freed reservation, autoscaler drains a node, actual money saved. With no autoscaler, capacity is freed but nothing is billed-saved.">
-</p>
-
-The `⇢` is a hand-off, not a step Warden takes. On a fixed node pool with no
-autoscaler, Warden's lower-request still frees *schedulable* capacity but zero
-*billed* capacity — so the savings story is only as real as your consolidation
-setup.
-
-**You can't change `-Xmx` on a running JVM.** Max heap is fixed at launch. What
-*is* movable at runtime is the soft ceiling and committed memory:
-
-- **ZGC** — `SoftMaxHeapSize`, settable live via `jcmd VM.set_flag`, plus
-  automatic uncommit of unused heap.
-- **Shenandoah** — aggressive uncommit via `-XX:ShenandoahUncommitDelay`
-  (the gold standard for returning memory to the OS).
-- **G1** — `-XX:G1PeriodicGCInterval` / `-XX:G1PeriodicGCSystemLoadThreshold`
-  already trigger idle GC + uncommit.
-
-The JVM already does half of this. **Warden's job is the orchestration** — it
-drives these knobs from a traffic schedule *and* coordinates them with a
-Kubernetes [in-place Pod
-resize](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/),
-which the JVM has no way to do on its own.
+→ **[Why Warden](docs/why-warden.md)** has the worked numbers, the requests-vs-limits argument,
+and the per-collector JVM knobs (`SoftMaxHeapSize`, Shenandoah uncommit, G1 periodic GC).
 
 ---
 
 ## The safety handshake
 
-The shrink and grow sequences are **not symmetric**. Get the order wrong and you
-`OOMKilled` the pod. This ordering is the core correctness guarantee of the
-tool:
+You can't change `-Xmx` on a running JVM, but you *can* move its soft ceiling and committed
+memory. Warden's job is to coordinate that with a Kubernetes [in-place Pod
+resize](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/) —
+which the JVM cannot do on its own.
+
+The shrink and grow sequences are **not symmetric**. Get the order wrong and you `OOMKilled`
+the pod. This ordering is the core correctness guarantee of the tool:
 
 ```mermaid
 sequenceDiagram
@@ -141,14 +81,77 @@ sequenceDiagram
     W->>JVM: (optional) pre-warm cache ahead of load
 ```
 
-- **Shrinking:** shrink the JVM first, *verify RSS actually fell*, **then** lower
-  the cgroup. Lowering the cgroup before the JVM has released memory = instant
-  OOMKill.
-- **Growing:** raise the cgroup **first**, then raise the JVM's soft max. Give
-  the headroom before the JVM tries to use it.
-- **Cache re-warming** happens *ahead* of the predicted traffic return — a
-  flushed cache is itself a cold start, so Warden shrinks early and re-warms
-  early rather than reactively.
+- **Shrinking:** shrink the JVM first, *verify RSS actually fell*, **then** lower the cgroup.
+  Lowering the cgroup first = instant OOMKill.
+- **Growing:** raise the cgroup **first**, then the JVM's soft max. Give headroom before the
+  JVM tries to use it.
+- **Cache re-warming** happens *ahead* of the predicted traffic return — a flushed cache is
+  itself a cold start.
+
+→ **[Architecture](docs/architecture.md)** for components, the full state machine, and
+invariants.
+
+---
+
+## Boost: let the application ask for memory
+
+Scheduled right-sizing handles the predictable curve. **Boost** handles the thing a schedule
+can't know about: a bounded, named operation — an index rebuild, a nightly batch, a migration —
+that needs headroom *now* and gives it back when it's done.
+
+Add a named Boost to the policy, so the operator decides what the application is allowed to
+ask for:
+
+```yaml
+spec:
+  profiles:
+    maintenance: { request: 1Gi, limit: 2Gi }
+  boosts:
+    index-rebuild:
+      profile: maintenance
+      heapTarget: 1Gi
+      acquisitionTimeout: 2m
+      maxDuration: 20m
+```
+
+Then the application takes a lease. `warden-boost-client` (Maven Central, Java 21, no
+third-party dependencies) talks only to a loopback API served by the Warden sidecar — the app
+never holds Kubernetes credentials:
+
+```java
+WardenBoostClient warden = WardenBoostClient.discover();
+
+try (BoostLease lease = warden.acquireBoost("index-rebuild", Duration.ofMinutes(2))) {
+    // Reached only after a durable Granted — never for a merely pending request.
+    rebuildIndex();
+    // close() requests completion; it is idempotent and does not block on reclamation.
+} catch (BoostRejectedException e) {
+    // Definite: this request will not be granted. No lease was handed out.
+    log.warn("boost rejected: phase={} {}", e.phase(), e.getMessage());
+} catch (BoostAcquisitionTimeoutException e) {
+    // Uncertain, not failed: the grant may still be racing server-side, so the client
+    // deliberately leaves the request alone. Persist the stable ID and reconcile later with
+    // warden.inspect(id), or resume the wait via acquireBoost("index-rebuild", id, timeout).
+    reconcileLater(e.requestId());
+}
+```
+
+`discover()` reads the sidecar's own defaults from the environment, so an app container usually
+needs **no** extra configuration — only the shared token volume mount. Under the hood: a
+pod-bound bearer token the agent generates and shares over an `emptyDir`, Kubernetes
+`ValidatingAdmissionPolicy` rules binding every self-requested boost to the requesting Pod's
+own identity, and RBAC that never grants the agent `delete` or the `status` subresource.
+
+The two failure modes being *separate types* is deliberate. A caller cannot accidentally treat
+"definitely rejected" as "might still be granted" — because an uncertain grant that gets
+released is an operation that may already be running without its memory floor.
+
+Warden prepares the allocation *and* the JVM before it records a grant, then returns the Pod to
+its current policy target once the lease closes. Boost is entirely opt-in: scheduled
+right-sizing works exactly the same without ever creating a Boost request.
+
+→ **[Boost guide](docs/warden-boost.md)** for the full lifecycle, the opt-in security package,
+phase reference, and trust assumptions. Boost is **experimental**; see [Status](#status) below.
 
 ---
 
@@ -156,8 +159,7 @@ sequenceDiagram
 
 Warden's real neighbor isn't HPA — it's the [Vertical Pod
 Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler),
-which now also supports in-place updates. The difference is that VPA is
-**JVM-blind**:
+which now also supports in-place updates. The difference is that VPA is **JVM-blind**:
 
 | | VPA | mnemo-jvm-warden |
 |---|---|---|
@@ -166,107 +168,36 @@ which now also supports in-place updates. The difference is that VPA is
 | Coordinates GC/uncommit with the resize | ❌ | ✅ ordered handshake |
 | Understands cache / working-set state | ❌ | ✅ flushes evictable, keeps hot set |
 | Driven by predicted traffic curves | ❌ reactive to observed usage | ✅ proactive, schedule-aware |
+| Lets the application request headroom for a job | ❌ | ✅ Boost lease API |
 
 > **VPA resizes the box and hopes the JVM cooperates.
 > Warden makes the JVM cooperate first, then resizes.**
 
 ---
 
-## Deploying with Helm
+## Getting started
 
-Two charts, two different jobs. Both are published to a Helm repo hosted on GitHub Pages, so no
-local checkout is needed:
+**1. Install the controller.** Charts are published to a Helm repo on GitHub Pages:
 
 ```bash
 helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/
 helm repo update
-```
-
-(You can still install straight from a local checkout — `helm install warden charts/warden` —
-if you're working on the charts themselves.)
-
-### `charts/warden` — installs the controller
-
-```bash
 helm install warden warden/warden
 ```
 
-This cluster-wide install includes the `WardenPolicy` and `WardenBoost` CRDs, controller RBAC,
-and the controller Deployment. The controller runs one replica with a `Recreate` rollout;
-there is no leader election yet. Helm does not update installed CRDs on `helm upgrade`.
-Existing installations must apply the updated CRDs before upgrading the controller; see the
-[upgrade notes](docs/warden-boost.md#upgrading-an-existing-installation). The chart update can
-briefly stop the controller during rollout.
+This installs the `WardenPolicy` and `WardenBoost` CRDs, controller RBAC, and the controller
+Deployment (one replica, `Recreate` rollout, no leader election yet). Helm does **not** upgrade
+installed CRDs on `helm upgrade` — existing installations must apply the updated CRDs first;
+see the [upgrade notes](docs/warden-boost.md#upgrading-an-existing-installation).
 
-The controller can watch and patch Boost requests and their status as well as policy status and
-Pod annotations. See the [RBAC mapping](docs/rbac-mapping.md) for the exact permissions.
+**2. Add the sidecar to your workload.** Warden resizes from inside the Pod, as a native
+sidecar. `charts/warden-sidecar` is a Helm *library* chart your own app chart depends on and
+includes as a named template — see
+[including the sidecar](docs/configuration.md#including-the-warden-sidecar-library-chart), or
+`deploy/example-sidecar.yaml` for the hand-authored equivalent.
 
-Values worth knowing (`charts/warden/values.yaml`):
-
-| key | what it controls |
-|---|---|
-| `controller.image.repository` / `.tag` | which controller image to run |
-| `controller.prometheusUrl` | where Prometheus lives, for guardrail metric evaluation (W-401) — leave empty if no policy uses a guardrail |
-| `controller.resources` | the controller Pod's own request/limit (defaults to 256Mi request / 512Mi limit — the controller is a JVM with a heavy dependency graph, so its non-heap memory needs real headroom; 256Mi was too tight and OOMKilled it under load) |
-
-### `charts/warden-sidecar` — the reusable sidecar template
-
-There is no admission webhook. "Injecting" the sidecar means an **operator's own app chart**
-includes a Helm named template that renders the same native-sidecar shape as
-`deploy/example-sidecar.yaml`, parameterized instead of hand-copied. It's a Helm **library
-chart** (`type: library`) on purpose: depending on it can never deploy a second controller
-alongside your app, because a library chart is structurally forbidden from rendering any
-resources of its own.
-
-In your own app chart's `Chart.yaml`:
-
-```yaml
-dependencies:
-  - name: warden-sidecar
-    version: "0.1.5"   # match the published chart version (see `helm search repo warden`)
-    repository: "https://baokhang83.github.io/mnemo-jvm-warden/"
-```
-
-In your own `values.yaml`, a `warden:` block shaped like `charts/warden/values.yaml`'s
-`sidecar:` section (`targetContainerName` and `resources` are required, with no default — see
-that file's comments for why):
-
-```yaml
-warden:
-  enabled: true
-  image:
-    repository: ghcr.io/baokhang83/mnemo-jvm-warden
-    tag: latest
-  targetContainerName: app   # the sibling container Warden resizes
-  resources:
-    requests: { cpu: 25m, memory: 64Mi }
-    limits: { memory: 256Mi }
-```
-
-And in your own Pod template:
-
-```yaml
-spec:
-  shareProcessNamespace: true   # lets the sidecar see the target JVM's PID (W-102)
-  volumes:
-    {{- include "warden.sidecar.volumes" . | nindent 4 }}
-  initContainers:
-    {{- if .Values.warden.enabled }}
-    {{- include "warden.sidecar" (dict "cfg" .Values.warden) | nindent 4 }}
-    {{- end }}
-  containers:
-    - name: app   # must match warden.targetContainerName above
-      # ... your app container, with the JMX flags deploy/example-sidecar.yaml documents
-```
-
-`warden.sidecar` renders only the `initContainer` entry; `shareProcessNamespace` and the
-host-cgroup volume are set by your own chart rather than injected, so your chart stays in full
-control of its own Pod spec end to end.
-
-### Configuring a policy
-
-Neither chart above makes Warden *do* anything on its own — it acts only once a `WardenPolicy`
-exists for the target workload:
+**3. Write a policy.** Neither chart makes Warden *do* anything on its own; it acts only once a
+`WardenPolicy` targets the workload:
 
 ```yaml
 apiVersion: warden.mnemo.io/v1alpha1
@@ -287,48 +218,56 @@ spec:
     - { cron: "0 7 * * *", profile: peak }
 ```
 
-Apply it with `kubectl apply -f`, same as any other custom resource. For every field
-(`leadTime`, `blackout`, `guardrail`), the sidecar/controller environment variables, and the
-full set of Helm values, see **[docs/configuration.md](docs/configuration.md)** — it also has
-an operator runbook for the failure modes you'll actually hit (read-only mode on an
-unsupported collector, a shrink aborted by the RSS verification gate, cgroup mount issues, and
-more).
-
----
-
-## Status
-
-🧪 **Beta.** The controller, agent, CRD, and both Helm charts are built, released, and
-installable (published container images on GHCR, charts on the Helm repo above, libraries on
-Maven Central), and the full schedule → shrink/grow → verify flow works end to end against a real
-cluster. It has not yet been battle-tested under production load, and APIs may still change —
-issues and feedback welcome.
-
-**Boost is experimental.** The opt-in path includes a local sidecar API, Java lease client,
-request admission, RBAC, events, and metrics. A disposable-cluster acceptance run covers the
-manual flow; the client and local API have separate checks. A single end-to-end client-to-JVM
-run and production validation remain outstanding. See the [Boost guide](docs/warden-boost.md)
-for setup, trust assumptions, and controlled evaluation. Release `0.2.0` includes the local API
-and Java client; check the publication workflows and registries before using its artifacts.
+→ **[Configuration reference](docs/configuration.md)** for every policy field (`leadTime`,
+`blackout`, `guardrail`), all Helm values, the sidecar/controller environment variables, and an
+operator runbook for the failure modes you'll actually hit.
 
 ## Requirements
 
-- Kubernetes **1.35+** (in-place Pod resize is GA; on earlier versions it needs the
+- Kubernetes **1.35+** (in-place Pod resize is GA; earlier versions need the
   `InPlacePodVerticalScaling` feature gate)
-- A JVM with runtime-tunable heap commit: **ZGC**, **Shenandoah**, or **G1**
-  with periodic GC enabled. Boost's explicit heap target additionally requires runtime
-  `SoftMaxHeapSize` support (ZGC or Shenandoah); the existing G1 scheduled-resize path remains
-  available.
-- Cluster Autoscaler (or equivalent node consolidation) to realize cost savings
-  from reduced requests
+- A JVM with runtime-tunable heap commit: **ZGC**, **Shenandoah**, or **G1** with periodic GC
+  enabled. Boost's explicit heap target additionally requires runtime `SoftMaxHeapSize` (ZGC or
+  Shenandoah); the scheduled-resize path still supports G1.
+- Java **21** for `warden-boost-client`
+- Cluster Autoscaler (or equivalent node consolidation) to turn reduced requests into savings
+
+## Status
+
+🧪 **Beta.** The controller, agent, CRDs, and both Helm charts are built, released, and
+installable (images on GHCR, charts on the Helm repo above, libraries on Maven Central), and
+the full schedule → shrink/grow → verify flow works end to end against a real cluster. It has
+not been battle-tested under production load, and APIs may still change — issues and feedback
+welcome.
+
+**Boost is experimental.** The opt-in path includes the local sidecar API, the Java lease
+client, request admission, RBAC, events, and metrics, with disposable-cluster acceptance runs
+covering the manual flow and separate checks for the client and local API. A single end-to-end
+client-to-JVM run and production validation remain outstanding. Treat it as a controlled
+evaluation for a trusted operator, not a production multi-tenant interface. Release `0.2.0`
+includes the local API and Java client; confirm the registries have published the artifacts
+before depending on them.
+
+## Documentation
+
+| | |
+|---|---|
+| [Why Warden](docs/why-warden.md) | The gap, the economics, the JVM knobs |
+| [Architecture](docs/architecture.md) | Components, protocol, resize state machine |
+| [Configuration](docs/configuration.md) | Policy fields, Helm values, env vars, runbook |
+| [Boost guide](docs/warden-boost.md) | Lifecycle, local API, Java client, security package |
+| [Boost operations](docs/warden-boost-operations.md) | Tested matrix, release and recovery steps |
+| [Threat model](docs/threat-model.md) · [Hardening](docs/hardening.md) · [RBAC mapping](docs/rbac-mapping.md) | Trust boundaries and the pre-production checklist |
+| [Roadmap](docs/roadmap.md) | What's next |
+| [`deploy/`](deploy/README.md) | Example manifests and the real-cluster verification scripts |
 
 ## Security
 
-Warden runs with real privileges inside your cluster (RBAC, JMX, a host
-cgroup mount). See **[SECURITY.md](SECURITY.md)** for how to report a
-vulnerability, **[docs/threat-model.md](docs/threat-model.md)** for the full
-trust-boundary analysis, and **[docs/hardening.md](docs/hardening.md)** for
-an operator checklist before going to production.
+Warden runs with real privileges inside your cluster (RBAC, JMX, a host cgroup mount). See
+**[SECURITY.md](SECURITY.md)** to report a vulnerability,
+**[docs/threat-model.md](docs/threat-model.md)** for the full trust-boundary analysis, and
+**[docs/hardening.md](docs/hardening.md)** for the operator checklist before going to
+production.
 
 ## Press
 

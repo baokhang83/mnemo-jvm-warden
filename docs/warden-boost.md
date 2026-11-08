@@ -21,7 +21,7 @@ production-ready multi-tenant interface.
 
 If you only use scheduled right-sizing, you do not need a `boosts` section, a `WardenBoost`
 request, a policy opt-in label, or Boost acknowledgement permissions for the sidecar. Keep the
-existing [installation and sidecar setup](../README.md#deploying-with-helm). Controller upgrades
+existing [installation and sidecar setup](../README.md#getting-started). Controller upgrades
 still need the CRD and RBAC updates described below.
 
 ## What happens
