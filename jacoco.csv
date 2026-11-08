@@ -86,9 +86,9 @@ coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentLog,0,7,0,0,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,AgentConfig,3,214,5,19,1,40,6,15,1,8
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent,HealthState,0,23,0,0,0,7,0,4,0,4
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,Intent,0,9,0,0,0,1,0,1,0,1
-coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,IntentWatcher,488,21,38,6,133,4,29,4,10,1
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,IntentWatcher,492,21,40,6,133,4,30,4,10,1
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,PodState,11,27,0,0,2,1,1,1,1,1
-coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,CorrelatedResize,5,202,8,24,1,31,8,11,0,3
+coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,CorrelatedResize,5,205,7,25,1,30,7,12,0,3
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.intent,PodIntentReader,213,261,28,24,45,51,27,9,7,3
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.attach,AttachedJvm,0,35,0,0,0,12,0,5,0,5
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.attach,TargetAttacher,7,33,3,1,1,8,2,3,0,3

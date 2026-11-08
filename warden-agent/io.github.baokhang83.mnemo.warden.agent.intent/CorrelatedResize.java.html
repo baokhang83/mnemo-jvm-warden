@@ -26,44 +26,49 @@ public final class CorrelatedResize {
       throws IOException, InterruptedException {
 <span class="fc" id="L27">    PodState before = observation.read();</span>
 <span class="fc" id="L28">    requireCurrent(intent, before);</span>
-<span class="pc bpc" id="L29" title="1 of 4 branches missed.">    if (!heap.capabilities().supportsSoftMax() || intent.heapBytes() &gt; heap.maxHeapBytes())</span>
-<span class="fc" id="L30">      throw new IOException(&quot;UnsupportedHeapTarget&quot;);</span>
-<span class="pc bpc" id="L31" title="2 of 4 branches missed.">    if (before.currentRequestBytes().isEmpty() || before.currentLimitBytes().isEmpty())</span>
-<span class="nc" id="L32">      throw new IOException(&quot;AppliedAllocationUnavailable&quot;);</span>
+    // G1 has no runtime soft max (GcCapabilities.supportsSoftMax() is false for it), so the only
+    // bound that applies is the fixed launch-time ceiling — G1 workloads must be launched with
+    // -Xmx already covering every boost heapTarget they'll ever request (B11; see
+    // docs/warden-boost.md's G1 section for why this is a weaker guarantee than ZGC/Shenandoah).
+<span class="fc bfc" id="L33" title="All 2 branches covered.">    if (intent.heapBytes() &gt; heap.maxHeapBytes()) throw new IOException(&quot;UnsupportedHeapTarget&quot;);</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">    if (before.currentRequestBytes().isEmpty() || before.currentLimitBytes().isEmpty())</span>
+<span class="nc" id="L35">      throw new IOException(&quot;AppliedAllocationUnavailable&quot;);</span>
 
     // Identity is re-read at the resource mutation boundary; production ResizePort also uses
     // an API-server resourceVersion/UID precondition so replacement cannot race this check.
-<span class="fc" id="L36">    ResizePort fenced = (pod, container, request, limit, timeout) -&gt; {</span>
-<span class="fc" id="L37">      requireCurrent(intent, observation.read());</span>
-<span class="fc" id="L38">      resize.resizeMemory(pod, container, request, limit, timeout);</span>
-<span class="fc" id="L39">    };</span>
-<span class="fc" id="L40">    long request = before.currentRequestBytes().getAsLong();</span>
-<span class="fc" id="L41">    long limit = before.currentLimitBytes().getAsLong();</span>
-<span class="pc bpc" id="L42" title="1 of 4 branches missed.">    if (intent.requestBytes() &lt; request || intent.limitBytes() &lt; limit) {</span>
-<span class="fc" id="L43">      var outcome = new ShrinkSequence(heap, fenced, hooks, podName, intent.containerName(), gcTimeout, resizeTimeout)</span>
-<span class="fc" id="L44">          .shrinkTo(intent.requestBytes(), intent.limitBytes(), intent.heapBytes());</span>
-<span class="fc bfc" id="L45" title="All 2 branches covered.">      if (!(outcome instanceof ShrinkOutcome.Completed)) throw new IOException(&quot;VerificationFailed&quot;);</span>
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">    } else if (intent.requestBytes() != request || intent.limitBytes() != limit) {</span>
-<span class="fc" id="L47">      new GrowSequence(heap, fenced, hooks, podName, intent.containerName(), resizeTimeout)</span>
-<span class="fc" id="L48">          .growTo(intent.requestBytes(), intent.limitBytes(), intent.heapBytes());</span>
+<span class="fc" id="L39">    ResizePort fenced = (pod, container, request, limit, timeout) -&gt; {</span>
+<span class="fc" id="L40">      requireCurrent(intent, observation.read());</span>
+<span class="fc" id="L41">      resize.resizeMemory(pod, container, request, limit, timeout);</span>
+<span class="fc" id="L42">    };</span>
+<span class="fc" id="L43">    long request = before.currentRequestBytes().getAsLong();</span>
+<span class="fc" id="L44">    long limit = before.currentLimitBytes().getAsLong();</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">    if (intent.requestBytes() &lt; request || intent.limitBytes() &lt; limit) {</span>
+<span class="fc" id="L46">      var outcome = new ShrinkSequence(heap, fenced, hooks, podName, intent.containerName(), gcTimeout, resizeTimeout)</span>
+<span class="fc" id="L47">          .shrinkTo(intent.requestBytes(), intent.limitBytes(), intent.heapBytes());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">      if (!(outcome instanceof ShrinkOutcome.Completed)) throw new IOException(&quot;VerificationFailed&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 4 branches missed.">    } else if (intent.requestBytes() != request || intent.limitBytes() != limit) {</span>
+<span class="fc" id="L50">      new GrowSequence(heap, fenced, hooks, podName, intent.containerName(), resizeTimeout)</span>
+<span class="fc" id="L51">          .growTo(intent.requestBytes(), intent.limitBytes(), intent.heapBytes());</span>
     } else {
       // Equal container resources still require actual JVM preparation for a new transition.
-<span class="fc" id="L51">      heap.setSoftMax(intent.heapBytes());</span>
+<span class="fc" id="L54">      heap.setSoftMax(intent.heapBytes());</span>
     }
-<span class="fc" id="L53">    long observedHeap = heap.softMaxBytes();</span>
-<span class="fc" id="L54">    PodState after = observation.read();</span>
-<span class="fc" id="L55">    requireCurrent(intent, after);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">    if (after.currentRequestBytes().orElse(-1) != intent.requestBytes()</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        || after.currentLimitBytes().orElse(-1) != intent.limitBytes()</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        || observedHeap != intent.heapBytes()) throw new IOException(&quot;PreparationNotConfirmed&quot;);</span>
-<span class="fc" id="L59">    return new ResizeAcknowledgement(intent, true, &quot;Applied&quot;, intent.requestBytes(),</span>
-<span class="fc" id="L60">        intent.limitBytes(), observedHeap, clock.instant());</span>
+    // G1 has no soft max to read back; its only evidence is the allocation transition above
+    // actually landing, already re-confirmed below, so the heap figure is vacuously the request.
+<span class="fc bfc" id="L58" title="All 2 branches covered.">    long observedHeap = heap.capabilities().supportsSoftMax() ? heap.softMaxBytes() : intent.heapBytes();</span>
+<span class="fc" id="L59">    PodState after = observation.read();</span>
+<span class="fc" id="L60">    requireCurrent(intent, after);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    if (after.currentRequestBytes().orElse(-1) != intent.requestBytes()</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        || after.currentLimitBytes().orElse(-1) != intent.limitBytes()</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        || observedHeap != intent.heapBytes()) throw new IOException(&quot;PreparationNotConfirmed&quot;);</span>
+<span class="fc" id="L64">    return new ResizeAcknowledgement(intent, true, &quot;Applied&quot;, intent.requestBytes(),</span>
+<span class="fc" id="L65">        intent.limitBytes(), observedHeap, clock.instant());</span>
   }
 
   public static void requireCurrent(ResizeIntent intent, PodState state) throws IOException {
-<span class="pc bpc" id="L64" title="1 of 4 branches missed.">    if (!intent.podUid().equals(state.podUid()) || !intent.containerId().equals(state.containerId())</span>
-<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        || state.correlatedIntent().isEmpty() || !intent.equals(state.correlatedIntent().get()))</span>
-<span class="fc" id="L66">      throw new IOException(&quot;StaleTransitionIdentity&quot;);</span>
-<span class="fc" id="L67">  }</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">    if (!intent.podUid().equals(state.podUid()) || !intent.containerId().equals(state.containerId())</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">        || state.correlatedIntent().isEmpty() || !intent.equals(state.correlatedIntent().get()))</span>
+<span class="fc" id="L71">      throw new IOException(&quot;StaleTransitionIdentity&quot;);</span>
+<span class="fc" id="L72">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
