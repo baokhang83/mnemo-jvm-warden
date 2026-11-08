@@ -54,6 +54,10 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: cp artifacthub-repo.yml coverage/target/site/jacoco-aggregate/artifacthub-repo.yml
 
+      - name: Include llms.txt at the site root
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cp llms.txt coverage/target/site/jacoco-aggregate/llms.txt
+
       - name: Publish coverage report to GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: JamesIves/github-pages-deploy-action@v4
