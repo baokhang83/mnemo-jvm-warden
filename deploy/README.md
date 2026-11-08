@@ -363,6 +363,16 @@ cluster first. No controller is installed (nothing can reach `Granted`), so this
 what specifically needs a real cluster to mean anything: confirming the client, for real,
 never releases an uncertain grant when its own acquisition timeout elapses.
 
+`verify-boost-g1.py` exercises B11's G1 collector support against a real controller and a real
+G1 JVM workload. Pass `--context`, `--controller-image repository:tag`, and `--agent-image
+repository:tag`; both images must already be loaded into the cluster. It confirms a feasible
+`heapTarget` (below the JVM's launch-time `-Xmx`) reaches `Granted` through the unmodified
+controller, and that an infeasible one is rejected before any allocation grows — proving B11's
+claim that no controller-side change was needed, since the controller never sees the
+collector, only an opaque `heapTarget` number. Full release to `Completed` is deliberately not
+asserted; see the script's own docstring for the separate, non-collector-specific release gap
+this run surfaced.
+
 For an end-to-end index rebuild with the real controller, sidecar, JVM, and resize API, see
 [Boost B7 acceptance](../docs/validation/warden-boost-b7-kind.md). This separate test is
 for disposable clusters and does not change the scheduled-only setup.
