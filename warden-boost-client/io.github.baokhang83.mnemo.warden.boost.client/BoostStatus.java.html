@@ -13,12 +13,12 @@
 
   private static final String GRANTED = &quot;Granted&quot;;
 
-  /** True once the request has reached {@code Granted}. */
+  /** True when the current observed phase is {@code Granted}. */
   public boolean isGranted() {
 <span class="fc" id="L18">    return GRANTED.equals(phase);</span>
   }
 
-  /** True once the request has reached any phase it will not move on from. */
+  /** True for phases that end acquisition waiting; some may still transition during cleanup. */
   public boolean isTerminal() {
 <span class="fc bfc" id="L23" title="All 2 branches covered.">    return switch (phase) {</span>
 <span class="fc" id="L24">      case &quot;Completed&quot;, &quot;Rejected&quot;, &quot;Failed&quot;, &quot;Expired&quot;, &quot;Orphaned&quot; -&gt; true;</span>

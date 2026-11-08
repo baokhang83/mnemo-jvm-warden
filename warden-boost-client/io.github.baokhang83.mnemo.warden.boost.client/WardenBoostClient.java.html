@@ -30,14 +30,12 @@ import java.util.function.Function;
  * }&lt;/pre&gt;
  *
  * &lt;p&gt;{@link #acquireBoost} returns only after a durable {@code Granted} &amp;mdash; never for a
- * merely {@code Pending} request. If the request reaches a terminal phase without ever
- * granting, it throws {@link BoostRejectedException} (a definite failure). If this client's own
- * {@code timeout} elapses first, it throws {@link BoostAcquisitionTimeoutException} and
- * deliberately does not touch the request: the grant may still be racing server-side, and
- * assuming otherwise is exactly the mistake the dev plan calls out. The timeout is a purely
- * local ceiling on how long this call waits &amp;mdash; it never asks the server to extend
- * anything, so it cannot outlive the operator's own acquisition deadline; once the controller
- * marks a request terminal (e.g. {@code Expired}), this client simply observes that and stops.
+ * merely {@code Pending} request. If it observes a non-granted phase treated as terminal by
+ * the client, it throws {@link BoostRejectedException}; cleanup can still be pending. If this
+ * client's own {@code timeout} elapses first, it throws {@link BoostAcquisitionTimeoutException}
+ * and does not complete the request: a grant may still race server-side. The timeout does not
+ * extend the operator's acquisition deadline. It is checked between HTTP calls, so an in-flight
+ * call can make the total wait exceed it. Preserve the request ID and reconcile uncertain outcomes.
  */
 public final class WardenBoostClient {
 
@@ -45,8 +43,8 @@ public final class WardenBoostClient {
   private static final String ENV_BOOST_TOKEN_PATH = &quot;WARDEN_BOOST_TOKEN_PATH&quot;;
   private static final int DEFAULT_BOOST_PORT = 8090;
   private static final String DEFAULT_TOKEN_PATH = &quot;/var/run/warden/boost/token&quot;;
-<span class="fc" id="L48">  private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);</span>
-<span class="fc" id="L49">  private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);</span>
+<span class="fc" id="L46">  private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);</span>
+<span class="fc" id="L47">  private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);</span>
 
   private final URI baseUri;
   private final Path tokenPath;
@@ -60,32 +58,32 @@ public final class WardenBoostClient {
    * env vars at all if it accepts them, only the shared token volume mount.
    */
   public static WardenBoostClient discover() {
-<span class="nc" id="L63">    return discover(System::getenv);</span>
+<span class="nc" id="L61">    return discover(System::getenv);</span>
   }
 
   /** Package-private seam so tests can supply a fake environment. */
   static WardenBoostClient discover(Function&lt;String, String&gt; env) {
-<span class="fc" id="L68">    int port = parsePort(env.apply(ENV_BOOST_PORT));</span>
-<span class="fc" id="L69">    String configuredTokenPath = env.apply(ENV_BOOST_TOKEN_PATH);</span>
-<span class="fc" id="L70">    Path tokenPath = Path.of(</span>
-<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        (configuredTokenPath == null || configuredTokenPath.isBlank())</span>
-<span class="fc" id="L72">            ? DEFAULT_TOKEN_PATH</span>
-<span class="fc" id="L73">            : configuredTokenPath.trim());</span>
-<span class="fc" id="L74">    return new WardenBoostClient(</span>
-<span class="fc" id="L75">        URI.create(&quot;http://127.0.0.1:&quot; + port), tokenPath, HttpClient.newHttpClient(), DEFAULT_POLL_INTERVAL);</span>
+<span class="fc" id="L66">    int port = parsePort(env.apply(ENV_BOOST_PORT));</span>
+<span class="fc" id="L67">    String configuredTokenPath = env.apply(ENV_BOOST_TOKEN_PATH);</span>
+<span class="fc" id="L68">    Path tokenPath = Path.of(</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        (configuredTokenPath == null || configuredTokenPath.isBlank())</span>
+<span class="fc" id="L70">            ? DEFAULT_TOKEN_PATH</span>
+<span class="fc" id="L71">            : configuredTokenPath.trim());</span>
+<span class="fc" id="L72">    return new WardenBoostClient(</span>
+<span class="fc" id="L73">        URI.create(&quot;http://127.0.0.1:&quot; + port), tokenPath, HttpClient.newHttpClient(), DEFAULT_POLL_INTERVAL);</span>
   }
 
   /** Package-private seam so tests can point at a fake local server and shorten polling. */
-<span class="fc" id="L79">  WardenBoostClient(URI baseUri, Path tokenPath, HttpClient httpClient, Duration pollInterval) {</span>
-<span class="fc" id="L80">    this.baseUri = baseUri;</span>
-<span class="fc" id="L81">    this.tokenPath = tokenPath;</span>
-<span class="fc" id="L82">    this.httpClient = httpClient;</span>
-<span class="fc" id="L83">    this.pollInterval = pollInterval;</span>
-<span class="fc" id="L84">  }</span>
+<span class="fc" id="L77">  WardenBoostClient(URI baseUri, Path tokenPath, HttpClient httpClient, Duration pollInterval) {</span>
+<span class="fc" id="L78">    this.baseUri = baseUri;</span>
+<span class="fc" id="L79">    this.tokenPath = tokenPath;</span>
+<span class="fc" id="L80">    this.httpClient = httpClient;</span>
+<span class="fc" id="L81">    this.pollInterval = pollInterval;</span>
+<span class="fc" id="L82">  }</span>
 
   /** Acquires a new boost, generating a stable request ID. See the class javadoc. */
   public BoostLease acquireBoost(String boost, Duration timeout) throws IOException, InterruptedException {
-<span class="fc" id="L88">    return acquireBoost(boost, UUID.randomUUID().toString(), timeout);</span>
+<span class="fc" id="L86">    return acquireBoost(boost, UUID.randomUUID().toString(), timeout);</span>
   }
 
   /**
@@ -95,96 +93,96 @@ public final class WardenBoostClient {
    */
   public BoostLease acquireBoost(String boost, String requestId, Duration timeout)
       throws IOException, InterruptedException {
-<span class="pc bpc" id="L98" title="1 of 4 branches missed.">    if (boost == null || boost.isBlank()) {</span>
-<span class="fc" id="L99">      throw new IllegalArgumentException(&quot;boost is required&quot;);</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">    if (boost == null || boost.isBlank()) {</span>
+<span class="fc" id="L97">      throw new IllegalArgumentException(&quot;boost is required&quot;);</span>
     }
-<span class="pc bpc" id="L101" title="2 of 4 branches missed.">    if (requestId == null || requestId.isBlank()) {</span>
-<span class="nc" id="L102">      throw new IllegalArgumentException(&quot;requestId is required&quot;);</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">    if (requestId == null || requestId.isBlank()) {</span>
+<span class="nc" id="L100">      throw new IllegalArgumentException(&quot;requestId is required&quot;);</span>
     }
-<span class="fc" id="L104">    Instant deadline = Instant.now().plus(timeout);</span>
-<span class="fc" id="L105">    boolean created = false;</span>
-<span class="fc" id="L106">    String lastPhase = &quot;Pending&quot;;</span>
+<span class="fc" id="L102">    Instant deadline = Instant.now().plus(timeout);</span>
+<span class="fc" id="L103">    boolean created = false;</span>
+<span class="fc" id="L104">    String lastPhase = &quot;Pending&quot;;</span>
     while (true) {
-<span class="fc" id="L108">      HttpResponse&lt;String&gt; response = null;</span>
+<span class="fc" id="L106">      HttpResponse&lt;String&gt; response = null;</span>
       try {
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        response = created</span>
-<span class="fc" id="L111">            ? rawGet(&quot;/v1/boost/status?requestId=&quot; + encode(requestId))</span>
-<span class="fc" id="L112">            : rawPost(&quot;/v1/boost/acquire&quot;, acquireBody(boost, requestId));</span>
-<span class="nc" id="L113">      } catch (IOException networkBlip) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        response = created</span>
+<span class="fc" id="L109">            ? rawGet(&quot;/v1/boost/status?requestId=&quot; + encode(requestId))</span>
+<span class="fc" id="L110">            : rawPost(&quot;/v1/boost/acquire&quot;, acquireBody(boost, requestId));</span>
+<span class="nc" id="L111">      } catch (IOException networkBlip) {</span>
         // Transient — fall through to the deadline/backoff check below rather than failing fast.
-<span class="fc" id="L115">      }</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">      if (response != null) {</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (response.statusCode() == 401) {</span>
-<span class="fc" id="L118">          throw new IOException(&quot;boost API rejected the bearer token (401): &quot; + response.body());</span>
+<span class="fc" id="L113">      }</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">      if (response != null) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (response.statusCode() == 401) {</span>
+<span class="fc" id="L116">          throw new IOException(&quot;boost API rejected the bearer token (401): &quot; + response.body());</span>
         }
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (response.statusCode() == 400) {</span>
-<span class="nc" id="L121">          throw new IOException(&quot;boost API rejected the request (400): &quot; + response.body());</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (response.statusCode() == 400) {</span>
+<span class="nc" id="L119">          throw new IOException(&quot;boost API rejected the request (400): &quot; + response.body());</span>
         }
-<span class="fc bfc" id="L123" title="All 4 branches covered.">        if (response.statusCode() == 200 || response.statusCode() == 202) {</span>
-<span class="fc" id="L124">          created = true;</span>
-<span class="fc" id="L125">          BoostStatus status = parseStatus(response.body());</span>
-<span class="fc" id="L126">          lastPhase = status.phase();</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">          if (status.isGranted()) {</span>
-<span class="fc" id="L128">            return new BoostLease(this, requestId);</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">        if (response.statusCode() == 200 || response.statusCode() == 202) {</span>
+<span class="fc" id="L122">          created = true;</span>
+<span class="fc" id="L123">          BoostStatus status = parseStatus(response.body());</span>
+<span class="fc" id="L124">          lastPhase = status.phase();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">          if (status.isGranted()) {</span>
+<span class="fc" id="L126">            return new BoostLease(this, requestId);</span>
           }
-<span class="fc bfc" id="L130" title="All 2 branches covered.">          if (status.isTerminal()) {</span>
-<span class="fc" id="L131">            throw new BoostRejectedException(requestId, status.phase(), status.message());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">          if (status.isTerminal()) {</span>
+<span class="fc" id="L129">            throw new BoostRejectedException(requestId, status.phase(), status.message());</span>
           }
           // Pending/Preparing/Releasing — keep polling below.
         }
         // Any other status (404/409/5xx mid-poll) is treated the same as a network blip.
       }
-<span class="fc bfc" id="L137" title="All 2 branches covered.">      if (!Instant.now().isBefore(deadline)) {</span>
-<span class="fc" id="L138">        throw new BoostAcquisitionTimeoutException(requestId, lastPhase);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">      if (!Instant.now().isBefore(deadline)) {</span>
+<span class="fc" id="L136">        throw new BoostAcquisitionTimeoutException(requestId, lastPhase);</span>
       }
-<span class="fc" id="L140">      Thread.sleep(pollInterval.toMillis());</span>
-<span class="fc" id="L141">    }</span>
+<span class="fc" id="L138">      Thread.sleep(pollInterval.toMillis());</span>
+<span class="fc" id="L139">    }</span>
   }
 
   /** Package-private introspection seam for tests confirming {@link #discover} resolved correctly. */
   URI baseUri() {
-<span class="fc" id="L146">    return baseUri;</span>
+<span class="fc" id="L144">    return baseUri;</span>
   }
 
   /** Package-private introspection seam for tests confirming {@link #discover} resolved correctly. */
   Path tokenPath() {
-<span class="fc" id="L151">    return tokenPath;</span>
+<span class="fc" id="L149">    return tokenPath;</span>
   }
 
   /** Looks up a known request ID directly, without creating a {@link BoostLease}. */
   public BoostStatus inspect(String requestId) throws IOException, InterruptedException {
-<span class="fc" id="L156">    HttpResponse&lt;String&gt; response = rawGet(&quot;/v1/boost/status?requestId=&quot; + encode(requestId));</span>
-<span class="pc bpc" id="L157" title="1 of 2 branches missed.">    if (response.statusCode() != 200) {</span>
-<span class="nc" id="L158">      throw new IOException(&quot;inspect &quot; + requestId + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+<span class="fc" id="L154">    HttpResponse&lt;String&gt; response = rawGet(&quot;/v1/boost/status?requestId=&quot; + encode(requestId));</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L156">      throw new IOException(&quot;inspect &quot; + requestId + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
     }
-<span class="fc" id="L160">    return parseStatus(response.body());</span>
+<span class="fc" id="L158">    return parseStatus(response.body());</span>
   }
 
   BoostStatus release(String requestId) throws IOException, InterruptedException {
-<span class="fc" id="L164">    HttpResponse&lt;String&gt; response = rawPost(&quot;/v1/boost/release&quot;, releaseBody(requestId));</span>
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">    if (response.statusCode() != 200) {</span>
-<span class="nc" id="L166">      throw new IOException(&quot;release &quot; + requestId + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+<span class="fc" id="L162">    HttpResponse&lt;String&gt; response = rawPost(&quot;/v1/boost/release&quot;, releaseBody(requestId));</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L164">      throw new IOException(&quot;release &quot; + requestId + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
     }
-<span class="fc" id="L168">    return parseStatus(response.body());</span>
+<span class="fc" id="L166">    return parseStatus(response.body());</span>
   }
 
   private HttpResponse&lt;String&gt; rawPost(String path, String body) throws IOException, InterruptedException {
-<span class="fc" id="L172">    HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(path))</span>
-<span class="fc" id="L173">        .timeout(REQUEST_TIMEOUT)</span>
-<span class="fc" id="L174">        .header(&quot;Authorization&quot;, &quot;Bearer &quot; + bearerToken())</span>
-<span class="fc" id="L175">        .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
-<span class="fc" id="L176">        .POST(HttpRequest.BodyPublishers.ofString(body))</span>
-<span class="fc" id="L177">        .build();</span>
-<span class="fc" id="L178">    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="fc" id="L170">    HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(path))</span>
+<span class="fc" id="L171">        .timeout(REQUEST_TIMEOUT)</span>
+<span class="fc" id="L172">        .header(&quot;Authorization&quot;, &quot;Bearer &quot; + bearerToken())</span>
+<span class="fc" id="L173">        .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
+<span class="fc" id="L174">        .POST(HttpRequest.BodyPublishers.ofString(body))</span>
+<span class="fc" id="L175">        .build();</span>
+<span class="fc" id="L176">    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
   }
 
   private HttpResponse&lt;String&gt; rawGet(String pathWithQuery) throws IOException, InterruptedException {
-<span class="fc" id="L182">    HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(pathWithQuery))</span>
-<span class="fc" id="L183">        .timeout(REQUEST_TIMEOUT)</span>
-<span class="fc" id="L184">        .header(&quot;Authorization&quot;, &quot;Bearer &quot; + bearerToken())</span>
-<span class="fc" id="L185">        .GET()</span>
-<span class="fc" id="L186">        .build();</span>
-<span class="fc" id="L187">    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+<span class="fc" id="L180">    HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(pathWithQuery))</span>
+<span class="fc" id="L181">        .timeout(REQUEST_TIMEOUT)</span>
+<span class="fc" id="L182">        .header(&quot;Authorization&quot;, &quot;Bearer &quot; + bearerToken())</span>
+<span class="fc" id="L183">        .GET()</span>
+<span class="fc" id="L184">        .build();</span>
+<span class="fc" id="L185">    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
   }
 
   /**
@@ -193,35 +191,35 @@ public final class WardenBoostClient {
    * {@code InClusterApiServer.bearerToken()}'s own rationale.
    */
   private String bearerToken() throws IOException {
-<span class="fc" id="L196">    return Files.readString(tokenPath, StandardCharsets.UTF_8).trim();</span>
+<span class="fc" id="L194">    return Files.readString(tokenPath, StandardCharsets.UTF_8).trim();</span>
   }
 
   @SuppressWarnings(&quot;unchecked&quot;)
   private static BoostStatus parseStatus(String json) {
-<span class="fc" id="L201">    Map&lt;String, Object&gt; map = (Map&lt;String, Object&gt;) MinimalJson.parse(json);</span>
-<span class="fc" id="L202">    return new BoostStatus((String) map.get(&quot;requestId&quot;), (String) map.get(&quot;phase&quot;), (String) map.get(&quot;message&quot;));</span>
+<span class="fc" id="L199">    Map&lt;String, Object&gt; map = (Map&lt;String, Object&gt;) MinimalJson.parse(json);</span>
+<span class="fc" id="L200">    return new BoostStatus((String) map.get(&quot;requestId&quot;), (String) map.get(&quot;phase&quot;), (String) map.get(&quot;message&quot;));</span>
   }
 
   private static String acquireBody(String boost, String requestId) {
-<span class="fc" id="L206">    return &quot;{\&quot;boost\&quot;:&quot; + JsonString.quote(boost) + &quot;,\&quot;requestId\&quot;:&quot; + JsonString.quote(requestId) + &quot;}&quot;;</span>
+<span class="fc" id="L204">    return &quot;{\&quot;boost\&quot;:&quot; + JsonString.quote(boost) + &quot;,\&quot;requestId\&quot;:&quot; + JsonString.quote(requestId) + &quot;}&quot;;</span>
   }
 
   private static String releaseBody(String requestId) {
-<span class="fc" id="L210">    return &quot;{\&quot;requestId\&quot;:&quot; + JsonString.quote(requestId) + &quot;}&quot;;</span>
+<span class="fc" id="L208">    return &quot;{\&quot;requestId\&quot;:&quot; + JsonString.quote(requestId) + &quot;}&quot;;</span>
   }
 
   private static String encode(String value) {
-<span class="fc" id="L214">    return URLEncoder.encode(value, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L212">    return URLEncoder.encode(value, StandardCharsets.UTF_8);</span>
   }
 
   private static int parsePort(String raw) {
-<span class="pc bpc" id="L218" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
-<span class="fc" id="L219">      return DEFAULT_BOOST_PORT;</span>
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L217">      return DEFAULT_BOOST_PORT;</span>
     }
     try {
-<span class="fc" id="L222">      return Integer.parseInt(raw.trim());</span>
-<span class="fc" id="L223">    } catch (NumberFormatException e) {</span>
-<span class="fc" id="L224">      throw new IllegalArgumentException(ENV_BOOST_PORT + &quot; must be an integer, got: &quot; + raw, e);</span>
+<span class="fc" id="L220">      return Integer.parseInt(raw.trim());</span>
+<span class="fc" id="L221">    } catch (NumberFormatException e) {</span>
+<span class="fc" id="L222">      throw new IllegalArgumentException(ENV_BOOST_PORT + &quot; must be an integer, got: &quot; + raw, e);</span>
     }
   }
 }
