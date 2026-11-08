@@ -56,7 +56,15 @@ jobs:
 
       - name: Include llms.txt at the site root
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: cp llms.txt coverage/target/site/jacoco-aggregate/llms.txt
+        run: |
+          site=coverage/target/site/jacoco-aggregate
+          cp llms.txt "$site/llms.txt"
+          # Link it from the landing page (the JaCoCo report) so crawlers that do not
+          # guess root paths still find it. Fail loudly if JaCoCo's markup ever changes.
+          grep -q '<div class="footer">' "$site/index.html"
+          sed -i 's|<div class="footer">|<div class="footer"><span class="left"><a href="llms.txt">llms.txt</a></span>|' "$site/index.html"
+          sed -i 's|</head>|<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt"/></head>|' "$site/index.html"
+          grep -q 'href="llms.txt">llms.txt</a>' "$site/index.html"
 
       - name: Publish coverage report to GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
