@@ -291,6 +291,10 @@ production.
 
 [Your JVMs Are Burning Money Overnight — Here's How to Shrink Them Safely in Kubernetes](https://baokhang.hashnode.dev/shrink-jvm-memory-kubernetes-in-place-resize)
 
+[Does a JVM Need RestartContainer? Not With ZGC/Shenandoah](https://baokhang.hashnode.dev/why-kubernetes-1-35-resizepolicy-restartcontainer-isn-t-required-for-zgc-shenandoah)
+
+[How to Make G1 Release Memory to the OS in Kubernetes](https://baokhang.hashnode.dev/your-g1-pod-ignores-softmaxheapsize-here-s-what-works-instead)
+
 ## License
 
 [Apache License 2.0](./LICENSE)
