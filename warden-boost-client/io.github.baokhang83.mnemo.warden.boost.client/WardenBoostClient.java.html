@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WardenBoostClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">coverage</a> &gt; <a href="../index.html" class="el_bundle">warden-boost-client</a> &gt; <a href="index.source.html" class="el_package">io.github.baokhang83.mnemo.warden.boost.client</a> &gt; <span class="el_source">WardenBoostClient.java</span></div><h1>WardenBoostClient.java</h1><pre class="source lang-java linenums">package io.github.baokhang83.mnemo.warden.boost.client;
+
+import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import io.github.baokhang83.mnemo.warden.protocol.MinimalJson;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+
+/**
+ * Entry point for B9's Java lease client: talks only to the B8 local sidecar API
+ * (loopback-only, never the Kubernetes API), so embedding this in an application needs no
+ * Kubernetes credentials at all &amp;mdash; the dev plan's explicit requirement.
+ *
+ * &lt;pre&gt;{@code
+ * try (BoostLease lease = WardenBoostClient.discover().acquireBoost(
+ *         &quot;index-rebuild&quot;, Duration.ofMinutes(2))) {
+ *   rebuildIndex();
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;{@link #acquireBoost} returns only after a durable {@code Granted} &amp;mdash; never for a
+ * merely {@code Pending} request. If the request reaches a terminal phase without ever
+ * granting, it throws {@link BoostRejectedException} (a definite failure). If this client's own
+ * {@code timeout} elapses first, it throws {@link BoostAcquisitionTimeoutException} and
+ * deliberately does not touch the request: the grant may still be racing server-side, and
+ * assuming otherwise is exactly the mistake the dev plan calls out. The timeout is a purely
+ * local ceiling on how long this call waits &amp;mdash; it never asks the server to extend
+ * anything, so it cannot outlive the operator's own acquisition deadline; once the controller
+ * marks a request terminal (e.g. {@code Expired}), this client simply observes that and stops.
+ */
+public final class WardenBoostClient {
+
+  private static final String ENV_BOOST_PORT = &quot;WARDEN_BOOST_PORT&quot;;
+  private static final String ENV_BOOST_TOKEN_PATH = &quot;WARDEN_BOOST_TOKEN_PATH&quot;;
+  private static final int DEFAULT_BOOST_PORT = 8090;
+  private static final String DEFAULT_TOKEN_PATH = &quot;/var/run/warden/boost/token&quot;;
+<span class="fc" id="L48">  private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);</span>
+<span class="fc" id="L49">  private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);</span>
+
+  private final URI baseUri;
+  private final Path tokenPath;
+  private final HttpClient httpClient;
+  private final Duration pollInterval;
+
+  /**
+   * Connects using the agent's own defaults ({@code WARDEN_BOOST_PORT}=8090, {@code
+   * WARDEN_BOOST_TOKEN_PATH}=/var/run/warden/boost/token) unless overridden by the environment
+   * &amp;mdash; matching {@code AgentConfig}'s defaults exactly, so an app container needs no extra
+   * env vars at all if it accepts them, only the shared token volume mount.
+   */
+  public static WardenBoostClient discover() {
+<span class="nc" id="L63">    return discover(System::getenv);</span>
+  }
+
+  /** Package-private seam so tests can supply a fake environment. */
+  static WardenBoostClient discover(Function&lt;String, String&gt; env) {
+<span class="fc" id="L68">    int port = parsePort(env.apply(ENV_BOOST_PORT));</span>
+<span class="fc" id="L69">    String configuredTokenPath = env.apply(ENV_BOOST_TOKEN_PATH);</span>
+<span class="fc" id="L70">    Path tokenPath = Path.of(</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        (configuredTokenPath == null || configuredTokenPath.isBlank())</span>
+<span class="fc" id="L72">            ? DEFAULT_TOKEN_PATH</span>
+<span class="fc" id="L73">            : configuredTokenPath.trim());</span>
+<span class="fc" id="L74">    return new WardenBoostClient(</span>
+<span class="fc" id="L75">        URI.create(&quot;http://127.0.0.1:&quot; + port), tokenPath, HttpClient.newHttpClient(), DEFAULT_POLL_INTERVAL);</span>
+  }
+
+  /** Package-private seam so tests can point at a fake local server and shorten polling. */
+<span class="fc" id="L79">  WardenBoostClient(URI baseUri, Path tokenPath, HttpClient httpClient, Duration pollInterval) {</span>
+<span class="fc" id="L80">    this.baseUri = baseUri;</span>
+<span class="fc" id="L81">    this.tokenPath = tokenPath;</span>
+<span class="fc" id="L82">    this.httpClient = httpClient;</span>
+<span class="fc" id="L83">    this.pollInterval = pollInterval;</span>
+<span class="fc" id="L84">  }</span>
+
+  /** Acquires a new boost, generating a stable request ID. See the class javadoc. */
+  public BoostLease acquireBoost(String boost, Duration timeout) throws IOException, InterruptedException {
+<span class="fc" id="L88">    return acquireBoost(boost, UUID.randomUUID().toString(), timeout);</span>
+  }
+
+  /**
+   * Acquires (or resumes waiting on) a boost under a caller-supplied, stable request ID &amp;mdash;
+   * the retry path for a {@code requestId} recovered from a previous
+   * {@link BoostAcquisitionTimeoutException}. See the class javadoc.
+   */
+  public BoostLease acquireBoost(String boost, String requestId, Duration timeout)
+      throws IOException, InterruptedException {
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">    if (boost == null || boost.isBlank()) {</span>
+<span class="fc" id="L99">      throw new IllegalArgumentException(&quot;boost is required&quot;);</span>
+    }
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">    if (requestId == null || requestId.isBlank()) {</span>
+<span class="nc" id="L102">      throw new IllegalArgumentException(&quot;requestId is required&quot;);</span>
+    }
+<span class="fc" id="L104">    Instant deadline = Instant.now().plus(timeout);</span>
+<span class="fc" id="L105">    boolean created = false;</span>
+<span class="fc" id="L106">    String lastPhase = &quot;Pending&quot;;</span>
+    while (true) {
+<span class="fc" id="L108">      HttpResponse&lt;String&gt; response = null;</span>
+      try {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        response = created</span>
+<span class="fc" id="L111">            ? rawGet(&quot;/v1/boost/status?requestId=&quot; + encode(requestId))</span>
+<span class="fc" id="L112">            : rawPost(&quot;/v1/boost/acquire&quot;, acquireBody(boost, requestId));</span>
+<span class="nc" id="L113">      } catch (IOException networkBlip) {</span>
+        // Transient — fall through to the deadline/backoff check below rather than failing fast.
+<span class="fc" id="L115">      }</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">      if (response != null) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (response.statusCode() == 401) {</span>
+<span class="fc" id="L118">          throw new IOException(&quot;boost API rejected the bearer token (401): &quot; + response.body());</span>
+        }
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (response.statusCode() == 400) {</span>
+<span class="nc" id="L121">          throw new IOException(&quot;boost API rejected the request (400): &quot; + response.body());</span>
+        }
+<span class="fc bfc" id="L123" title="All 4 branches covered.">        if (response.statusCode() == 200 || response.statusCode() == 202) {</span>
+<span class="fc" id="L124">          created = true;</span>
+<span class="fc" id="L125">          BoostStatus status = parseStatus(response.body());</span>
+<span class="fc" id="L126">          lastPhase = status.phase();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">          if (status.isGranted()) {</span>
+<span class="fc" id="L128">            return new BoostLease(this, requestId);</span>
+          }
+<span class="fc bfc" id="L130" title="All 2 branches covered.">          if (status.isTerminal()) {</span>
+<span class="fc" id="L131">            throw new BoostRejectedException(requestId, status.phase(), status.message());</span>
+          }
+          // Pending/Preparing/Releasing — keep polling below.
+        }
+        // Any other status (404/409/5xx mid-poll) is treated the same as a network blip.
+      }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">      if (!Instant.now().isBefore(deadline)) {</span>
+<span class="fc" id="L138">        throw new BoostAcquisitionTimeoutException(requestId, lastPhase);</span>
+      }
+<span class="fc" id="L140">      Thread.sleep(pollInterval.toMillis());</span>
+<span class="fc" id="L141">    }</span>
+  }
+
+  /** Package-private introspection seam for tests confirming {@link #discover} resolved correctly. */
+  URI baseUri() {
+<span class="fc" id="L146">    return baseUri;</span>
+  }
+
+  /** Package-private introspection seam for tests confirming {@link #discover} resolved correctly. */
+  Path tokenPath() {
+<span class="fc" id="L151">    return tokenPath;</span>
+  }
+
+  /** Looks up a known request ID directly, without creating a {@link BoostLease}. */
+  public BoostStatus inspect(String requestId) throws IOException, InterruptedException {
+<span class="fc" id="L156">    HttpResponse&lt;String&gt; response = rawGet(&quot;/v1/boost/status?requestId=&quot; + encode(requestId));</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L158">      throw new IOException(&quot;inspect &quot; + requestId + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+    }
+<span class="fc" id="L160">    return parseStatus(response.body());</span>
+  }
+
+  BoostStatus release(String requestId) throws IOException, InterruptedException {
+<span class="fc" id="L164">    HttpResponse&lt;String&gt; response = rawPost(&quot;/v1/boost/release&quot;, releaseBody(requestId));</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">    if (response.statusCode() != 200) {</span>
+<span class="nc" id="L166">      throw new IOException(&quot;release &quot; + requestId + &quot; failed: HTTP &quot; + response.statusCode() + &quot; &quot; + response.body());</span>
+    }
+<span class="fc" id="L168">    return parseStatus(response.body());</span>
+  }
+
+  private HttpResponse&lt;String&gt; rawPost(String path, String body) throws IOException, InterruptedException {
+<span class="fc" id="L172">    HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(path))</span>
+<span class="fc" id="L173">        .timeout(REQUEST_TIMEOUT)</span>
+<span class="fc" id="L174">        .header(&quot;Authorization&quot;, &quot;Bearer &quot; + bearerToken())</span>
+<span class="fc" id="L175">        .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
+<span class="fc" id="L176">        .POST(HttpRequest.BodyPublishers.ofString(body))</span>
+<span class="fc" id="L177">        .build();</span>
+<span class="fc" id="L178">    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+  }
+
+  private HttpResponse&lt;String&gt; rawGet(String pathWithQuery) throws IOException, InterruptedException {
+<span class="fc" id="L182">    HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(pathWithQuery))</span>
+<span class="fc" id="L183">        .timeout(REQUEST_TIMEOUT)</span>
+<span class="fc" id="L184">        .header(&quot;Authorization&quot;, &quot;Bearer &quot; + bearerToken())</span>
+<span class="fc" id="L185">        .GET()</span>
+<span class="fc" id="L186">        .build();</span>
+<span class="fc" id="L187">    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+  }
+
+  /**
+   * Re-read fresh on every call, never cached in a field — a sidecar restart regenerates the
+   * token, and this client may live far longer than any single token's validity, mirroring
+   * {@code InClusterApiServer.bearerToken()}'s own rationale.
+   */
+  private String bearerToken() throws IOException {
+<span class="fc" id="L196">    return Files.readString(tokenPath, StandardCharsets.UTF_8).trim();</span>
+  }
+
+  @SuppressWarnings(&quot;unchecked&quot;)
+  private static BoostStatus parseStatus(String json) {
+<span class="fc" id="L201">    Map&lt;String, Object&gt; map = (Map&lt;String, Object&gt;) MinimalJson.parse(json);</span>
+<span class="fc" id="L202">    return new BoostStatus((String) map.get(&quot;requestId&quot;), (String) map.get(&quot;phase&quot;), (String) map.get(&quot;message&quot;));</span>
+  }
+
+  private static String acquireBody(String boost, String requestId) {
+<span class="fc" id="L206">    return &quot;{\&quot;boost\&quot;:&quot; + JsonString.quote(boost) + &quot;,\&quot;requestId\&quot;:&quot; + JsonString.quote(requestId) + &quot;}&quot;;</span>
+  }
+
+  private static String releaseBody(String requestId) {
+<span class="fc" id="L210">    return &quot;{\&quot;requestId\&quot;:&quot; + JsonString.quote(requestId) + &quot;}&quot;;</span>
+  }
+
+  private static String encode(String value) {
+<span class="fc" id="L214">    return URLEncoder.encode(value, StandardCharsets.UTF_8);</span>
+  }
+
+  private static int parsePort(String raw) {
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">    if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L219">      return DEFAULT_BOOST_PORT;</span>
+    }
+    try {
+<span class="fc" id="L222">      return Integer.parseInt(raw.trim());</span>
+<span class="fc" id="L223">    } catch (NumberFormatException e) {</span>
+<span class="fc" id="L224">      throw new IllegalArgumentException(ENV_BOOST_PORT + &quot; must be an integer, got: &quot; + raw, e);</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
