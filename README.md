@@ -1,4 +1,4 @@
-<img width="1774" height="887" alt="image" src="https://github.com/user-attachments/assets/b6482962-8fad-4a76-875a-85cefb16796d" />
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/994b7082-0375-480d-935b-5233a854a536" />
 
 # mnemo-jvm-warden
 
