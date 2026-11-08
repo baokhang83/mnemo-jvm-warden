@@ -308,9 +308,8 @@ issues and feedback welcome.
 request admission, RBAC, events, and metrics. A disposable-cluster acceptance run covers the
 manual flow; the client and local API have separate checks. A single end-to-end client-to-JVM
 run and production validation remain outstanding. See the [Boost guide](docs/warden-boost.md)
-for setup, trust assumptions, and controlled evaluation. The Boost client and compatible images
-are planned for `0.2.0`, which is not published yet; older published artifacts do not provide
-them.
+for setup, trust assumptions, and controlled evaluation. Release `0.2.0` includes the local API
+and Java client; check the publication workflows and registries before using its artifacts.
 
 ## Requirements
 

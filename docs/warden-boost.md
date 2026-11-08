@@ -371,7 +371,8 @@ that `status.podUid` and `status.containerId` match the live Pod and application
 and that the current time is before `status.executionDeadline`. These are separate Kubernetes
 reads, not an atomic cross-resource transaction: a restart or replacement can happen after a
 check. Do not reuse a grant after an identity change, and coordinate your operation's start and
-lifetime accordingly. A future client API is planned to make this interaction easier.
+lifetime accordingly. The local sidecar API and Java client can also manage requests, as
+explained below.
 
 Only after the operation and all child work have actually stopped, request completion:
 
@@ -514,8 +515,8 @@ path — those come from the sidecar's own configuration, never from the app's r
 
 `warden-boost-client` wraps the local API above in the shape application code actually wants.
 It requires Java 21. The dependency below uses the version of an application release that
-contains B9. The planned release is `0.2.0` and is not published yet; the client is not present
-in the older `v0.1.4` release:
+contains B9. The client is included in release `0.2.0`; it is not present in the older `v0.1.4`
+release. Verify that Maven Central has published the artifact before using it:
 
 ```xml
 <dependency>
@@ -525,9 +526,8 @@ in the older `v0.1.4` release:
 </dependency>
 ```
 
-Before that release is published, build from the matching checkout with
-`mvn -pl warden-boost-client -am install` and use its project version locally. Do not interpret
-the checkout's `0.1.0` as the published Boost version.
+To build from source instead, run `mvn -pl warden-boost-client -am install` and use the
+checkout's project version locally. The release workflow stamps the Maven version from its tag.
 
 ```java
 try (BoostLease lease = WardenBoostClient.discover().acquireBoost(
