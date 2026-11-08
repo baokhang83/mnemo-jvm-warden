@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing application tag to publish (for example v0.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,7 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     name: publish to maven central
     steps:
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected an application tag such as v0.2.0"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -29,7 +46,9 @@ jobs:
       # recurring "Component ... @0.1.0 already exists" failure caused by the poms sitting at a
       # stale 0.1.0 while tags advanced.
       - name: Set version from tag
-        run: mvn -B -ntp versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: mvn -B -ntp versions:set -DnewVersion="${RELEASE_TAG#v}" -DgenerateBackupPoms=false
 
       - name: Import GPG key
         run: |
@@ -59,6 +78,7 @@ jobs:
             ]
 
       - name: Deploy to Maven Central
-        run: mvn -B -ntp deploy -Prelease
+        # The override also fixes retries of older tags without changing their source commit.
+        run: mvn -B -ntp deploy -Prelease -Dcentral-publishing-maven-plugin.version=0.12.0
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
