@@ -1,16 +1,16 @@
 # Warden Boost: compatibility, operations, and release
 
 Boost is experimental. This page supplements the [operator guide](warden-boost.md); it does not
-replace the [scheduled-only configuration](configuration.md). The planned `0.2.0` release will contain the local
-API and Java client; it has not yet been published. Do not assume older chart, image, or Maven
-versions contain these features just because the current source does.
+replace the [scheduled-only configuration](configuration.md). Release `0.2.0` includes the local
+API and Java client. Check each publication workflow and registry before using its artifacts;
+do not assume older chart, image, or Maven versions contain these features.
 
 ## Compatibility and evidence
 
 | Component | Requirement or evidence |
 | --- | --- |
 | Kubernetes | In-place container memory resize and native sidecars are required. Kubernetes 1.35+ provides stable in-place resize; the opt-in security package additionally requires `ValidatingAdmissionPolicy`. Verify admission and resize behavior on your distribution. |
-| Node | Linux, cgroup v2, sufficient node capacity, and a runtime that applies in-place memory resizing. Node policies and Pod QoS can restrict resizing. |
+| Node | Linux, cgroup v2, sufficient node capacity, and a runtime that applies in-place memory resizing. The published `v0.2.0` agent and controller images are `linux/amd64` only; the recorded arm64 tests used locally built images. Node policies and Pod QoS can restrict resizing. |
 | Target JVM | Boost's explicit heap target needs runtime `SoftMaxHeapSize` support; use a supported ZGC or Shenandoah configuration. `-Xmx` is a fixed ceiling and must accommodate the Boost heap target. Heap is only part of container memory. |
 | Application client | Java 21+, an agent built with B8, the B9 client, and a shared readable bearer-token file. The API binds loopback and is disabled unless configured. |
 | Controller and security | Use matching Boost-capable controller and agent images, current CRDs and RBAC; the opt-in chart admission package must be available and enabled if using its documented trust boundary. A chart version alone does not upgrade images. |
@@ -94,10 +94,8 @@ work or cause an OOM; this guide does not prescribe it as routine recovery.
 
 ## Preparing a release
 
-Release from the reviewed and merged commit. The planned application version is `0.2.0`. Before releasing, confirm that it is unused and
-greater than existing releases **and** both published chart versions; chart tags cannot be overwritten. The
-current published chart versions are `warden 0.1.8` and `warden-sidecar 0.1.5`; inspect the
-repository's releases and tags again at release time. Do not reuse a version if a previous
+Release from the reviewed and merged commit. Before choosing a version, confirm that it is unused
+and greater than existing releases **and** both published chart versions; chart tags cannot be overwritten. Inspect the repository's releases and tags at release time. Do not reuse a version if a previous
 partial publication already created any of its artifacts.
 
 1. Verify the merged commit, full CI, both chart lints, and the relevant disposable-cluster
@@ -105,7 +103,7 @@ partial publication already created any of its artifacts.
    signing credentials are configured without exposing their values.
 2. Prepare release notes from [the Boost release notes](releases/warden-boost.md), including
    the exact commit, version, compatibility and verification results. Create the application
-   `v0.2.0` tag on that merged commit and push the tag, then publish the matching GitHub
+   `vX.Y.Z` tag on that merged commit and push the tag, then publish the matching GitHub
    release using the project's normal release process. A tag push triggers `publish-maven` and `publish-charts-release`; publishing the
    GitHub release triggers the two container image jobs. The workflows have different triggers:
    a tag alone does not publish the images. Do not assume a GitHub Actions-created tag/release

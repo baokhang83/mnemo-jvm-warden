@@ -67,7 +67,7 @@
          only works with the legacy OSSRH host and 404s against the new Sonatype Central Portal,
          which this namespace is provisioned on — central-publishing-maven-plugin is the plugin
          Sonatype ships for the Central Portal Publisher API. -->
-    <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
+    <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
     <!-- Verified against Maven Central (not guessed): 3.6.2 is latest. Only warden-controller
          needs this — unlike warden-agent (zero runtime deps), it pulls in a real dependency
          graph (fabric8 kubernetes-client, operator-framework, cron-utils), so a plain jar with

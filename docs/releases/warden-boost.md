@@ -1,8 +1,7 @@
-# Warden 0.2.0: Warden Boost release notes (prepared)
+# Warden 0.2.0: Warden Boost release notes
 
-These notes are prepared for the planned `0.2.0` application release containing B1–B10.
-Record the reviewed merged commit before publishing. This document does not
-assert that new Maven, GHCR, or Helm artifacts have already been published.
+The `0.2.0` release contains the Boost implementation through B10. Maven, GHCR, and Helm
+publication use separate workflows; check each registry and workflow before using its artifacts.
 
 ## Experimental Boost
 
