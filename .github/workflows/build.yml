@@ -65,6 +65,9 @@ jobs:
           sed -i 's|<div class="footer">|<div class="footer"><span class="left"><a href="llms.txt">llms.txt</a></span>|' "$site/index.html"
           sed -i 's|</head>|<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt"/></head>|' "$site/index.html"
           grep -q 'href="llms.txt">llms.txt</a>' "$site/index.html"
+          # Google Search Console ownership verification for the Pages site.
+          sed -i 's|</head>|<meta name="google-site-verification" content="zCzosWiOtvBhUttTa-AeHjMsPxfmJ8T0Fgx9MuXZdh4"/></head>|' "$site/index.html"
+          grep -q 'name="google-site-verification" content="zCzosWiOtvBhUttTa-AeHjMsPxfmJ8T0Fgx9MuXZdh4"' "$site/index.html"
 
       - name: Publish coverage report to GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
