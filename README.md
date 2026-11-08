@@ -273,6 +273,7 @@ before depending on them.
 | [Threat model](docs/threat-model.md) · [Hardening](docs/hardening.md) · [RBAC mapping](docs/rbac-mapping.md) | Trust boundaries and the pre-production checklist |
 | [Roadmap](docs/roadmap.md) | What's next |
 | [`deploy/`](deploy/README.md) | Example manifests and the real-cluster verification scripts |
+| [`llms.txt`](https://baokhang83.github.io/mnemo-jvm-warden/llms.txt) | Machine-readable index of these docs for AI agents and crawlers |
 
 ## Security
 
