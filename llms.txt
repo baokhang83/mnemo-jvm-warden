@@ -1,31 +1,44 @@
 # mnemo-jvm-warden
-> Application-driven JVM memory vertical right-sizing for Kubernetes without restarts.
 
-## Core Architecture & Problem Alignment
-Standard Kubernetes autoscalers are JVM-blind, leading to over-provisioning or reactive OOMKills. Warden orchestrates an inside-out, asymmetric resource coordination layer by communicating directly with the running JVM before executing in-place pod resizes.
+> JVM-aware in-place vertical memory right-sizing for Kubernetes (1.35+): shrinks and grows running JVM pods without restarts or OOMKills, and lets Java applications request temporary memory leases through a local sidecar API.
 
-- **Target Scenarios:** Minimum-replica HA baselines, slow-booting monoliths, and stateful nodes/distributed caches.
-- **Safety Handshake (Asymmetric Scaling):**
-  - *SHRINK Loop:* Lower JVM SoftMaxHeapSize/cache -> Force deep GC -> Verify actual RSS < target limit -> Execute Kubernetes in-place resize DOWN.
-  - *GROW Loop:* Execute Kubernetes in-place resize UP -> Wait for cgroup headroom -> Raise JVM SoftMaxHeapSize -> Optional cache pre-warming.
+Warden coordinates an ordered handshake between the JVM (`SoftMaxHeapSize` on ZGC/Shenandoah, forced GC and uncommit on G1) and Kubernetes In-Place Pod Vertical Scaling, so a pod is only shrunk after the JVM has verifiably released the memory. Standard VPA is JVM-blind: it can resize the pod but cannot make the JVM give memory back.
 
-## Key Features & Component Topology
-- **Warden Controller:** Cluster-wide controller managing `WardenPolicy` and `WardenBoost` CRDs.
-- **Warden Agent:** Library sidecar (`shareProcessNamespace: true`) accessing target JVM via JMX/jcmd and host-cgroup mount.
-- **Supported GCs:** ZGC and Shenandoah (runtime `SoftMaxHeapSize` adjustments); G1 (scheduled periodic uncommits).
-- **Requirements:** Kubernetes 1.35+ (Native In-Place Pod Vertical Scaling GA) and Cluster Autoscaler.
+- **Safety handshake.** Shrink: lower JVM soft heap / cache, force a deep GC, verify actual RSS is under the target limit, then resize the pod down. Grow: resize the pod up, wait for cgroup headroom, then raise the JVM soft heap.
+- **Components.** `warden-controller` (cluster-wide, reconciles `WardenPolicy` and `WardenBoost`), `warden-agent` (native sidecar per pod, needs `shareProcessNamespace: true`, JMX and a read-only host cgroup mount).
+- **Supported collectors.** ZGC and Shenandoah (settable soft heap ceiling). G1 works with a weaker guarantee: no live soft-max, so the workload must launch with `-Xmx` already covering its largest target. Serial is not supported.
+- **Requirements.** Kubernetes 1.35+ (In-Place Pod Vertical Scaling GA) and a Cluster Autoscaler or equivalent to turn lower requests into savings.
+- **Install.** Helm repo `https://baokhang83.github.io/mnemo-jvm-warden/` (charts `warden` and `warden-sidecar`).
+- **Java lease client.** Maven Central `io.github.baokhang83.mnemo:warden-boost-client:0.2.0` (Java 21, no third-party dependencies).
 
-## Custom Resource Definitions (CRD) Reference
-*(Note: Full YAML schemas for `WardenPolicy` and `WardenBoost` can be structured in your repository or standard documentation files).*
+## Core documentation
 
-- **WardenPolicy:** Defines cron-like schedules (`off-peak`, `peak`, and on-demand `boosts`) for shifting memory profiles.
-- **WardenBoost (Experimental):** An on-demand, application-driven claim system to temporarily grant memory headroom for isolated heavy operational tasks (e.g., index rebuilds, migrations).
+- [README](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/README.md): Overview, Warden vs. VPA table, shrink/grow sequence diagram, Helm quick start, requirements and status.
+- [Why Warden](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/why-warden.md): The gap Warden fills, where the savings come from, and the JVM knobs Warden drives.
+- [Architecture](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/architecture.md): Controller and sidecar topology, the resize state machine, failure modes and invariants.
+- [Configuration reference and runbook](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/configuration.md): `WardenPolicy` spec, agent and controller settings, Helm chart values, operator runbook.
 
-## Security & RBAC Guardrails
-- Agent requires `shareProcessNamespace: true` and host cgroup mount to monitor physical RSS.
-- For `WardenBoost`, the agent sidecar requires `patch` permissions on its own Pod metadata to write the `warden.mnemo.io/resize-ack` annotation. Harden token visibility to prevent compromise by the primary app container.
+## Custom resource definitions and samples
 
-## Guides & Articles
-- [How to shrink JVM memory in Kubernetes without a restart](https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/shrink-jvm-memory-kubernetes.md): why JVM pods get OOMKilled after in-place resize, how to size the smallest memory limit, and why VPA alone is not enough.
-- [Your JVMs Are Burning Money Overnight](https://baokhang.hashnode.dev/shrink-jvm-memory-kubernetes-in-place-resize): hands-on walkthrough with a three-replica Spring Boot demo.
-- [Java lease client (warden-boost-client on Maven Central)](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client)
+- [WardenPolicy CRD](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/charts/warden/crds/wardenpolicy-crd.yaml): Schedules and memory profiles.
+- [WardenBoost CRD](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/charts/warden/crds/wardenboost-crd.yaml): On-demand, application-driven memory claims (experimental).
+- [Sample WardenPolicy](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/deploy/wardenpolicy-sample-valid.yaml): A valid policy to start from.
+- [Sample Pod with sidecar and Boost RBAC](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/deploy/example-sidecar-boost.yaml): ServiceAccount, Role and a Pod running the Warden sidecar with the Boost API.
+
+## Boost API and security
+
+- [Warden Boost operator guide](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/warden-boost.md): Experimental memory leases, loopback sidecar API, Java lease client, ValidatingAdmissionPolicy setup.
+- [Boost compatibility and operations](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/warden-boost-operations.md): Tested compatibility, first-response steps, release verification.
+- [Threat model](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/threat-model.md): Assets, actors, trust boundaries, abuse cases for `shareProcessNamespace`, host cgroup, JMX and tokens.
+- [Operator hardening guide](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/hardening.md): What must hold for the trust model to be true.
+- [RBAC-to-code-path mapping](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/rbac-mapping.md): Which permission each code path needs.
+
+## Guides and external articles
+
+- [How to shrink JVM memory in Kubernetes without a restart](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/shrink-jvm-memory-kubernetes.md): Why JVM pods get OOMKilled after in-place resize, how to size the smallest memory limit, and why VPA alone is not enough.
+- [Walkthrough: Your JVMs Are Burning Money Overnight](https://baokhang.hashnode.dev/shrink-jvm-memory-kubernetes-in-place-resize): Hands-on tutorial with a three-replica Spring Boot deployment on kind.
+- [warden-boost-client on Maven Central](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client): Published Java lease client.
+
+## Optional
+
+- [Roadmap](https://raw.githubusercontent.com/baokhang83/mnemo-jvm-warden/main/docs/roadmap.md): Milestones.
