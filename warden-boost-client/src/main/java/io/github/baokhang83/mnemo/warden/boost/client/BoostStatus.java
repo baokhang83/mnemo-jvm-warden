@@ -13,12 +13,12 @@ public record BoostStatus(String requestId, String phase, String message) {
 
   private static final String GRANTED = "Granted";
 
-  /** True once the request has reached {@code Granted}. */
+  /** True when the current observed phase is {@code Granted}. */
   public boolean isGranted() {
     return GRANTED.equals(phase);
   }
 
-  /** True once the request has reached any phase it will not move on from. */
+  /** True for phases that end acquisition waiting; some may still transition during cleanup. */
   public boolean isTerminal() {
     return switch (phase) {
       case "Completed", "Rejected", "Failed", "Expired", "Orphaned" -> true;

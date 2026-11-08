@@ -30,14 +30,12 @@ import java.util.function.Function;
  * }</pre>
  *
  * <p>{@link #acquireBoost} returns only after a durable {@code Granted} &mdash; never for a
- * merely {@code Pending} request. If the request reaches a terminal phase without ever
- * granting, it throws {@link BoostRejectedException} (a definite failure). If this client's own
- * {@code timeout} elapses first, it throws {@link BoostAcquisitionTimeoutException} and
- * deliberately does not touch the request: the grant may still be racing server-side, and
- * assuming otherwise is exactly the mistake the dev plan calls out. The timeout is a purely
- * local ceiling on how long this call waits &mdash; it never asks the server to extend
- * anything, so it cannot outlive the operator's own acquisition deadline; once the controller
- * marks a request terminal (e.g. {@code Expired}), this client simply observes that and stops.
+ * merely {@code Pending} request. If it observes a non-granted phase treated as terminal by
+ * the client, it throws {@link BoostRejectedException}; cleanup can still be pending. If this
+ * client's own {@code timeout} elapses first, it throws {@link BoostAcquisitionTimeoutException}
+ * and does not complete the request: a grant may still race server-side. The timeout does not
+ * extend the operator's acquisition deadline. It is checked between HTTP calls, so an in-flight
+ * call can make the total wait exceed it. Preserve the request ID and reconcile uncertain outcomes.
  */
 public final class WardenBoostClient {
 

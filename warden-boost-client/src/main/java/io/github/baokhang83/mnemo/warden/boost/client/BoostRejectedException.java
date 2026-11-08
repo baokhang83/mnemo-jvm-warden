@@ -1,9 +1,11 @@
 package io.github.baokhang83.mnemo.warden.boost.client;
 
 /**
- * The request reached a terminal phase other than {@code Granted} before this client gave up
- * waiting &mdash; a definite failure. Unlike {@link BoostAcquisitionTimeoutException}, there is
- * nothing to reconcile: the controller itself has decided this request will never be granted.
+ * Acquisition observed a phase treated as terminal by the client before returning a lease.
+ * Unlike {@link BoostAcquisitionTimeoutException}, the client observed that phase, but it did
+ * not receive permission to start work. Resource cleanup may still be in progress, or an
+ * expired request may retain resources until the operation is confirmed stopped and completion
+ * is requested.
  */
 public final class BoostRejectedException extends BoostException {
 
