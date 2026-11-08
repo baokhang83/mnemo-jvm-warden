@@ -15,12 +15,15 @@ versions contain these features just because the current source does.
 | Application client | Java 21+, an agent built with B8, the B9 client, and a shared readable bearer-token file. The API binds loopback and is disabled unless configured. |
 | Controller and security | Use matching Boost-capable controller and agent images, current CRDs and RBAC; the opt-in chart admission package must be available and enabled if using its documented trust boundary. A chart version alone does not upgrade images. |
 
-The recorded [B7 run](validation/warden-boost-b7-kind.md) used Kubernetes 1.36.1, Linux arm64,
+The [B10 current-source rerun](validation/warden-boost-b10-kind-summary.json) also passed all
+seven B7 scenario groups on 2026-11-08, using images built from commit `94f07e2`. The recorded
+[B7 run](validation/warden-boost-b7-kind.md) used Kubernetes 1.36.1, Linux arm64,
 cgroup v2, containerd 2.3.1 and Temurin 21.0.13/ZGC. It tests a manual request against a real
 controller, sidecar, JVM and resize API. Its fault fixture and security matrix have the explicit
 limits described there. B8's local API and B9's Java client have separate disposable-cluster
 checks; these probes scale their chart controller to zero, and B9 verifies uncertain timeout
-retention without a policy or controller reconciliation. A
+retention without a policy or controller reconciliation. Both probes passed on the B10 kind
+cluster on 2026-11-08 with the current agent and example images. A
 single real-client-to-grant-to-reclaim integration test and a Shenandoah deployment have not
 been established by that evidence. No performance or cost savings are implied.
 
