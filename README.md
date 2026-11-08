@@ -227,8 +227,10 @@ operator runbook for the failure modes you'll actually hit.
 - Kubernetes **1.35+** (in-place Pod resize is GA; earlier versions need the
   `InPlacePodVerticalScaling` feature gate)
 - A JVM with runtime-tunable heap commit: **ZGC**, **Shenandoah**, or **G1** with periodic GC
-  enabled. Boost's explicit heap target additionally requires runtime `SoftMaxHeapSize` (ZGC or
-  Shenandoah); the scheduled-resize path still supports G1.
+  enabled. Boost works on all three, but G1 has no live soft-max knob — a G1 workload must
+  launch with `-Xmx` already covering its largest `heapTarget` (see the [Boost
+  guide](docs/warden-boost.md#prerequisites-for-a-boost-evaluation) for the full gap vs.
+  ZGC/Shenandoah).
 - Java **21** for `warden-boost-client`
 - Cluster Autoscaler (or equivalent node consolidation) to turn reduced requests into savings
 

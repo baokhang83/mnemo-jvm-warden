@@ -26,8 +26,11 @@ public final class CorrelatedResize {
       throws IOException, InterruptedException {
     PodState before = observation.read();
     requireCurrent(intent, before);
-    if (!heap.capabilities().supportsSoftMax() || intent.heapBytes() > heap.maxHeapBytes())
-      throw new IOException("UnsupportedHeapTarget");
+    // G1 has no runtime soft max (GcCapabilities.supportsSoftMax() is false for it), so the only
+    // bound that applies is the fixed launch-time ceiling — G1 workloads must be launched with
+    // -Xmx already covering every boost heapTarget they'll ever request (B11; see
+    // docs/warden-boost.md's G1 section for why this is a weaker guarantee than ZGC/Shenandoah).
+    if (intent.heapBytes() > heap.maxHeapBytes()) throw new IOException("UnsupportedHeapTarget");
     if (before.currentRequestBytes().isEmpty() || before.currentLimitBytes().isEmpty())
       throw new IOException("AppliedAllocationUnavailable");
 
@@ -50,7 +53,9 @@ public final class CorrelatedResize {
       // Equal container resources still require actual JVM preparation for a new transition.
       heap.setSoftMax(intent.heapBytes());
     }
-    long observedHeap = heap.softMaxBytes();
+    // G1 has no soft max to read back; its only evidence is the allocation transition above
+    // actually landing, already re-confirmed below, so the heap figure is vacuously the request.
+    long observedHeap = heap.capabilities().supportsSoftMax() ? heap.softMaxBytes() : intent.heapBytes();
     PodState after = observation.read();
     requireCurrent(intent, after);
     if (after.currentRequestBytes().orElse(-1) != intent.requestBytes()
