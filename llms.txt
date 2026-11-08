@@ -24,12 +24,8 @@ Standard Kubernetes autoscalers are JVM-blind, leading to over-provisioning or r
 ## Security & RBAC Guardrails
 - Agent requires `shareProcessNamespace: true` and host cgroup mount to monitor physical RSS.
 - For `WardenBoost`, the agent sidecar requires `patch` permissions on its own Pod metadata to write the `warden.mnemo.io/resize-ack` annotation. Harden token visibility to prevent compromise by the primary app container.
-Use code with caution.
 
-Why this works for LLMs
-
-1. No Conversational Filler: LLMs waste context tokens filtering out phrases like "Welcome to our repository!" This file gets straight to the code and logic boundaries.
-2. Implicit Rule Enforcement: By clearly labeling the Safety Handshake as "Crucial Logic," an AI developer assistant (like Copilot or Gemini) will write code or build scripts that strictly preserve this order, preventing it from generating broken deployment workflows.
-3. Structured Context: The inclusion of copy-pasteable YAML definitions allows an AI tool to immediately generate valid Kubernetes configuration objects when prompted by a user.
-Would you also like a Markdown structural outline for a technical blog post (on Dev.to/Medium) designed to help indexing web-crawlers match this repository against common Java OOM problems?
-AI responses may include mistakes. Learn more
+## Guides & Articles
+- [How to shrink JVM memory in Kubernetes without a restart](https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/shrink-jvm-memory-kubernetes.md): why JVM pods get OOMKilled after in-place resize, how to size the smallest memory limit, and why VPA alone is not enough.
+- [Your JVMs Are Burning Money Overnight](https://baokhang.hashnode.dev/shrink-jvm-memory-kubernetes-in-place-resize): hands-on walkthrough with a three-replica Spring Boot demo.
+- [Java lease client (warden-boost-client on Maven Central)](https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client)

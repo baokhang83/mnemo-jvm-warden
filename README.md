@@ -284,6 +284,8 @@ production.
 
 ## Press
 
+[How to shrink JVM memory in Kubernetes without a restart](docs/shrink-jvm-memory-kubernetes.md) (guide: OOMKilled after in-place resize, memory limit sizing, VPA comparison)
+
 [Automatically Shrink and Grow JVM Memory in Kubernetes](https://medium.com/@baokhang/how-to-shrink-grow-on-schedule-the-memory-of-a-fleet-of-jvms-8bbd3d4b3539)
 
 [Your JVMs Are Burning Money Overnight — Here's How to Shrink Them Safely in Kubernetes](https://baokhang.hashnode.dev/shrink-jvm-memory-kubernetes-in-place-resize)
