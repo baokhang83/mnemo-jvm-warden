@@ -323,6 +323,7 @@ No runtime grant/reconcile behavior is introduced in B2.
 
 The shared versioned protocol, per-pod emitter/evidence reader, and agent confirmation
 path are implemented. See [correlated transport and verification](warden-boost-protocol.md).
+B4/B5 still own floor resolution and durable request/grant reconciliation.
 
 ## B8 local API
 
@@ -335,5 +336,18 @@ second identity wasn't possible) with narrowed RBAC and admission (create/update
 delete, never status, always bound to its own Pod — see
 [Enable the manual-flow security package](warden-boost.md#enable-the-manual-flow-security-package)).
 See [the application-facing local API](warden-boost.md#application-facing-local-api-b8) for the
-wire format. B9 (the Java lease client) is a separate, later milestone — not part of this one.
-B4/B5 still own floor resolution and durable request/grant reconciliation.
+wire format.
+
+## B9 lease client
+
+The `warden-boost-client` module and `BoostLease` try-with-resources API are implemented,
+wrapping B8's local API in exactly the shape the dev plan specifies. Acquisition blocks until
+a durable `Granted` or throws; a terminal non-`Granted` phase throws `BoostRejectedException`
+(a definite failure), while the client's own timeout elapsing throws
+`BoostAcquisitionTimeoutException` and deliberately never releases the request — the grant may
+still be racing server-side, so the stable `requestId` is retained for the caller to retry or
+reconcile rather than assumed lost. `close()` requests completion, is idempotent, and does not
+block for reclamation. See [the Java lease client](warden-boost.md#java-lease-client-b9) for
+the full contract, `examples/.../boost/IndexRebuildExample.java` for the application example,
+and `deploy/verify-boost-client.py` for the real-cluster check that a client-side timeout
+genuinely never releases an uncertain request.

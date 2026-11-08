@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+
+# Test/demo-only image: packages the `examples` module's B9 IndexRebuildExample so
+# deploy/verify-boost-client.py can run it as a real app container against a real agent and
+# real Kubernetes admission/RBAC. Not a shipped artifact (examples/pom.xml is itself
+# skipPublishing=true) — build from the repository root:
+#   docker build -f deploy/Dockerfile.boost-client-example -t warden-boost-example:local .
+
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
+
+# Every module POM so the reactor loads (Maven validates the whole module graph regardless of
+# -pl), then only the source `examples` actually needs at compile time: its own, plus
+# warden-protocol/warden-boost-client/warden-cache-api, its three internal dependencies.
+# maven.test.skip=true (not just -DskipTests) also skips compiling examples' own test sources,
+# which pull in warden-agent at test scope — avoiding the need to build that whole module here.
+COPY pom.xml ./
+COPY warden-protocol/pom.xml warden-protocol/pom.xml
+COPY warden-crd-model/pom.xml warden-crd-model/pom.xml
+COPY warden-cache-api/pom.xml warden-cache-api/pom.xml
+COPY warden-boost-client/pom.xml warden-boost-client/pom.xml
+COPY warden-controller/pom.xml warden-controller/pom.xml
+COPY warden-agent/pom.xml warden-agent/pom.xml
+COPY examples/pom.xml examples/pom.xml
+COPY coverage/pom.xml coverage/pom.xml
+COPY warden-protocol/src/main warden-protocol/src/main
+COPY warden-cache-api/src/main warden-cache-api/src/main
+COPY warden-boost-client/src/main warden-boost-client/src/main
+COPY examples/src/main examples/src/main
+
+# One combined invocation: a separate second `mvn` call wouldn't see this reactor's in-memory
+# build of warden-boost-client/warden-cache-api (package, not install, never touches ~/.m2), so
+# dependency:copy-dependencies has to run in the same pass while they're still resolvable.
+RUN mvn -q -B -pl examples -am -Dmaven.test.skip=true package dependency:copy-dependencies \
+      -DincludeScope=runtime -DoutputDirectory=/build/examples/target/deps
+
+FROM eclipse-temurin:21-jre AS runtime
+RUN groupadd --system warden && useradd --system --gid warden --home-dir /app warden
+WORKDIR /app
+COPY --from=builder /build/examples/target/examples-*.jar /app/examples.jar
+COPY --from=builder /build/examples/target/deps /app/deps
+USER warden
+ENTRYPOINT ["java", "-cp", "/app/examples.jar:/app/deps/*", \
+  "io.github.baokhang83.mnemo.warden.examples.boost.IndexRebuildExample"]

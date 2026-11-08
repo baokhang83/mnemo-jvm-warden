@@ -1,6 +1,7 @@
 package io.github.baokhang83.mnemo.warden.agent.resize;
 
 import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import io.github.baokhang83.mnemo.warden.protocol.MinimalJson;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
 import java.io.IOException;
 import java.net.URI;

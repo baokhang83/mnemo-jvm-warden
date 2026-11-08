@@ -354,6 +354,15 @@ Cross-pod admission denial is already covered by `verify-boost-security.py`'s ag
 scenarios, so this script focuses on the local HTTP surface instead: bearer-token auth,
 idempotent `requestId` retries, the one-outstanding-request limit, and acquire/status/release.
 
+`verify-boost-client.py` exercises B9's `warden-boost-client` Java lease client (see
+[the Java lease client docs](../docs/warden-boost.md#java-lease-client-b9)) — the real
+`IndexRebuildExample` application code (not raw curl) as the `app` container, against a real
+agent. Pass `--context`, `--agent-image repository:tag`, and `--example-image repository:tag`;
+build the example image from `deploy/Dockerfile.boost-client-example` and load both into the
+cluster first. No controller is installed (nothing can reach `Granted`), so this focuses on
+what specifically needs a real cluster to mean anything: confirming the client, for real,
+never releases an uncertain grant when its own acquisition timeout elapses.
+
 For an end-to-end index rebuild with the real controller, sidecar, JVM, and resize API, see
 [Boost B7 acceptance](../docs/validation/warden-boost-b7-kind.md). This separate test is
 for disposable clusters and does not change the scheduled-only setup.

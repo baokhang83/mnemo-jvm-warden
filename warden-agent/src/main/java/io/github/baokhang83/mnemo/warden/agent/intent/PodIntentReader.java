@@ -2,8 +2,8 @@ package io.github.baokhang83.mnemo.warden.agent.intent;
 
 import io.github.baokhang83.mnemo.warden.agent.resize.InClusterApiServer;
 import io.github.baokhang83.mnemo.warden.agent.resize.K8sQuantity;
-import io.github.baokhang83.mnemo.warden.agent.resize.MinimalJson;
 import io.github.baokhang83.mnemo.warden.protocol.JsonString;
+import io.github.baokhang83.mnemo.warden.protocol.MinimalJson;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement;
 import io.github.baokhang83.mnemo.warden.protocol.ResizeIntent;
 import java.io.IOException;
