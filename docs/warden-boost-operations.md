@@ -10,7 +10,7 @@ do not assume older chart, image, or Maven versions contain these features.
 | Component | Requirement or evidence |
 | --- | --- |
 | Kubernetes | In-place container memory resize and native sidecars are required. Kubernetes 1.35+ provides stable in-place resize; the opt-in security package additionally requires `ValidatingAdmissionPolicy`. Verify admission and resize behavior on your distribution. |
-| Node | Linux, cgroup v2, sufficient node capacity, and a runtime that applies in-place memory resizing. Node policies and Pod QoS can restrict resizing. |
+| Node | Linux, cgroup v2, sufficient node capacity, and a runtime that applies in-place memory resizing. The published `v0.2.0` agent and controller images are `linux/amd64` only; the recorded arm64 tests used locally built images. Node policies and Pod QoS can restrict resizing. |
 | Target JVM | Boost's explicit heap target needs runtime `SoftMaxHeapSize` support; use a supported ZGC or Shenandoah configuration. `-Xmx` is a fixed ceiling and must accommodate the Boost heap target. Heap is only part of container memory. |
 | Application client | Java 21+, an agent built with B8, the B9 client, and a shared readable bearer-token file. The API binds loopback and is disabled unless configured. |
 | Controller and security | Use matching Boost-capable controller and agent images, current CRDs and RBAC; the opt-in chart admission package must be available and enabled if using its documented trust boundary. A chart version alone does not upgrade images. |
