@@ -1,0 +1,129 @@
+{
+  "agentImage": "warden-b10-agent:local",
+  "cluster": {
+    "buildDate": "2026-05-12T09:51:34Z",
+    "compiler": "gc",
+    "emulationMajor": "1",
+    "emulationMinor": "36",
+    "gitCommit": "756939600b9a7180fc2df6550a4585b638875e67",
+    "gitTreeState": "clean",
+    "gitVersion": "v1.36.1",
+    "goVersion": "go1.26.2",
+    "major": "1",
+    "minCompatibilityMajor": "1",
+    "minCompatibilityMinor": "35",
+    "minor": "36",
+    "platform": "linux/arm64"
+  },
+  "controllerImage": "warden-b10-controller:local",
+  "finishedAt": "2026-11-08T04:27:23.044146+00:00",
+  "javaVersion": "21.0.13",
+  "node": {
+    "architecture": "arm64",
+    "bootID": "4621a38f-b96c-40a1-b3c7-ff261c7f3f3d",
+    "containerRuntimeVersion": "containerd://2.3.1",
+    "kernelVersion": "6.12.76-linuxkit",
+    "kubeProxyVersion": "",
+    "kubeletVersion": "v1.36.1",
+    "machineID": "9df805e4c92a4cd884f9d0238868669a",
+    "operatingSystem": "linux",
+    "osImage": "Debian GNU/Linux 13 (trixie)",
+    "swap": {
+      "capacity": 1073737728
+    },
+    "systemUUID": "9df805e4c92a4cd884f9d0238868669a"
+  },
+  "result": "PASS",
+  "scenarios": {
+    "application-restart-invalidates-grant": {
+      "durationSeconds": 31.525,
+      "result": "PASS"
+    },
+    "denied-growth": {
+      "durationSeconds": 80.744,
+      "result": "PASS"
+    },
+    "failed-shrink-and-recovery": {
+      "durationSeconds": 81.215,
+      "result": "PASS"
+    },
+    "jvm-preparation-fails-after-growth": {
+      "durationSeconds": 102.439,
+      "result": "PASS"
+    },
+    "policy-and-target-deletion": {
+      "durationSeconds": 89.905,
+      "result": "PASS"
+    },
+    "security-boundaries": {
+      "durationSeconds": null,
+      "result": "PASS"
+    },
+    "success-and-expiry": {
+      "durationSeconds": 127.863,
+      "result": "PASS"
+    }
+  },
+  "scope": "Summary of the current-source B7 acceptance run; see warden-boost-b7-kind.md for test boundaries and prior detailed evidence.",
+  "sourceCommit": "94f07e2315e5dd12324c067fd568a9cc806e3b58",
+  "startedAt": "2026-11-08T04:17:15.535374+00:00",
+  "success": {
+    "acquisitionSeconds": 30.931,
+    "after": {
+      "containerId": "containerd://18f563c699b17560d4ae0fe9bf47a94d5beb31930e907a005b2ccc6f059bbcbb",
+      "podUid": "8ea41b66-7517-4d9e-bfee-6e6cd9fe9e2e",
+      "resources": {
+        "limits": {
+          "memory": "320Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "restartCount": 0
+    },
+    "before": {
+      "containerId": "containerd://18f563c699b17560d4ae0fe9bf47a94d5beb31930e907a005b2ccc6f059bbcbb",
+      "podUid": "8ea41b66-7517-4d9e-bfee-6e6cd9fe9e2e",
+      "resources": {
+        "limits": {
+          "memory": "320Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "restartCount": 0
+    },
+    "grantedAllocation": {
+      "containerId": "containerd://18f563c699b17560d4ae0fe9bf47a94d5beb31930e907a005b2ccc6f059bbcbb",
+      "podUid": "8ea41b66-7517-4d9e-bfee-6e6cd9fe9e2e",
+      "resources": {
+        "limits": {
+          "memory": "640Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "256Mi"
+        }
+      },
+      "restartCount": 0
+    },
+    "heldAllocation": {
+      "containerId": "containerd://18f563c699b17560d4ae0fe9bf47a94d5beb31930e907a005b2ccc6f059bbcbb",
+      "podUid": "8ea41b66-7517-4d9e-bfee-6e6cd9fe9e2e",
+      "resources": {
+        "limits": {
+          "memory": "640Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "256Mi"
+        }
+      },
+      "restartCount": 0
+    }
+  }
+}

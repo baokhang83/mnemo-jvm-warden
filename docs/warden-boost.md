@@ -441,9 +441,7 @@ For a runnable index rebuild and recorded end-to-end checks on a disposable clus
 ## Application-facing local API (B8)
 
 The app container can acquire and release a boost itself, over a loopback-only HTTP API the
-agent sidecar serves — no `kubectl`, no Kubernetes credentials in the app. This closes the gap
-the manual flow above leaves: until now, "There is no application-facing endpoint" (`docs/
-warden-boost-development-plan.md`); a human had to create the `WardenBoost` object by hand.
+agent sidecar serves — no `kubectl` or Kubernetes credentials in the app.
 
 **Enable it** by setting, on the `warden` sidecar container (see
 `deploy/example-sidecar-boost.yaml` for a complete manifest):
@@ -455,6 +453,11 @@ warden-boost-development-plan.md`); a human had to create the `WardenBoost` obje
 | `WARDEN_BOOST_PORT` | no | `8090` | Loopback-only; never bind this to the Pod IP. |
 | `WARDEN_BOOST_ACQUIRE_WAIT_SECONDS` | no | `25` | How long an `acquire` call blocks before returning `202` so the caller polls `/status` instead. |
 | `WARDEN_BOOST_TOKEN_PATH` | no | `/var/run/warden/boost/token` | Where the agent writes the shared bearer token (see below). |
+
+The token file is owner-only (`0600`) on POSIX filesystems. The application must be able to
+read it: run the application and sidecar with the same effective UID, or use another explicitly
+verified credential-sharing arrangement compatible with that mode. A shared volume or `fsGroup`
+alone does not grant a different UID access to a `0600` file. Do not make the token world-readable.
 
 This also requires the same RBAC the manual flow's `boost.security.enabled=true` package
 grants the agent identity (`wardenboosts` get/list/watch/create/patch — never `delete`, never
@@ -509,7 +512,22 @@ path — those come from the sidecar's own configuration, never from the app's r
 
 ## Java lease client (B9)
 
-`warden-boost-client` wraps the local API above in the shape application code actually wants:
+`warden-boost-client` wraps the local API above in the shape application code actually wants.
+It requires Java 21. The dependency below uses the version of an application release that
+contains B9. The planned release is `0.2.0` and is not published yet; the client is not present
+in the older `v0.1.4` release:
+
+```xml
+<dependency>
+  <groupId>io.github.baokhang83.mnemo</groupId>
+  <artifactId>warden-boost-client</artifactId>
+  <version>0.2.0</version>
+</dependency>
+```
+
+Before that release is published, build from the matching checkout with
+`mvn -pl warden-boost-client -am install` and use its project version locally. Do not interpret
+the checkout's `0.1.0` as the published Boost version.
 
 ```java
 try (BoostLease lease = WardenBoostClient.discover().acquireBoost(
@@ -526,14 +544,18 @@ credentials: every call stays on the loopback local API.
 `acquireBoost` returns only once the request reaches `Granted` — never for a merely `Pending`
 one. It can fail two different ways, and they mean different things:
 
-- **`BoostRejectedException`** — the controller decided the request will never be granted (it
-  reached a terminal phase other than `Granted`). A definite failure; nothing to reconcile.
+- **`BoostRejectedException`** — the client observed a non-granted phase it treats as terminal.
+  This call did not return a lease. Inspect the
+  request: failed preparation can still need guarded cleanup, and an expired request can retain
+  its allocation until the operation is known to have stopped and completion is requested.
 - **`BoostAcquisitionTimeoutException`** — this call gave up waiting before the request
-  settled. This is **not** a failure — the grant may still be racing server-side. The client
+  settled. The outcome is uncertain: the grant may still be racing server-side. The client
   deliberately does not release or otherwise touch the request on this path; it carries
   `requestId()` so the caller can retry acquisition with the same ID later
   (`acquireBoost(boost, requestId, timeout)`) or look it up directly (`inspect(requestId)`) to
   reconcile what actually happened, rather than assuming the operation could not have started.
+  The client checks its timeout between HTTP calls, so a call already in flight can make the
+  elapsed time exceed that timeout.
 
 `BoostLease.close()` requests completion and is idempotent — call it more than once freely —
 and does not block until memory is actually reclaimed; `lease.status()` re-fetches the current
@@ -544,3 +566,6 @@ wrapper (deferred, per the dev plan).
 See `examples/src/main/java/.../examples/boost/IndexRebuildExample.java` for a complete,
 runnable example of both code paths, and `deploy/verify-boost-client.py` for a real-cluster
 check that a client-side timeout genuinely never releases the uncertain request.
+
+For the tested matrix, release procedure, and concrete failure-recovery steps, see the
+[Boost operations and release runbook](warden-boost-operations.md).
