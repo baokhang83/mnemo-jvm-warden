@@ -50,6 +50,23 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: mvn -B -ntp versions:set -DnewVersion="${RELEASE_TAG#v}" -DgenerateBackupPoms=false
 
+      # v0.2.0 was tagged without the name required by Central. Correct only that tag's
+      # packaging metadata before signing; no source files or release tag are changed.
+      - name: Correct historical protocol metadata
+        if: (inputs.release_tag || github.ref_name) == 'v0.2.0'
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          path = Path('warden-protocol/pom.xml')
+          text = path.read_text()
+          artifact = '  <artifactId>warden-protocol</artifactId>\n'
+          name = '  <name>warden-protocol</name>\n'
+          if name not in text:
+              if text.count(artifact) != 1:
+                  raise SystemExit('Unexpected protocol POM; refusing to change metadata')
+              path.write_text(text.replace(artifact, artifact + name))
+          PYCODE
+
       - name: Import GPG key
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
