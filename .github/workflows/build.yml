@@ -77,3 +77,4 @@ jobs:
           clean-exclude: |
               index.yaml
               artifacthub-repo.yml
+              charts/**
