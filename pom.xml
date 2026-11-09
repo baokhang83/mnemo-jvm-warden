@@ -96,6 +96,13 @@
          (W-504), not a fake. Caffeine's version matches what mnemo-cache itself builds
          against (its pom marks the dependency optional, so consumers pin their own). -->
     <mnemo-cache.version>0.1.0</mnemo-cache.version>
+    <!-- Security overrides for transitives brought in by fabric8 7.3.1 / JOSDK 5.1.1 (netty
+         4.1.118, vertx 4.5.14, commons-lang3 3.17.0 had open CVEs in the controller image).
+         Versions verified on Maven Central. Drop an override once fabric8 ships a newer
+         transitive. Same 4.1.x / 4.5.x lines, so no API change for the shaded controller. -->
+    <netty.version>4.1.140.Final</netty.version>
+    <vertx.version>4.5.29</vertx.version>
+    <commons-lang3.version>3.20.0</commons-lang3.version>
     <caffeine.version>3.1.8</caffeine.version>
   </properties>
 
@@ -109,6 +116,26 @@
         <version>${jackson.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-bom</artifactId>
+        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Vert.x BOM (not just vertx-core) so web-client/web-common/auth-common stay aligned. -->
+      <dependency>
+        <groupId>io.vertx</groupId>
+        <artifactId>vertx-dependencies</artifactId>
+        <version>${vertx.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang3.version}</version>
       </dependency>
       <!-- One entry the whole tree needs today: JUnit 5, imported as a BOM so every
            module gets a consistent test stack without repeating the version. -->
