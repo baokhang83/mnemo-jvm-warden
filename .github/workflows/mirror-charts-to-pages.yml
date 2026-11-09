@@ -1,0 +1,65 @@
+name: mirror-charts-to-pages
+
+# chart-releaser stores chart packages as GitHub release assets and writes those URLs into the
+# Helm repo index. Artifact Hub's tracker fetches every version at once from
+# github.com/.../releases/download (a redirect to a signed CDN URL) and regularly times out
+# ("Client.Timeout exceeded while awaiting headers"). This workflow copies each package (and its
+# .prov, if any) next to index.yaml on gh-pages under charts/ and rewrites the index URLs to
+# GitHub Pages, which serves static files directly. Idempotent: safe to re-run.
+on:
+  workflow_run:
+    workflows: [ publish-charts, publish-charts-release ]
+    types: [ completed ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mirror-charts-to-pages
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Mirror packages and rewrite index URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO#*/}"
+          mkdir -p charts
+          # Every chart package url currently in the index that still points at a release asset.
+          grep -oE "https://github.com/${REPO}/releases/download/[^/]+/[^ ]+\.tgz" index.yaml | sort -u |
+          while read -r url; do
+            tag="$(echo "$url" | awk -F/ '{print $(NF-1)}')"
+            file="$(basename "$url")"
+            if [ ! -s "charts/$file" ]; then
+              gh release download "$tag" --repo "$REPO" --pattern "$file" --dir charts
+            fi
+            gh release download "$tag" --repo "$REPO" --pattern "$file.prov" --dir charts 2>/dev/null || true
+          done
+          sed -i -E "s#https://github.com/${REPO}/releases/download/[^/]+/#${base}/charts/#g" index.yaml
+          ! grep -q "releases/download" index.yaml
+          ls charts | head -50
+
+      - name: Verify every indexed package is served from the mirror
+        run: |
+          set -euo pipefail
+          grep -oE 'charts/[^ ]+\.tgz' index.yaml | sort -u | while read -r p; do test -s "$p" || { echo "missing $p"; exit 1; }; done
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add charts index.yaml
+          if git diff --cached --quiet; then echo "Nothing to mirror"; exit 0; fi
+          git commit -m "Serve chart packages from GitHub Pages"
+          git push origin HEAD:gh-pages
