@@ -122,7 +122,7 @@ dependencies) is published on [Maven Central](https://central.sonatype.com/artif
 <dependency>
   <groupId>io.github.baokhang83.mnemo</groupId>
   <artifactId>warden-boost-client</artifactId>
-  <version>0.2.0</version> <!-- see the Maven Central badge above for the latest -->
+  <version>0.2.1</version> <!-- see the Maven Central badge above for the latest -->
 </dependency>
 ```
 
