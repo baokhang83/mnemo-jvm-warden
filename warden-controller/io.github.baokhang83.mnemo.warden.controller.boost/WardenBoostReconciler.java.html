@@ -118,7 +118,7 @@ public final class WardenBoostReconciler implements Reconciler&lt;WardenBoost&gt
         blackout, evidence, releaseTarget, acquisition, execution, now));
 <span class="nc bnc" id="L119" title="All 2 branches missed.">    if (decision.phase() == phase) {</span>
 <span class="nc bnc" id="L120" title="All 4 branches missed.">      if (phase == BoostPhase.Preparing || phase == BoostPhase.Releasing)</span>
-<span class="nc" id="L121">        reportWaiting(client, boost, pod, decision.reason(), now);</span>
+<span class="nc" id="L121">        reportWaiting(client, boost, pod, decision.reason(), now, releaseBlockedDetail(boost, policy, policyMatches));</span>
 <span class="nc" id="L122">      return;</span>
     }
 <span class="nc" id="L124">    var next = copy(client, status);</span>
@@ -193,106 +193,126 @@ public final class WardenBoostReconciler implements Reconciler&lt;WardenBoost&gt
 <span class="nc" id="L193">    BoostStatusStore.compareAndSet(client, boost, next);</span>
 <span class="nc" id="L194">  }</span>
 
+  /** Non-null when the policy's current profile can never accept this release (see IntentEmitter). */
+  private static String releaseBlockedDetail(WardenBoost boost, WardenPolicy policy, boolean policyMatches) {
+<span class="nc" id="L198">    var status = boost.getStatus();</span>
+<span class="nc bnc" id="L199" title="All 6 branches missed.">    if (status.getPhase() != BoostPhase.Releasing || !policyMatches || status.getPreparedIntent() == null</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        || status.getReleaseBaselineTransitionId() == null</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        || !status.getReleaseBaselineTransitionId().equals(status.getTransitionId())</span>
+<span class="nc bnc" id="L202" title="All 4 branches missed.">        || policy.getStatus() == null || policy.getStatus().getCurrentProfile() == null</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        || policy.getSpec().getProfiles() == null) return null;</span>
+<span class="nc" id="L204">    String name = policy.getStatus().getCurrentProfile();</span>
+<span class="nc" id="L205">    var profile = policy.getSpec().getProfiles().get(name);</span>
+<span class="nc bnc" id="L206" title="All 4 branches missed.">    if (profile == null || profile.getLimit() == null) return null;</span>
+<span class="nc" id="L207">    return io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter.releaseBlockedDetail(name,</span>
+<span class="nc" id="L208">        io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getLimit()),</span>
+<span class="nc" id="L209">        PreparedTransitionStore.current(boost));</span>
+  }
+
   private static void reportWaiting(KubernetesClient client, WardenBoost boost, Pod pod,
-      String fallback, Instant now) {
-<span class="nc" id="L198">    String reason = fallback;</span>
-<span class="nc" id="L199">    var status = boost.getStatus();</span>
-<span class="nc" id="L200">    var annotations = pod.getMetadata().getAnnotations();</span>
-<span class="nc bnc" id="L201" title="All 6 branches missed.">    if (!&quot;Blackout&quot;.equals(fallback) &amp;&amp; status.getPreparedIntent() != null &amp;&amp; annotations != null) {</span>
-<span class="nc" id="L202">      String encoded = annotations.get(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ACK_ANNOTATION);</span>
-<span class="nc bnc" id="L203" title="All 2 branches missed.">      if (encoded != null) {</span>
+      String fallback, Instant now, String releaseBlocked) {
+<span class="nc" id="L214">    String reason = fallback;</span>
+<span class="nc" id="L215">    String detail = null;</span>
+<span class="nc" id="L216">    var status = boost.getStatus();</span>
+<span class="nc" id="L217">    var annotations = pod.getMetadata().getAnnotations();</span>
+<span class="nc bnc" id="L218" title="All 6 branches missed.">    if (!&quot;Blackout&quot;.equals(fallback) &amp;&amp; status.getPreparedIntent() != null &amp;&amp; annotations != null) {</span>
+<span class="nc" id="L219">      String encoded = annotations.get(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ACK_ANNOTATION);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">      if (encoded != null) {</span>
         try {
-<span class="nc" id="L205">          var ack = io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement.decode(encoded);</span>
-<span class="nc" id="L206">          var current = PreparedTransitionStore.current(boost);</span>
-<span class="nc bnc" id="L207" title="All 2 branches missed.">          if (!ack.intent().equals(current)) reason = &quot;StaleAcknowledgement&quot;;</span>
-<span class="nc bnc" id="L208" title="All 2 branches missed.">          else if (!ack.applied()) {</span>
-<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (status.getPhase() == BoostPhase.Releasing) reason = &quot;ReleaseBlocked&quot;;</span>
-<span class="nc bnc" id="L210" title="All 2 branches missed.">            else if (&quot;UnsupportedJvm&quot;.equals(ack.reason())) reason = &quot;UnsupportedJvm&quot;;</span>
-<span class="nc" id="L211">            else reason = &quot;PreparationFailed&quot;;</span>
+<span class="nc" id="L222">          var ack = io.github.baokhang83.mnemo.warden.protocol.ResizeAcknowledgement.decode(encoded);</span>
+<span class="nc" id="L223">          var current = PreparedTransitionStore.current(boost);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">          if (!ack.intent().equals(current)) reason = &quot;StaleAcknowledgement&quot;;</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">          else if (!ack.applied()) {</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (status.getPhase() == BoostPhase.Releasing) reason = &quot;ReleaseBlocked&quot;;</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            else if (&quot;UnsupportedJvm&quot;.equals(ack.reason())) reason = &quot;UnsupportedJvm&quot;;</span>
+<span class="nc" id="L228">            else reason = &quot;PreparationFailed&quot;;</span>
           }
-<span class="nc" id="L213">        } catch (IllegalArgumentException e) { reason = &quot;StaleAcknowledgement&quot;; }</span>
+<span class="nc" id="L230">        } catch (IllegalArgumentException e) { reason = &quot;StaleAcknowledgement&quot;; }</span>
       }
     }
-<span class="nc bnc" id="L216" title="All 2 branches missed.">    if (status.getConditions() != null) {</span>
-<span class="nc" id="L217">      String observedReason = reason;</span>
-<span class="nc bnc" id="L218" title="All 4 branches missed.">      if (status.getConditions().stream().anyMatch(c -&gt; &quot;Ready&quot;.equals(c.getType())</span>
-<span class="nc bnc" id="L219" title="All 4 branches missed.">          &amp;&amp; &quot;False&quot;.equals(c.getStatus()) &amp;&amp; observedReason.equals(c.getReason()))) return;</span>
+<span class="nc bnc" id="L233" title="All 4 branches missed.">    if (releaseBlocked != null &amp;&amp; &quot;ReleasePending&quot;.equals(reason)) { reason = &quot;ReleaseBlocked&quot;; detail = releaseBlocked; }</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">    if (status.getConditions() != null) {</span>
+<span class="nc" id="L235">      String observedReason = reason;</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">      if (status.getConditions().stream().anyMatch(c -&gt; &quot;Ready&quot;.equals(c.getType())</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">          &amp;&amp; &quot;False&quot;.equals(c.getStatus()) &amp;&amp; observedReason.equals(c.getReason()))) return;</span>
     }
-<span class="nc" id="L221">    var next = copy(client, status); condition(next, &quot;Ready&quot;, false, reason, now);</span>
-<span class="nc" id="L222">    BoostStatusStore.compareAndSet(client, boost, next);</span>
-<span class="nc" id="L223">  }</span>
+<span class="nc" id="L239">    var next = copy(client, status); condition(next, &quot;Ready&quot;, false, reason, now);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">    if (detail != null) next.getConditions().stream().filter(c -&gt; &quot;Ready&quot;.equals(c.getType()))</span>
+<span class="nc" id="L241">        .forEach(c -&gt; c.setMessage(releaseBlocked));</span>
+<span class="nc" id="L242">    BoostStatusStore.compareAndSet(client, boost, next);</span>
+<span class="nc" id="L243">  }</span>
 
   private void holdTopology(KubernetesClient client, WardenBoost boost) {
-<span class="nc" id="L226">    holdPending(client, boost, &quot;UnsupportedControllerTopology&quot;);</span>
-<span class="nc" id="L227">  }</span>
+<span class="nc" id="L246">    holdPending(client, boost, &quot;UnsupportedControllerTopology&quot;);</span>
+<span class="nc" id="L247">  }</span>
   private void holdPending(KubernetesClient client, WardenBoost boost, String reason) {
-<span class="nc" id="L229">    var current = boost.getStatus();</span>
-<span class="nc bnc" id="L230" title="All 4 branches missed.">    if (current != null &amp;&amp; current.getConditions() != null &amp;&amp; current.getConditions().stream()</span>
-<span class="nc bnc" id="L231" title="All 6 branches missed.">        .anyMatch(c -&gt; &quot;Ready&quot;.equals(c.getType()) &amp;&amp; reason.equals(c.getReason()))) return;</span>
-<span class="nc bnc" id="L232" title="All 2 branches missed.">    var next = current == null ? new WardenBoostStatus() : copy(client, current);</span>
-<span class="nc bnc" id="L233" title="All 2 branches missed.">    if (next.getPhase() == null) next.setPhase(BoostPhase.Pending);</span>
-<span class="nc" id="L234">    condition(next, &quot;Ready&quot;, false, reason, clock.instant());</span>
-<span class="nc" id="L235">    BoostStatusStore.compareAndSet(client, boost, next);</span>
-<span class="nc" id="L236">  }</span>
+<span class="nc" id="L249">    var current = boost.getStatus();</span>
+<span class="nc bnc" id="L250" title="All 4 branches missed.">    if (current != null &amp;&amp; current.getConditions() != null &amp;&amp; current.getConditions().stream()</span>
+<span class="nc bnc" id="L251" title="All 6 branches missed.">        .anyMatch(c -&gt; &quot;Ready&quot;.equals(c.getType()) &amp;&amp; reason.equals(c.getReason()))) return;</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">    var next = current == null ? new WardenBoostStatus() : copy(client, current);</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">    if (next.getPhase() == null) next.setPhase(BoostPhase.Pending);</span>
+<span class="nc" id="L254">    condition(next, &quot;Ready&quot;, false, reason, clock.instant());</span>
+<span class="nc" id="L255">    BoostStatusStore.compareAndSet(client, boost, next);</span>
+<span class="nc" id="L256">  }</span>
 
   private static void finishClaim(KubernetesClient client, WardenBoost boost, Pod pod) {
-<span class="nc bnc" id="L239" title="All 4 branches missed.">    if (pod == null || !Objects.equals(pod.getMetadata().getUid(), boost.getSpec().getPodRef().getUid())) return;</span>
-<span class="nc" id="L240">    String owner = TargetClaim.owner(pod);</span>
-<span class="nc bnc" id="L241" title="All 2 branches missed.">    if (owner == null) return;</span>
-<span class="nc bnc" id="L242" title="All 2 branches missed.">    if (!owner.equals(boost.getMetadata().getUid())) throw new IllegalStateException(&quot;claim belongs to another request&quot;);</span>
-<span class="nc" id="L243">    TargetClaim.finish(client, pod, owner, boost.getStatus().getPreparedIntent());</span>
-<span class="nc" id="L244">  }</span>
+<span class="nc bnc" id="L259" title="All 4 branches missed.">    if (pod == null || !Objects.equals(pod.getMetadata().getUid(), boost.getSpec().getPodRef().getUid())) return;</span>
+<span class="nc" id="L260">    String owner = TargetClaim.owner(pod);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">    if (owner == null) return;</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">    if (!owner.equals(boost.getMetadata().getUid())) throw new IllegalStateException(&quot;claim belongs to another request&quot;);</span>
+<span class="nc" id="L263">    TargetClaim.finish(client, pod, owner, boost.getStatus().getPreparedIntent());</span>
+<span class="nc" id="L264">  }</span>
 
   private static Pod pod(KubernetesClient client, WardenBoost boost) {
-<span class="nc" id="L247">    return client.pods().inNamespace(boost.getMetadata().getNamespace()).withName(boost.getSpec().getPodRef().getName()).get();</span>
+<span class="nc" id="L267">    return client.pods().inNamespace(boost.getMetadata().getNamespace()).withName(boost.getSpec().getPodRef().getName()).get();</span>
   }
   private static boolean sameContainer(Pod pod, String name, String id) {
-<span class="nc bnc" id="L250" title="All 4 branches missed.">    return pod.getStatus() != null &amp;&amp; pod.getStatus().getContainerStatuses() != null</span>
-<span class="nc bnc" id="L251" title="All 4 branches missed.">        &amp;&amp; pod.getStatus().getContainerStatuses().stream().anyMatch(c -&gt; name.equals(c.getName())</span>
-<span class="nc bnc" id="L252" title="All 6 branches missed.">            &amp;&amp; Objects.equals(id, c.getContainerID()) &amp;&amp; c.getState() != null &amp;&amp; c.getState().getRunning() != null);</span>
+<span class="nc bnc" id="L270" title="All 4 branches missed.">    return pod.getStatus() != null &amp;&amp; pod.getStatus().getContainerStatuses() != null</span>
+<span class="nc bnc" id="L271" title="All 4 branches missed.">        &amp;&amp; pod.getStatus().getContainerStatuses().stream().anyMatch(c -&gt; name.equals(c.getName())</span>
+<span class="nc bnc" id="L272" title="All 6 branches missed.">            &amp;&amp; Objects.equals(id, c.getContainerID()) &amp;&amp; c.getState() != null &amp;&amp; c.getState().getRunning() != null);</span>
   }
   /** Do not grant from evidence for an intent overtaken by the current schedule/profile. */
   private static boolean coversCurrentPolicy(WardenPolicy policy,
       io.github.baokhang83.mnemo.warden.protocol.ResizeIntent intent, Instant now) {
     try {
-<span class="nc" id="L258">      var spec = policy.getSpec();</span>
-<span class="nc" id="L259">      var current = io.github.baokhang83.mnemo.warden.controller.schedule.ScheduleEvaluator</span>
-<span class="nc" id="L260">          .currentProfileWithLeadTime(spec, now);</span>
-<span class="nc bnc" id="L261" title="All 4 branches missed.">      if (current.isEmpty() || spec.getProfiles() == null) return false;</span>
-<span class="nc" id="L262">      var names = new java.util.HashSet&lt;String&gt;(); names.add(current.get());</span>
-<span class="nc bnc" id="L263" title="All 4 branches missed.">      if (policy.getStatus() != null &amp;&amp; policy.getStatus().getCurrentProfile() != null)</span>
-<span class="nc" id="L264">        names.add(policy.getStatus().getCurrentProfile());</span>
-<span class="nc bnc" id="L265" title="All 2 branches missed.">      for (String name : names) {</span>
-<span class="nc" id="L266">        var profile = spec.getProfiles().get(name);</span>
-<span class="nc bnc" id="L267" title="All 6 branches missed.">        if (profile == null || profile.getRequest() == null || profile.getLimit() == null</span>
-<span class="nc bnc" id="L268" title="All 2 branches missed.">            || io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getRequest()) &gt; intent.requestBytes()</span>
-<span class="nc bnc" id="L269" title="All 2 branches missed.">            || io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getLimit()) &gt; intent.limitBytes()</span>
-<span class="nc bnc" id="L270" title="All 4 branches missed.">            || (profile.getHeapTarget() != null &amp;&amp; io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getHeapTarget()) &gt; intent.heapBytes())) return false;</span>
-<span class="nc" id="L271">      }</span>
-<span class="nc" id="L272">      return true;</span>
-<span class="nc" id="L273">    } catch (RuntimeException e) { return false; }</span>
+<span class="nc" id="L278">      var spec = policy.getSpec();</span>
+<span class="nc" id="L279">      var current = io.github.baokhang83.mnemo.warden.controller.schedule.ScheduleEvaluator</span>
+<span class="nc" id="L280">          .currentProfileWithLeadTime(spec, now);</span>
+<span class="nc bnc" id="L281" title="All 4 branches missed.">      if (current.isEmpty() || spec.getProfiles() == null) return false;</span>
+<span class="nc" id="L282">      var names = new java.util.HashSet&lt;String&gt;(); names.add(current.get());</span>
+<span class="nc bnc" id="L283" title="All 4 branches missed.">      if (policy.getStatus() != null &amp;&amp; policy.getStatus().getCurrentProfile() != null)</span>
+<span class="nc" id="L284">        names.add(policy.getStatus().getCurrentProfile());</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">      for (String name : names) {</span>
+<span class="nc" id="L286">        var profile = spec.getProfiles().get(name);</span>
+<span class="nc bnc" id="L287" title="All 6 branches missed.">        if (profile == null || profile.getRequest() == null || profile.getLimit() == null</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            || io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getRequest()) &gt; intent.requestBytes()</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            || io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getLimit()) &gt; intent.limitBytes()</span>
+<span class="nc bnc" id="L290" title="All 4 branches missed.">            || (profile.getHeapTarget() != null &amp;&amp; io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getHeapTarget()) &gt; intent.heapBytes())) return false;</span>
+<span class="nc" id="L291">      }</span>
+<span class="nc" id="L292">      return true;</span>
+<span class="nc" id="L293">    } catch (RuntimeException e) { return false; }</span>
   }
   private static boolean replacedContainer(Pod pod, String name, String originalId) {
-<span class="nc bnc" id="L276" title="All 4 branches missed.">    return pod.getStatus() != null &amp;&amp; pod.getStatus().getContainerStatuses() != null</span>
-<span class="nc bnc" id="L277" title="All 4 branches missed.">        &amp;&amp; pod.getStatus().getContainerStatuses().stream().anyMatch(c -&gt; name.equals(c.getName())</span>
-<span class="nc bnc" id="L278" title="All 4 branches missed.">            &amp;&amp; c.getContainerID() != null &amp;&amp; !Objects.equals(originalId, c.getContainerID()));</span>
+<span class="nc bnc" id="L296" title="All 4 branches missed.">    return pod.getStatus() != null &amp;&amp; pod.getStatus().getContainerStatuses() != null</span>
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        &amp;&amp; pod.getStatus().getContainerStatuses().stream().anyMatch(c -&gt; name.equals(c.getName())</span>
+<span class="nc bnc" id="L298" title="All 4 branches missed.">            &amp;&amp; c.getContainerID() != null &amp;&amp; !Objects.equals(originalId, c.getContainerID()));</span>
   }
   private static WardenBoostStatus copy(KubernetesClient client, WardenBoostStatus status) {
-<span class="nc" id="L281">    return client.getKubernetesSerialization().clone(status);</span>
+<span class="nc" id="L301">    return client.getKubernetesSerialization().clone(status);</span>
   }
-<span class="nc bnc" id="L283" title="All 2 branches missed.">  private static Instant parse(String value) { return value == null ? null : Instant.parse(value); }</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">  private static Instant parse(String value) { return value == null ? null : Instant.parse(value); }</span>
   private static void recordApplied(WardenBoostStatus status, io.github.baokhang83.mnemo.warden.protocol.ResizeIntent intent) {
-<span class="nc" id="L285">    status.setAppliedRequest(Long.toString(intent.requestBytes()));</span>
-<span class="nc" id="L286">    status.setAppliedLimit(Long.toString(intent.limitBytes()));</span>
-<span class="nc" id="L287">    status.setAppliedHeapTarget(Long.toString(intent.heapBytes()));</span>
-<span class="nc" id="L288">  }</span>
+<span class="nc" id="L305">    status.setAppliedRequest(Long.toString(intent.requestBytes()));</span>
+<span class="nc" id="L306">    status.setAppliedLimit(Long.toString(intent.limitBytes()));</span>
+<span class="nc" id="L307">    status.setAppliedHeapTarget(Long.toString(intent.heapBytes()));</span>
+<span class="nc" id="L308">  }</span>
   private static void condition(WardenBoostStatus status, String type, boolean value, String reason, Instant now) {
-<span class="nc bnc" id="L290" title="All 2 branches missed.">    var conditions = status.getConditions() == null ? new java.util.ArrayList&lt;io.fabric8.kubernetes.api.model.Condition&gt;()</span>
-<span class="nc" id="L291">        : new java.util.ArrayList&lt;&gt;(status.getConditions());</span>
-<span class="nc" id="L292">    conditions.removeIf(c -&gt; type.equals(c.getType()));</span>
-<span class="nc bnc" id="L293" title="All 2 branches missed.">    conditions.add(new ConditionBuilder().withType(type).withStatus(value ? &quot;True&quot; : &quot;False&quot;)</span>
-<span class="nc" id="L294">        .withReason(reason).withMessage(reason).withLastTransitionTime(now.toString()).build());</span>
-<span class="nc" id="L295">    status.setConditions(conditions);</span>
-<span class="nc" id="L296">  }</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">    var conditions = status.getConditions() == null ? new java.util.ArrayList&lt;io.fabric8.kubernetes.api.model.Condition&gt;()</span>
+<span class="nc" id="L311">        : new java.util.ArrayList&lt;&gt;(status.getConditions());</span>
+<span class="nc" id="L312">    conditions.removeIf(c -&gt; type.equals(c.getType()));</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">    conditions.add(new ConditionBuilder().withType(type).withStatus(value ? &quot;True&quot; : &quot;False&quot;)</span>
+<span class="nc" id="L314">        .withReason(reason).withMessage(reason).withLastTransitionTime(now.toString()).build());</span>
+<span class="nc" id="L315">    status.setConditions(conditions);</span>
+<span class="nc" id="L316">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

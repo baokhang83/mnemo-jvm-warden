@@ -43,7 +43,22 @@ public final class IntentEmitter {
   /** Must match {@code PodIntentReader.ANNOTATION_LIMIT_BYTES} in warden-agent exactly. */
   public static final String ANNOTATION_LIMIT_BYTES = &quot;warden.mnemo.io/target-limit-bytes&quot;;
 
+<span class="fc" id="L46">  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(IntentEmitter.class);</span>
+
   private IntentEmitter() {}
+
+  /**
+   * Explains why a release cannot publish the lower target, or {@code null} when it can. Release
+   * keeps the non-heap allowance (limit minus heap) of the boosted intent, so the scheduled
+   * profile's limit must exceed it; otherwise the Boost would sit in {@code Releasing} forever.
+   */
+  public static String releaseBlockedDetail(String profileName, long profileLimitBytes, ResizeIntent held) {
+<span class="fc" id="L56">    long allowance = held.limitBytes() - held.heapBytes();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">    if (profileLimitBytes &gt; allowance) return null;</span>
+<span class="fc" id="L58">    return &quot;scheduled profile '&quot; + profileName + &quot;' limit &quot; + profileLimitBytes + &quot; bytes must exceed the &quot;</span>
+<span class="fc" id="L59">        + allowance + &quot; bytes of non-heap allowance kept from the boosted intent (limit &quot; + held.limitBytes()</span>
+<span class="fc" id="L60">        + &quot; minus heap &quot; + held.heapBytes() + &quot;); raise that profile's limit or narrow the boosted limit/heap gap&quot;;</span>
+  }
 
   /**
    * PATCHes {@code targetRef}'s live pod(s) with {@code profile}'s resolved request/limit bytes,
@@ -52,274 +67,278 @@ public final class IntentEmitter {
    * profile} can't be resolved.
    */
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef, ResourceProfile profile) {
-<span class="fc" id="L55">    emit(client, namespace, targetRef, profile, null, true, null);</span>
-<span class="fc" id="L56">  }</span>
+<span class="fc" id="L70">    emit(client, namespace, targetRef, profile, null, true, null);</span>
+<span class="fc" id="L71">  }</span>
 
   /** Policy-aware writer; correlated intents require a persisted admission. */
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef,
       ResourceProfile profile, WardenPolicy policy) {
-<span class="nc" id="L61">    emit(client, namespace, targetRef, profile, policy, true, null);</span>
-<span class="nc" id="L62">  }</span>
+<span class="nc" id="L76">    emit(client, namespace, targetRef, profile, policy, true, null);</span>
+<span class="nc" id="L77">  }</span>
 
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef,
       ResourceProfile profile, WardenPolicy policy, boolean shrinkAllowed) {
-<span class="nc" id="L66">    emit(client, namespace, targetRef, profile, policy, shrinkAllowed, null);</span>
-<span class="nc" id="L67">  }</span>
+<span class="nc" id="L81">    emit(client, namespace, targetRef, profile, policy, shrinkAllowed, null);</span>
+<span class="nc" id="L82">  }</span>
 
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef,
       ResourceProfile profile, WardenPolicy policy, boolean shrinkAllowed, ResourceProfile scheduledFloor) {
-<span class="fc" id="L71">    emit(client, namespace, targetRef, profile, policy, shrinkAllowed, scheduledFloor, false);</span>
-<span class="fc" id="L72">  }</span>
+<span class="fc" id="L86">    emit(client, namespace, targetRef, profile, policy, shrinkAllowed, scheduledFloor, false);</span>
+<span class="fc" id="L87">  }</span>
 
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef,
       ResourceProfile profile, WardenPolicy policy, boolean shrinkAllowed, ResourceProfile scheduledFloor,
       boolean correlatedScheduleUnavailable) {
-<span class="fc" id="L77">    emit(client, namespace, targetRef, profile, policy, shrinkAllowed, scheduledFloor, correlatedScheduleUnavailable, false);</span>
-<span class="fc" id="L78">  }</span>
+<span class="fc" id="L92">    emit(client, namespace, targetRef, profile, policy, shrinkAllowed, scheduledFloor, correlatedScheduleUnavailable, false);</span>
+<span class="fc" id="L93">  }</span>
 
   public static void emit(KubernetesClient client, String namespace, TargetRef targetRef,
       ResourceProfile profile, WardenPolicy policy, boolean shrinkAllowed, ResourceProfile scheduledFloor,
       boolean correlatedScheduleUnavailable, boolean legacyVetoed) {
-<span class="pc bpc" id="L83" title="1 of 8 branches missed.">    if (targetRef == null || profile == null || profile.getRequest() == null || profile.getLimit() == null) {</span>
-<span class="fc" id="L84">      return;</span>
+<span class="pc bpc" id="L98" title="1 of 8 branches missed.">    if (targetRef == null || profile == null || profile.getRequest() == null || profile.getLimit() == null) {</span>
+<span class="fc" id="L99">      return;</span>
     }
 
-<span class="fc" id="L87">    long requestBytes = ResourceQuantity.parseBytes(profile.getRequest());</span>
-<span class="fc" id="L88">    long limitBytes = ResourceQuantity.parseBytes(profile.getLimit());</span>
+<span class="fc" id="L102">    long requestBytes = ResourceQuantity.parseBytes(profile.getRequest());</span>
+<span class="fc" id="L103">    long limitBytes = ResourceQuantity.parseBytes(profile.getLimit());</span>
 
-<span class="fc" id="L90">    List&lt;WardenBoost&gt; boosts = List.of();</span>
-<span class="pc bpc" id="L91" title="1 of 2 branches missed.">    if (policy != null) {</span>
+<span class="fc" id="L105">    List&lt;WardenBoost&gt; boosts = List.of();</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">    if (policy != null) {</span>
       try {
-<span class="nc" id="L93">        boosts = client.resources(WardenBoost.class).inNamespace(namespace).list().getItems();</span>
-<span class="nc" id="L94">      } catch (io.fabric8.kubernetes.client.KubernetesClientException e) {</span>
+<span class="nc" id="L108">        boosts = client.resources(WardenBoost.class).inNamespace(namespace).list().getItems();</span>
+<span class="nc" id="L109">      } catch (io.fabric8.kubernetes.client.KubernetesClientException e) {</span>
         // Helm upgrades do not install new CRDs. Preserve pre-Boost policy behavior only
         // when the API explicitly says the CRD is absent and this policy has no boosts.
-<span class="nc bnc" id="L97" title="All 6 branches missed.">        if (e.getCode() != 404 || (policy.getSpec().getBoosts() != null &amp;&amp; !policy.getSpec().getBoosts().isEmpty())) throw e;</span>
-<span class="nc" id="L98">      }</span>
+<span class="nc bnc" id="L112" title="All 6 branches missed.">        if (e.getCode() != 404 || (policy.getSpec().getBoosts() != null &amp;&amp; !policy.getSpec().getBoosts().isEmpty())) throw e;</span>
+<span class="nc" id="L113">      }</span>
     }
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    for (String podName : resolvePodNames(client, namespace, targetRef)) {</span>
-<span class="nc" id="L101">      annotate(client, namespace, podName, requestBytes, limitBytes, profile.getHeapTarget(), policy, shrinkAllowed, scheduledFloor, correlatedScheduleUnavailable, boosts, legacyVetoed);</span>
-<span class="nc" id="L102">    }</span>
-<span class="fc" id="L103">  }</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">    for (String podName : resolvePodNames(client, namespace, targetRef)) {</span>
+<span class="nc" id="L116">      annotate(client, namespace, podName, requestBytes, limitBytes, profile.getHeapTarget(), policy, shrinkAllowed, scheduledFloor, correlatedScheduleUnavailable, boosts, legacyVetoed);</span>
+<span class="nc" id="L117">    }</span>
+<span class="fc" id="L118">  }</span>
 
   private static List&lt;String&gt; resolvePodNames(KubernetesClient client, String namespace, TargetRef targetRef) {
-<span class="fc" id="L106">    String kind = targetRef.getKind();</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">    if (&quot;Pod&quot;.equals(kind)) {</span>
-<span class="nc" id="L108">      return List.of(targetRef.getName());</span>
+<span class="fc" id="L121">    String kind = targetRef.getKind();</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">    if (&quot;Pod&quot;.equals(kind)) {</span>
+<span class="nc" id="L123">      return List.of(targetRef.getName());</span>
     }
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">    if (&quot;Deployment&quot;.equals(kind)) {</span>
-<span class="nc" id="L111">      Deployment deployment = client.apps().deployments().inNamespace(namespace).withName(targetRef.getName()).get();</span>
-<span class="nc bnc" id="L112" title="All 2 branches missed.">      return deployment == null ? List.of() : podNamesForSelector(client, namespace, deployment.getSpec().getSelector());</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">    if (&quot;Deployment&quot;.equals(kind)) {</span>
+<span class="nc" id="L126">      Deployment deployment = client.apps().deployments().inNamespace(namespace).withName(targetRef.getName()).get();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">      return deployment == null ? List.of() : podNamesForSelector(client, namespace, deployment.getSpec().getSelector());</span>
     }
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">    if (&quot;StatefulSet&quot;.equals(kind)) {</span>
-<span class="nc" id="L115">      StatefulSet statefulSet = client.apps().statefulSets().inNamespace(namespace).withName(targetRef.getName()).get();</span>
-<span class="nc bnc" id="L116" title="All 2 branches missed.">      return statefulSet == null ? List.of() : podNamesForSelector(client, namespace, statefulSet.getSpec().getSelector());</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">    if (&quot;StatefulSet&quot;.equals(kind)) {</span>
+<span class="nc" id="L130">      StatefulSet statefulSet = client.apps().statefulSets().inNamespace(namespace).withName(targetRef.getName()).get();</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">      return statefulSet == null ? List.of() : podNamesForSelector(client, namespace, statefulSet.getSpec().getSelector());</span>
     }
-<span class="fc" id="L118">    return List.of();</span>
+<span class="fc" id="L133">    return List.of();</span>
   }
 
   private static List&lt;String&gt; podNamesForSelector(KubernetesClient client, String namespace, LabelSelector selector) {
-<span class="nc" id="L122">    return client.pods().inNamespace(namespace).withLabelSelector(selector).list().getItems().stream()</span>
-<span class="nc" id="L123">        .map(pod -&gt; pod.getMetadata().getName())</span>
-<span class="nc" id="L124">        .toList();</span>
+<span class="nc" id="L137">    return client.pods().inNamespace(namespace).withLabelSelector(selector).list().getItems().stream()</span>
+<span class="nc" id="L138">        .map(pod -&gt; pod.getMetadata().getName())</span>
+<span class="nc" id="L139">        .toList();</span>
   }
 
   private static void annotate(KubernetesClient client, String namespace, String podName, long requestBytes, long limitBytes, String profileHeap, WardenPolicy policy, boolean shrinkAllowed, ResourceProfile scheduledFloor, boolean correlatedScheduleUnavailable, List&lt;WardenBoost&gt; boosts, boolean legacyVetoed) {
-<span class="nc" id="L128">    var resource = client.pods().inNamespace(namespace).withName(podName);</span>
-<span class="nc" id="L129">    Pod observed = resource.get();</span>
-<span class="nc bnc" id="L130" title="All 4 branches missed.">    if (observed == null || observed.getMetadata().getResourceVersion() == null</span>
-<span class="nc bnc" id="L131" title="All 2 branches missed.">        || observed.getMetadata().getUid() == null) return;</span>
-<span class="nc bnc" id="L132" title="All 2 branches missed.">    String encoded = observed.getMetadata().getAnnotations() == null ? null</span>
-<span class="nc" id="L133">        : observed.getMetadata().getAnnotations().get(ResizeIntent.ANNOTATION);</span>
-<span class="nc" id="L134">    String claim = io.github.baokhang83.mnemo.warden.controller.boost.TargetClaim.owner(observed);</span>
-<span class="nc bnc" id="L135" title="All 2 branches missed.">    if (policy != null) {</span>
-<span class="nc bnc" id="L136" title="All 4 branches missed.">      var admitted = boosts.stream().filter(b -&gt; b.getSpec() != null &amp;&amp; b.getSpec().getPodRef() != null</span>
-<span class="nc bnc" id="L137" title="All 2 branches missed.">          &amp;&amp; observed.getMetadata().getUid().equals(b.getSpec().getPodRef().getUid())</span>
-<span class="nc bnc" id="L138" title="All 4 branches missed.">          &amp;&amp; b.getStatus() != null &amp;&amp; b.getStatus().getPhase() != null</span>
-<span class="nc bnc" id="L139" title="All 2 branches missed.">          &amp;&amp; b.getStatus().getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Pending</span>
-<span class="nc bnc" id="L140" title="All 2 branches missed.">          &amp;&amp; b.getStatus().getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Rejected</span>
-<span class="nc bnc" id="L141" title="All 2 branches missed.">          &amp;&amp; !((b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Completed</span>
-<span class="nc bnc" id="L142" title="All 2 branches missed.">              || b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Orphaned)</span>
-<span class="nc bnc" id="L143" title="All 2 branches missed.">              &amp;&amp; b.getStatus().getConditions() != null &amp;&amp; b.getStatus().getConditions().stream()</span>
-<span class="nc bnc" id="L144" title="All 6 branches missed.">                  .anyMatch(c -&gt; &quot;Released&quot;.equals(c.getType()) &amp;&amp; &quot;True&quot;.equals(c.getStatus()))))</span>
-<span class="nc" id="L145">          .toList();</span>
-<span class="nc bnc" id="L146" title="All 2 branches missed.">      if (admitted.size() &gt; 1) return; // Conflicting claims: never select a winner by list order.</span>
-<span class="nc bnc" id="L147" title="All 2 branches missed.">      if (!admitted.isEmpty()) {</span>
-<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (correlatedScheduleUnavailable) return;</span>
-<span class="nc" id="L149">        var boost = admitted.getFirst();</span>
-<span class="nc bnc" id="L150" title="All 4 branches missed.">        if (claim != null &amp;&amp; !claim.equals(boost.getMetadata().getUid())) return;</span>
-<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (encoded == null) {</span>
+<span class="nc" id="L143">    var resource = client.pods().inNamespace(namespace).withName(podName);</span>
+<span class="nc" id="L144">    Pod observed = resource.get();</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">    if (observed == null || observed.getMetadata().getResourceVersion() == null</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        || observed.getMetadata().getUid() == null) return;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">    String encoded = observed.getMetadata().getAnnotations() == null ? null</span>
+<span class="nc" id="L148">        : observed.getMetadata().getAnnotations().get(ResizeIntent.ANNOTATION);</span>
+<span class="nc" id="L149">    String claim = io.github.baokhang83.mnemo.warden.controller.boost.TargetClaim.owner(observed);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">    if (policy != null) {</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">      var admitted = boosts.stream().filter(b -&gt; b.getSpec() != null &amp;&amp; b.getSpec().getPodRef() != null</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">          &amp;&amp; observed.getMetadata().getUid().equals(b.getSpec().getPodRef().getUid())</span>
+<span class="nc bnc" id="L153" title="All 4 branches missed.">          &amp;&amp; b.getStatus() != null &amp;&amp; b.getStatus().getPhase() != null</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">          &amp;&amp; b.getStatus().getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Pending</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">          &amp;&amp; b.getStatus().getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Rejected</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">          &amp;&amp; !((b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Completed</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">              || b.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Orphaned)</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">              &amp;&amp; b.getStatus().getConditions() != null &amp;&amp; b.getStatus().getConditions().stream()</span>
+<span class="nc bnc" id="L159" title="All 6 branches missed.">                  .anyMatch(c -&gt; &quot;Released&quot;.equals(c.getType()) &amp;&amp; &quot;True&quot;.equals(c.getStatus()))))</span>
+<span class="nc" id="L160">          .toList();</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">      if (admitted.size() &gt; 1) return; // Conflicting claims: never select a winner by list order.</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">      if (!admitted.isEmpty()) {</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (correlatedScheduleUnavailable) return;</span>
+<span class="nc" id="L164">        var boost = admitted.getFirst();</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">        if (claim != null &amp;&amp; !claim.equals(boost.getMetadata().getUid())) return;</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (encoded == null) {</span>
           // A durable intent can survive a crash before the first pod annotation.
-<span class="nc bnc" id="L153" title="All 2 branches missed.">          if (!policy.getMetadata().getUid().equals(boost.getStatus().getPolicyUid())</span>
-<span class="nc bnc" id="L154" title="All 2 branches missed.">              || !policy.getMetadata().getName().equals(boost.getSpec().getPolicyRef())) return;</span>
-<span class="nc bnc" id="L155" title="All 2 branches missed.">          if (boost.getStatus().getPreparedIntent() == null) {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">          if (!policy.getMetadata().getUid().equals(boost.getStatus().getPolicyUid())</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">              || !policy.getMetadata().getName().equals(boost.getSpec().getPolicyRef())) return;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">          if (boost.getStatus().getPreparedIntent() == null) {</span>
             // Only the policy writer can construct the first intent, so it includes the
             // current schedule/emergency target. Unknown prior heap requires quiet traffic.
-<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (!shrinkAllowed) return;</span>
-<span class="nc" id="L159">            prepareInitial(client, observed, boost, policy, requestBytes, limitBytes, profileHeap, scheduledFloor);</span>
-<span class="nc" id="L160">            return;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (!shrinkAllowed) return;</span>
+<span class="nc" id="L174">            prepareInitial(client, observed, boost, policy, requestBytes, limitBytes, profileHeap, scheduledFloor);</span>
+<span class="nc" id="L175">            return;</span>
           }
-<span class="nc" id="L162">          var prepared = PreparedTransitionStore.current(boost);</span>
-<span class="nc bnc" id="L163" title="All 4 branches missed.">          if (!shrinkAllowed &amp;&amp; reducesObserved(observed, prepared, prepared.requestBytes(), prepared.limitBytes())) return;</span>
-<span class="nc" id="L164">          PreparedTransitionStore.prepareAndPublish(client, boost, prepared);</span>
-<span class="nc" id="L165">        } else {</span>
-<span class="nc" id="L166">          reconcileCorrelated(client, namespace, observed, requestBytes, limitBytes, profileHeap,</span>
+<span class="nc" id="L177">          var prepared = PreparedTransitionStore.current(boost);</span>
+<span class="nc bnc" id="L178" title="All 4 branches missed.">          if (!shrinkAllowed &amp;&amp; reducesObserved(observed, prepared, prepared.requestBytes(), prepared.limitBytes())) return;</span>
+<span class="nc" id="L179">          PreparedTransitionStore.prepareAndPublish(client, boost, prepared);</span>
+<span class="nc" id="L180">        } else {</span>
+<span class="nc" id="L181">          reconcileCorrelated(client, namespace, observed, requestBytes, limitBytes, profileHeap,</span>
               policy, shrinkAllowed, scheduledFloor, boost);
         }
-<span class="nc" id="L169">        return;</span>
+<span class="nc" id="L184">        return;</span>
       }
     }
     // Unknown correlated ownership is not permission to overwrite it with a schedule.
-<span class="nc bnc" id="L173" title="All 6 branches missed.">    if (encoded != null || claim != null || legacyVetoed) return;</span>
-<span class="nc" id="L174">    Pod desired = applyScheduled(observed, requestBytes, limitBytes);</span>
-<span class="nc bnc" id="L175" title="All 2 branches missed.">    if (desired == observed) return;</span>
-<span class="nc" id="L176">    var annotations = desired.getMetadata().getAnnotations();</span>
-<span class="nc" id="L177">    String request = annotations.get(ANNOTATION_REQUEST_BYTES);</span>
-<span class="nc" id="L178">    String limit = annotations.get(ANNOTATION_LIMIT_BYTES);</span>
-<span class="nc" id="L179">    String correlated = annotations.get(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION);</span>
-<span class="nc" id="L180">    StringBuilder patch = new StringBuilder(&quot;[{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/resourceVersion\&quot;,\&quot;value\&quot;:&quot;)</span>
-<span class="nc" id="L181">        .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(observed.getMetadata().getResourceVersion()))</span>
-<span class="nc" id="L182">        .append(&quot;},{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/uid\&quot;,\&quot;value\&quot;:&quot;)</span>
-<span class="nc" id="L183">        .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(observed.getMetadata().getUid())).append(&quot;}&quot;);</span>
-<span class="nc bnc" id="L184" title="All 4 branches missed.">    if (observed.getMetadata().getAnnotations() == null || observed.getMetadata().getAnnotations().isEmpty()) {</span>
-<span class="nc" id="L185">      patch.append(&quot;,{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:\&quot;/metadata/annotations\&quot;,\&quot;value\&quot;:{}} &quot;);</span>
+<span class="nc bnc" id="L188" title="All 6 branches missed.">    if (encoded != null || claim != null || legacyVetoed) return;</span>
+<span class="nc" id="L189">    Pod desired = applyScheduled(observed, requestBytes, limitBytes);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">    if (desired == observed) return;</span>
+<span class="nc" id="L191">    var annotations = desired.getMetadata().getAnnotations();</span>
+<span class="nc" id="L192">    String request = annotations.get(ANNOTATION_REQUEST_BYTES);</span>
+<span class="nc" id="L193">    String limit = annotations.get(ANNOTATION_LIMIT_BYTES);</span>
+<span class="nc" id="L194">    String correlated = annotations.get(io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION);</span>
+<span class="nc" id="L195">    StringBuilder patch = new StringBuilder(&quot;[{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/resourceVersion\&quot;,\&quot;value\&quot;:&quot;)</span>
+<span class="nc" id="L196">        .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(observed.getMetadata().getResourceVersion()))</span>
+<span class="nc" id="L197">        .append(&quot;},{\&quot;op\&quot;:\&quot;test\&quot;,\&quot;path\&quot;:\&quot;/metadata/uid\&quot;,\&quot;value\&quot;:&quot;)</span>
+<span class="nc" id="L198">        .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(observed.getMetadata().getUid())).append(&quot;}&quot;);</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">    if (observed.getMetadata().getAnnotations() == null || observed.getMetadata().getAnnotations().isEmpty()) {</span>
+<span class="nc" id="L200">      patch.append(&quot;,{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:\&quot;/metadata/annotations\&quot;,\&quot;value\&quot;:{}} &quot;);</span>
     }
-<span class="nc" id="L187">    appendAnnotation(patch, ANNOTATION_REQUEST_BYTES, request);</span>
-<span class="nc" id="L188">    appendAnnotation(patch, ANNOTATION_LIMIT_BYTES, limit);</span>
-<span class="nc bnc" id="L189" title="All 2 branches missed.">    if (correlated != null) appendAnnotation(patch, io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION, correlated);</span>
-<span class="nc" id="L190">    patch.append(&quot;]&quot;);</span>
-<span class="nc" id="L191">    resource.patch(io.fabric8.kubernetes.client.dsl.base.PatchContext.of(</span>
-<span class="nc" id="L192">        io.fabric8.kubernetes.client.dsl.base.PatchType.JSON), patch.toString());</span>
-<span class="nc" id="L193">  }</span>
+<span class="nc" id="L202">    appendAnnotation(patch, ANNOTATION_REQUEST_BYTES, request);</span>
+<span class="nc" id="L203">    appendAnnotation(patch, ANNOTATION_LIMIT_BYTES, limit);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">    if (correlated != null) appendAnnotation(patch, io.github.baokhang83.mnemo.warden.protocol.ResizeIntent.ANNOTATION, correlated);</span>
+<span class="nc" id="L205">    patch.append(&quot;]&quot;);</span>
+<span class="nc" id="L206">    resource.patch(io.fabric8.kubernetes.client.dsl.base.PatchContext.of(</span>
+<span class="nc" id="L207">        io.fabric8.kubernetes.client.dsl.base.PatchType.JSON), patch.toString());</span>
+<span class="nc" id="L208">  }</span>
 
   private static void prepareInitial(KubernetesClient client, Pod pod, WardenBoost boost,
       WardenPolicy policy, long request, long limit, String profileHeap, ResourceProfile scheduledFloor) {
-<span class="nc" id="L197">    var status = boost.getStatus();</span>
-<span class="nc bnc" id="L198" title="All 2 branches missed.">    if (status.getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Preparing) return;</span>
-<span class="nc" id="L199">    var floor = AdmittedBoostFloor.read(boost, policy.getMetadata().getUid(), pod.getMetadata().getUid(),</span>
-<span class="nc" id="L200">        boost.getSpec().getContainer(), status.getContainerId()).orElseThrow();</span>
-<span class="nc bnc" id="L201" title="All 4 branches missed.">    if (pod.getStatus() == null || pod.getStatus().getContainerStatuses() == null) return;</span>
-<span class="nc" id="L202">    var container = pod.getStatus().getContainerStatuses().stream().filter(c -&gt;</span>
-<span class="nc bnc" id="L203" title="All 4 branches missed.">        boost.getSpec().getContainer().equals(c.getName()) &amp;&amp; status.getContainerId().equals(c.getContainerID())</span>
-<span class="nc bnc" id="L204" title="All 4 branches missed.">        &amp;&amp; c.getState() != null &amp;&amp; c.getState().getRunning() != null).findFirst();</span>
-<span class="nc bnc" id="L205" title="All 4 branches missed.">    if (container.isEmpty() || container.get().getResources() == null</span>
-<span class="nc bnc" id="L206" title="All 4 branches missed.">        || container.get().getResources().getRequests() == null || container.get().getResources().getLimits() == null</span>
-<span class="nc bnc" id="L207" title="All 2 branches missed.">        || container.get().getResources().getRequests().get(&quot;memory&quot;) == null</span>
-<span class="nc bnc" id="L208" title="All 2 branches missed.">        || container.get().getResources().getLimits().get(&quot;memory&quot;) == null) return;</span>
-<span class="nc" id="L209">    request = Math.max(Math.max(request, floor.memory().request()),</span>
-<span class="nc" id="L210">        ResourceQuantity.parseBytes(container.get().getResources().getRequests().get(&quot;memory&quot;).toString()));</span>
-<span class="nc" id="L211">    limit = Math.max(Math.max(limit, floor.memory().limit()),</span>
-<span class="nc" id="L212">        ResourceQuantity.parseBytes(container.get().getResources().getLimits().get(&quot;memory&quot;).toString()));</span>
-<span class="nc bnc" id="L213" title="All 2 branches missed.">    long heap = Math.max(floor.heapBytes(), profileHeap == null ? 0 : ResourceQuantity.parseBytes(profileHeap));</span>
-<span class="nc bnc" id="L214" title="All 2 branches missed.">    if (scheduledFloor != null) {</span>
-<span class="nc" id="L215">      request = Math.max(request, ResourceQuantity.parseBytes(scheduledFloor.getRequest()));</span>
-<span class="nc" id="L216">      limit = Math.max(limit, ResourceQuantity.parseBytes(scheduledFloor.getLimit()));</span>
-<span class="nc bnc" id="L217" title="All 2 branches missed.">      if (scheduledFloor.getHeapTarget() != null)</span>
-<span class="nc" id="L218">        heap = Math.max(heap, ResourceQuantity.parseBytes(scheduledFloor.getHeapTarget()));</span>
+<span class="nc" id="L212">    var status = boost.getStatus();</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">    if (status.getPhase() != io.github.baokhang83.mnemo.warden.crd.BoostPhase.Preparing) return;</span>
+<span class="nc" id="L214">    var floor = AdmittedBoostFloor.read(boost, policy.getMetadata().getUid(), pod.getMetadata().getUid(),</span>
+<span class="nc" id="L215">        boost.getSpec().getContainer(), status.getContainerId()).orElseThrow();</span>
+<span class="nc bnc" id="L216" title="All 4 branches missed.">    if (pod.getStatus() == null || pod.getStatus().getContainerStatuses() == null) return;</span>
+<span class="nc" id="L217">    var container = pod.getStatus().getContainerStatuses().stream().filter(c -&gt;</span>
+<span class="nc bnc" id="L218" title="All 4 branches missed.">        boost.getSpec().getContainer().equals(c.getName()) &amp;&amp; status.getContainerId().equals(c.getContainerID())</span>
+<span class="nc bnc" id="L219" title="All 4 branches missed.">        &amp;&amp; c.getState() != null &amp;&amp; c.getState().getRunning() != null).findFirst();</span>
+<span class="nc bnc" id="L220" title="All 4 branches missed.">    if (container.isEmpty() || container.get().getResources() == null</span>
+<span class="nc bnc" id="L221" title="All 4 branches missed.">        || container.get().getResources().getRequests() == null || container.get().getResources().getLimits() == null</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        || container.get().getResources().getRequests().get(&quot;memory&quot;) == null</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        || container.get().getResources().getLimits().get(&quot;memory&quot;) == null) return;</span>
+<span class="nc" id="L224">    request = Math.max(Math.max(request, floor.memory().request()),</span>
+<span class="nc" id="L225">        ResourceQuantity.parseBytes(container.get().getResources().getRequests().get(&quot;memory&quot;).toString()));</span>
+<span class="nc" id="L226">    limit = Math.max(Math.max(limit, floor.memory().limit()),</span>
+<span class="nc" id="L227">        ResourceQuantity.parseBytes(container.get().getResources().getLimits().get(&quot;memory&quot;).toString()));</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">    long heap = Math.max(floor.heapBytes(), profileHeap == null ? 0 : ResourceQuantity.parseBytes(profileHeap));</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">    if (scheduledFloor != null) {</span>
+<span class="nc" id="L230">      request = Math.max(request, ResourceQuantity.parseBytes(scheduledFloor.getRequest()));</span>
+<span class="nc" id="L231">      limit = Math.max(limit, ResourceQuantity.parseBytes(scheduledFloor.getLimit()));</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">      if (scheduledFloor.getHeapTarget() != null)</span>
+<span class="nc" id="L233">        heap = Math.max(heap, ResourceQuantity.parseBytes(scheduledFloor.getHeapTarget()));</span>
     }
-<span class="nc bnc" id="L220" title="All 2 branches missed.">    if (heap &gt;= limit) return;</span>
-<span class="nc" id="L221">    var intent = new ResizeIntent(java.util.UUID.randomUUID().toString(), boost.getMetadata().getUid(),</span>
-<span class="nc" id="L222">        pod.getMetadata().getUid(), boost.getSpec().getContainer(), status.getContainerId(), request, limit, heap);</span>
-<span class="nc" id="L223">    PreparedTransitionStore.prepareAndPublish(client, boost, intent);</span>
-<span class="nc" id="L224">  }</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">    if (heap &gt;= limit) return;</span>
+<span class="nc" id="L236">    var intent = new ResizeIntent(java.util.UUID.randomUUID().toString(), boost.getMetadata().getUid(),</span>
+<span class="nc" id="L237">        pod.getMetadata().getUid(), boost.getSpec().getContainer(), status.getContainerId(), request, limit, heap);</span>
+<span class="nc" id="L238">    PreparedTransitionStore.prepareAndPublish(client, boost, intent);</span>
+<span class="nc" id="L239">  }</span>
 
   /** Fail closed if the admitted request or its exact bound pod instance cannot be proven. */
   private static void reconcileCorrelated(KubernetesClient client, String namespace, Pod pod,
       long requestBytes, long limitBytes, String profileHeap, WardenPolicy policy, boolean shrinkAllowed,
       ResourceProfile scheduledFloor, WardenBoost boost) {
-<span class="nc bnc" id="L230" title="All 2 branches missed.">    if (scheduledFloor != null) {</span>
-<span class="nc" id="L231">      requestBytes = Math.max(requestBytes, ResourceQuantity.parseBytes(scheduledFloor.getRequest()));</span>
-<span class="nc" id="L232">      limitBytes = Math.max(limitBytes, ResourceQuantity.parseBytes(scheduledFloor.getLimit()));</span>
-<span class="nc bnc" id="L233" title="All 4 branches missed.">      if (scheduledFloor.getHeapTarget() != null &amp;&amp; (profileHeap == null ||</span>
-<span class="nc bnc" id="L234" title="All 2 branches missed.">          ResourceQuantity.parseBytes(scheduledFloor.getHeapTarget()) &gt; ResourceQuantity.parseBytes(profileHeap)))</span>
-<span class="nc" id="L235">        profileHeap = scheduledFloor.getHeapTarget();</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">    if (scheduledFloor != null) {</span>
+<span class="nc" id="L246">      requestBytes = Math.max(requestBytes, ResourceQuantity.parseBytes(scheduledFloor.getRequest()));</span>
+<span class="nc" id="L247">      limitBytes = Math.max(limitBytes, ResourceQuantity.parseBytes(scheduledFloor.getLimit()));</span>
+<span class="nc bnc" id="L248" title="All 4 branches missed.">      if (scheduledFloor.getHeapTarget() != null &amp;&amp; (profileHeap == null ||</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">          ResourceQuantity.parseBytes(scheduledFloor.getHeapTarget()) &gt; ResourceQuantity.parseBytes(profileHeap)))</span>
+<span class="nc" id="L250">        profileHeap = scheduledFloor.getHeapTarget();</span>
     }
-<span class="nc" id="L237">    var existing = ResizeIntent.decode(pod.getMetadata().getAnnotations().get(ResizeIntent.ANNOTATION));</span>
-<span class="nc bnc" id="L238" title="All 4 branches missed.">    if (policy.getMetadata().getUid() == null || !existing.podUid().equals(pod.getMetadata().getUid())</span>
-<span class="nc bnc" id="L239" title="All 2 branches missed.">        || CorrelatedIntentEmitter.currentContainer(pod, existing).isEmpty()) return;</span>
-<span class="nc bnc" id="L240" title="All 4 branches missed.">    if (boost.getMetadata() == null || !existing.requestUid().equals(boost.getMetadata().getUid())) return;</span>
-<span class="nc bnc" id="L241" title="All 4 branches missed.">    if (boost.getSpec() == null || !policy.getMetadata().getName().equals(boost.getSpec().getPolicyRef())) return;</span>
-<span class="nc" id="L242">    var floor = AdmittedBoostFloor.read(boost, policy.getMetadata().getUid(), existing.podUid(),</span>
-<span class="nc" id="L243">        existing.containerName(), existing.containerId());</span>
-<span class="nc bnc" id="L244" title="All 2 branches missed.">    boolean releasing = boost.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Releasing</span>
-<span class="nc bnc" id="L245" title="All 2 branches missed.">        &amp;&amp; boost.getStatus().getConditions() != null &amp;&amp; boost.getStatus().getConditions().stream()</span>
-<span class="nc bnc" id="L246" title="All 6 branches missed.">            .anyMatch(c -&gt; &quot;WorkFinished&quot;.equals(c.getType()) &amp;&amp; &quot;True&quot;.equals(c.getStatus()));</span>
-<span class="nc bnc" id="L247" title="All 4 branches missed.">    if (floor.isEmpty() &amp;&amp; !releasing) return;</span>
-<span class="nc bnc" id="L248" title="All 2 branches missed.">    if (boost.getStatus().getPreparedIntent() != null) {</span>
-<span class="nc" id="L249">      var prepared = PreparedTransitionStore.current(boost);</span>
-<span class="nc bnc" id="L250" title="All 2 branches missed.">      if (!prepared.equals(existing)) {</span>
+<span class="nc" id="L252">    var existing = ResizeIntent.decode(pod.getMetadata().getAnnotations().get(ResizeIntent.ANNOTATION));</span>
+<span class="nc bnc" id="L253" title="All 4 branches missed.">    if (policy.getMetadata().getUid() == null || !existing.podUid().equals(pod.getMetadata().getUid())</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        || CorrelatedIntentEmitter.currentContainer(pod, existing).isEmpty()) return;</span>
+<span class="nc bnc" id="L255" title="All 4 branches missed.">    if (boost.getMetadata() == null || !existing.requestUid().equals(boost.getMetadata().getUid())) return;</span>
+<span class="nc bnc" id="L256" title="All 4 branches missed.">    if (boost.getSpec() == null || !policy.getMetadata().getName().equals(boost.getSpec().getPolicyRef())) return;</span>
+<span class="nc" id="L257">    var floor = AdmittedBoostFloor.read(boost, policy.getMetadata().getUid(), existing.podUid(),</span>
+<span class="nc" id="L258">        existing.containerName(), existing.containerId());</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">    boolean releasing = boost.getStatus().getPhase() == io.github.baokhang83.mnemo.warden.crd.BoostPhase.Releasing</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        &amp;&amp; boost.getStatus().getConditions() != null &amp;&amp; boost.getStatus().getConditions().stream()</span>
+<span class="nc bnc" id="L261" title="All 6 branches missed.">            .anyMatch(c -&gt; &quot;WorkFinished&quot;.equals(c.getType()) &amp;&amp; &quot;True&quot;.equals(c.getStatus()));</span>
+<span class="nc bnc" id="L262" title="All 4 branches missed.">    if (floor.isEmpty() &amp;&amp; !releasing) return;</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">    if (boost.getStatus().getPreparedIntent() != null) {</span>
+<span class="nc" id="L264">      var prepared = PreparedTransitionStore.current(boost);</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">      if (!prepared.equals(existing)) {</span>
         // A previous quiet period is not evidence that a shrink is still safe now.
-<span class="nc bnc" id="L252" title="All 4 branches missed.">        if (!shrinkAllowed &amp;&amp; (prepared.heapBytes() &lt; existing.heapBytes()</span>
-<span class="nc bnc" id="L253" title="All 2 branches missed.">            || reducesObserved(pod, prepared, prepared.requestBytes(), prepared.limitBytes()))) return;</span>
-<span class="nc" id="L254">        PreparedTransitionStore.prepareAndPublish(client, boost, prepared);</span>
-<span class="nc" id="L255">        return;</span>
+<span class="nc bnc" id="L267" title="All 4 branches missed.">        if (!shrinkAllowed &amp;&amp; (prepared.heapBytes() &lt; existing.heapBytes()</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            || reducesObserved(pod, prepared, prepared.requestBytes(), prepared.limitBytes()))) return;</span>
+<span class="nc" id="L269">        PreparedTransitionStore.prepareAndPublish(client, boost, prepared);</span>
+<span class="nc" id="L270">        return;</span>
       }
-<span class="nc bnc" id="L257" title="All 4 branches missed.">    } else if (floor.isPresent() &amp;&amp; !floor.get().transitionId().equals(existing.transitionId())) {</span>
-<span class="nc" id="L258">      return;</span>
+<span class="nc bnc" id="L272" title="All 4 branches missed.">    } else if (floor.isPresent() &amp;&amp; !floor.get().transitionId().equals(existing.transitionId())) {</span>
+<span class="nc" id="L273">      return;</span>
     }
     long heldRequest, heldLimit, heldHeap;
-<span class="nc bnc" id="L261" title="All 2 branches missed.">    if (releasing) {</span>
-<span class="nc" id="L262">      var container = CorrelatedIntentEmitter.currentContainer(pod, existing).orElseThrow();</span>
-<span class="nc" id="L263">      var resources = container.getResources();</span>
-<span class="nc bnc" id="L264" title="All 6 branches missed.">      if (resources == null || resources.getRequests() == null || resources.getLimits() == null</span>
-<span class="nc bnc" id="L265" title="All 4 branches missed.">          || resources.getRequests().get(&quot;memory&quot;) == null || resources.getLimits().get(&quot;memory&quot;) == null) return;</span>
-<span class="nc" id="L266">      long actualRequest = ResourceQuantity.parseBytes(resources.getRequests().get(&quot;memory&quot;).toString());</span>
-<span class="nc" id="L267">      long actualLimit = ResourceQuantity.parseBytes(resources.getLimits().get(&quot;memory&quot;).toString());</span>
-<span class="nc bnc" id="L268" title="All 6 branches missed.">      if (!shrinkAllowed &amp;&amp; (requestBytes &lt; actualRequest || limitBytes &lt; actualLimit)) return;</span>
-<span class="nc" id="L269">      heldRequest = requestBytes; heldLimit = limitBytes;</span>
-      // Retain at least the existing explicit non-heap allowance; never invent a larger heap.
-<span class="nc" id="L271">      long allowance = existing.limitBytes() - existing.heapBytes();</span>
-<span class="nc bnc" id="L272" title="All 2 branches missed.">      if (heldLimit &lt;= allowance) return;</span>
-<span class="nc bnc" id="L273" title="All 2 branches missed.">      heldHeap = profileHeap == null ? Math.min(existing.heapBytes(), heldLimit - allowance)</span>
-<span class="nc" id="L274">          : ResourceQuantity.parseBytes(profileHeap);</span>
-<span class="nc bnc" id="L275" title="All 4 branches missed.">      if (heldHeap &lt;= 0 || heldHeap &gt; heldLimit - allowance) return;</span>
-<span class="nc" id="L276">    } else {</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">    if (releasing) {</span>
 <span class="nc" id="L277">      var container = CorrelatedIntentEmitter.currentContainer(pod, existing).orElseThrow();</span>
 <span class="nc" id="L278">      var resources = container.getResources();</span>
 <span class="nc bnc" id="L279" title="All 6 branches missed.">      if (resources == null || resources.getRequests() == null || resources.getLimits() == null</span>
 <span class="nc bnc" id="L280" title="All 4 branches missed.">          || resources.getRequests().get(&quot;memory&quot;) == null || resources.getLimits().get(&quot;memory&quot;) == null) return;</span>
-<span class="nc" id="L281">      heldRequest = Math.max(requestBytes, floor.get().memory().request());</span>
-<span class="nc" id="L282">      heldLimit = Math.max(limitBytes, floor.get().memory().limit());</span>
-<span class="nc bnc" id="L283" title="All 2 branches missed.">      heldHeap = profileHeap == null ? Math.max(existing.heapBytes(), floor.get().heapBytes())</span>
-<span class="nc" id="L284">          : Math.max(ResourceQuantity.parseBytes(profileHeap), floor.get().heapBytes());</span>
-<span class="nc bnc" id="L285" title="All 2 branches missed.">      if (heldHeap &gt;= heldLimit) return;</span>
-<span class="nc bnc" id="L286" title="All 4 branches missed.">      if (!shrinkAllowed &amp;&amp; reducesObserved(pod, existing, heldRequest, heldLimit)) return;</span>
+<span class="nc" id="L281">      long actualRequest = ResourceQuantity.parseBytes(resources.getRequests().get(&quot;memory&quot;).toString());</span>
+<span class="nc" id="L282">      long actualLimit = ResourceQuantity.parseBytes(resources.getLimits().get(&quot;memory&quot;).toString());</span>
+<span class="nc bnc" id="L283" title="All 6 branches missed.">      if (!shrinkAllowed &amp;&amp; (requestBytes &lt; actualRequest || limitBytes &lt; actualLimit)) return;</span>
+<span class="nc" id="L284">      heldRequest = requestBytes; heldLimit = limitBytes;</span>
+      // Retain at least the existing explicit non-heap allowance; never invent a larger heap.
+<span class="nc" id="L286">      long allowance = existing.limitBytes() - existing.heapBytes();</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">      if (heldLimit &lt;= allowance) {</span>
+<span class="nc" id="L288">        log.warn(&quot;Boost {} release blocked: {}&quot;, boost.getMetadata().getName(),</span>
+<span class="nc" id="L289">            releaseBlockedDetail(&quot;current&quot;, heldLimit, existing));</span>
+<span class="nc" id="L290">        return;</span>
+      }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">      heldHeap = profileHeap == null ? Math.min(existing.heapBytes(), heldLimit - allowance)</span>
+<span class="nc" id="L293">          : ResourceQuantity.parseBytes(profileHeap);</span>
+<span class="nc bnc" id="L294" title="All 4 branches missed.">      if (heldHeap &lt;= 0 || heldHeap &gt; heldLimit - allowance) return;</span>
+<span class="nc" id="L295">    } else {</span>
+<span class="nc" id="L296">      var container = CorrelatedIntentEmitter.currentContainer(pod, existing).orElseThrow();</span>
+<span class="nc" id="L297">      var resources = container.getResources();</span>
+<span class="nc bnc" id="L298" title="All 6 branches missed.">      if (resources == null || resources.getRequests() == null || resources.getLimits() == null</span>
+<span class="nc bnc" id="L299" title="All 4 branches missed.">          || resources.getRequests().get(&quot;memory&quot;) == null || resources.getLimits().get(&quot;memory&quot;) == null) return;</span>
+<span class="nc" id="L300">      heldRequest = Math.max(requestBytes, floor.get().memory().request());</span>
+<span class="nc" id="L301">      heldLimit = Math.max(limitBytes, floor.get().memory().limit());</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">      heldHeap = profileHeap == null ? Math.max(existing.heapBytes(), floor.get().heapBytes())</span>
+<span class="nc" id="L303">          : Math.max(ResourceQuantity.parseBytes(profileHeap), floor.get().heapBytes());</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">      if (heldHeap &gt;= heldLimit) return;</span>
+<span class="nc bnc" id="L305" title="All 4 branches missed.">      if (!shrinkAllowed &amp;&amp; reducesObserved(pod, existing, heldRequest, heldLimit)) return;</span>
     }
-<span class="nc bnc" id="L288" title="All 4 branches missed.">    if (!shrinkAllowed &amp;&amp; heldHeap &lt; existing.heapBytes()) return;</span>
-<span class="nc bnc" id="L289" title="All 4 branches missed.">    if (heldRequest == existing.requestBytes() &amp;&amp; heldLimit == existing.limitBytes()</span>
-<span class="nc bnc" id="L290" title="All 4 branches missed.">        &amp;&amp; heldHeap == existing.heapBytes()</span>
-<span class="nc bnc" id="L291" title="All 2 branches missed.">        &amp;&amp; !(releasing &amp;&amp; existing.transitionId().equals(boost.getStatus().getReleaseBaselineTransitionId()))) return;</span>
-<span class="nc" id="L292">    String seed = existing.encode() + &quot;:&quot; + heldRequest + &quot;:&quot; + heldLimit + &quot;:&quot; + heldHeap;</span>
-<span class="nc" id="L293">    String transition = java.util.UUID.nameUUIDFromBytes(seed.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();</span>
-<span class="nc" id="L294">    var next = new ResizeIntent(transition, existing.requestUid(), existing.podUid(), existing.containerName(),</span>
-<span class="nc" id="L295">        existing.containerId(), heldRequest, heldLimit, heldHeap);</span>
-<span class="nc" id="L296">    PreparedTransitionStore.prepareAndPublish(client, boost, next);</span>
-<span class="nc" id="L297">  }</span>
+<span class="nc bnc" id="L307" title="All 4 branches missed.">    if (!shrinkAllowed &amp;&amp; heldHeap &lt; existing.heapBytes()) return;</span>
+<span class="nc bnc" id="L308" title="All 4 branches missed.">    if (heldRequest == existing.requestBytes() &amp;&amp; heldLimit == existing.limitBytes()</span>
+<span class="nc bnc" id="L309" title="All 4 branches missed.">        &amp;&amp; heldHeap == existing.heapBytes()</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        &amp;&amp; !(releasing &amp;&amp; existing.transitionId().equals(boost.getStatus().getReleaseBaselineTransitionId()))) return;</span>
+<span class="nc" id="L311">    String seed = existing.encode() + &quot;:&quot; + heldRequest + &quot;:&quot; + heldLimit + &quot;:&quot; + heldHeap;</span>
+<span class="nc" id="L312">    String transition = java.util.UUID.nameUUIDFromBytes(seed.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();</span>
+<span class="nc" id="L313">    var next = new ResizeIntent(transition, existing.requestUid(), existing.podUid(), existing.containerName(),</span>
+<span class="nc" id="L314">        existing.containerId(), heldRequest, heldLimit, heldHeap);</span>
+<span class="nc" id="L315">    PreparedTransitionStore.prepareAndPublish(client, boost, next);</span>
+<span class="nc" id="L316">  }</span>
 
   private static boolean reducesObserved(Pod pod, ResizeIntent intent, long request, long limit) {
-<span class="nc" id="L300">    var container = CorrelatedIntentEmitter.currentContainer(pod, intent);</span>
-<span class="nc bnc" id="L301" title="All 4 branches missed.">    if (container.isEmpty() || container.get().getResources() == null</span>
-<span class="nc bnc" id="L302" title="All 4 branches missed.">        || container.get().getResources().getRequests() == null || container.get().getResources().getLimits() == null</span>
-<span class="nc bnc" id="L303" title="All 2 branches missed.">        || container.get().getResources().getRequests().get(&quot;memory&quot;) == null</span>
-<span class="nc bnc" id="L304" title="All 2 branches missed.">        || container.get().getResources().getLimits().get(&quot;memory&quot;) == null) return true;</span>
-<span class="nc bnc" id="L305" title="All 2 branches missed.">    return request &lt; ResourceQuantity.parseBytes(container.get().getResources().getRequests().get(&quot;memory&quot;).toString())</span>
-<span class="nc bnc" id="L306" title="All 2 branches missed.">        || limit &lt; ResourceQuantity.parseBytes(container.get().getResources().getLimits().get(&quot;memory&quot;).toString());</span>
+<span class="nc" id="L319">    var container = CorrelatedIntentEmitter.currentContainer(pod, intent);</span>
+<span class="nc bnc" id="L320" title="All 4 branches missed.">    if (container.isEmpty() || container.get().getResources() == null</span>
+<span class="nc bnc" id="L321" title="All 4 branches missed.">        || container.get().getResources().getRequests() == null || container.get().getResources().getLimits() == null</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        || container.get().getResources().getRequests().get(&quot;memory&quot;) == null</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        || container.get().getResources().getLimits().get(&quot;memory&quot;) == null) return true;</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">    return request &lt; ResourceQuantity.parseBytes(container.get().getResources().getRequests().get(&quot;memory&quot;).toString())</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        || limit &lt; ResourceQuantity.parseBytes(container.get().getResources().getLimits().get(&quot;memory&quot;).toString());</span>
   }
 
   private static void appendAnnotation(StringBuilder patch, String key, String value) {
-<span class="nc" id="L310">    patch.append(&quot;,{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:&quot;)</span>
-<span class="nc" id="L311">        .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(&quot;/metadata/annotations/&quot; + key.replace(&quot;~&quot;, &quot;~0&quot;).replace(&quot;/&quot;, &quot;~1&quot;)))</span>
-<span class="nc" id="L312">        .append(&quot;,\&quot;value\&quot;:&quot;).append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(value)).append(&quot;}&quot;);</span>
-<span class="nc" id="L313">  }</span>
+<span class="nc" id="L329">    patch.append(&quot;,{\&quot;op\&quot;:\&quot;add\&quot;,\&quot;path\&quot;:&quot;)</span>
+<span class="nc" id="L330">        .append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(&quot;/metadata/annotations/&quot; + key.replace(&quot;~&quot;, &quot;~0&quot;).replace(&quot;/&quot;, &quot;~1&quot;)))</span>
+<span class="nc" id="L331">        .append(&quot;,\&quot;value\&quot;:&quot;).append(io.github.baokhang83.mnemo.warden.protocol.JsonString.quote(value)).append(&quot;}&quot;);</span>
+<span class="nc" id="L332">  }</span>
 
   /** Legacy scheduling may never overwrite a correlated transition. */
   static Pod applyScheduled(Pod pod, long requestBytes, long limitBytes) {
-<span class="fc" id="L317">    var annotations = pod.getMetadata().getAnnotations();</span>
-<span class="pc bpc" id="L318" title="1 of 4 branches missed.">    if (annotations != null &amp;&amp; annotations.containsKey(ResizeIntent.ANNOTATION)) return pod;</span>
-<span class="fc" id="L319">    return new PodBuilder(pod).editMetadata()</span>
-<span class="fc" id="L320">        .addToAnnotations(ANNOTATION_REQUEST_BYTES, String.valueOf(requestBytes))</span>
-<span class="fc" id="L321">        .addToAnnotations(ANNOTATION_LIMIT_BYTES, String.valueOf(limitBytes))</span>
-<span class="fc" id="L322">        .endMetadata().build();</span>
+<span class="fc" id="L336">    var annotations = pod.getMetadata().getAnnotations();</span>
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">    if (annotations != null &amp;&amp; annotations.containsKey(ResizeIntent.ANNOTATION)) return pod;</span>
+<span class="fc" id="L338">    return new PodBuilder(pod).editMetadata()</span>
+<span class="fc" id="L339">        .addToAnnotations(ANNOTATION_REQUEST_BYTES, String.valueOf(requestBytes))</span>
+<span class="fc" id="L340">        .addToAnnotations(ANNOTATION_LIMIT_BYTES, String.valueOf(limitBytes))</span>
+<span class="fc" id="L341">        .endMetadata().build();</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

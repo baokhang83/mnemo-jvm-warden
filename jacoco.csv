@@ -35,7 +35,7 @@ coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,Bo
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,ControllerTopology,35,37,12,10,5,5,9,4,1,1
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,BoostLifecycle.Observation,0,37,0,0,0,3,0,1,0,1
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,TargetClaim,256,0,20,0,41,0,15,0,5,0
-coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,WardenBoostReconciler,1305,0,240,0,209,0,144,0,24,0
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,WardenBoostReconciler,1405,0,266,0,225,0,160,0,27,0
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,BoostAdmission,153,381,52,49,18,61,47,13,2,5
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,BoostLifecycle.Decision,0,12,0,0,0,1,0,1,0,1
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.boost,BoostLifecycle,62,154,16,40,7,21,15,14,0,1
@@ -54,7 +54,7 @@ coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenCo
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,ControllerConfig,3,29,1,3,1,5,2,3,1,2
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller,WardenPolicyReconciler,415,0,50,0,80,0,33,0,8,0
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,CorrelatedIntentEmitter,7,225,16,28,2,37,16,11,0,5
-coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,IntentEmitter,1166,111,249,15,173,25,141,10,13,6
+coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,IntentEmitter,1176,136,249,17,176,31,141,13,13,8
 coverage/warden-controller,io.github.baokhang83.mnemo.warden.controller.intent,PreparedTransitionStore,317,82,57,17,52,15,34,8,3,2
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,HeapController,10,0,0,0,2,0,2,0,2,0
 coverage/warden-agent,io.github.baokhang83.mnemo.warden.agent.heap,GcDetector,0,65,0,9,0,15,0,9,0,4
