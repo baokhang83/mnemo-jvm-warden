@@ -2,6 +2,20 @@ apiVersion: v1
 entries:
   warden:
   - apiVersion: v2
+    appVersion: 0.2.1
+    created: "2026-11-09T13:51:25.991492385Z"
+    description: Mnemo Warden — a JVM-aware vertical right-sizing controller, plus
+      a reusable native-sidecar template for target workloads.
+    digest: adf3232f7f49aa77738581400b4d6c8715b81520fb94ffb64a09e556da7ab4b0
+    home: https://github.com/baokhang83/mnemo-jvm-warden
+    name: warden
+    sources:
+    - https://github.com/baokhang83/mnemo-jvm-warden
+    type: application
+    urls:
+    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.2.1/warden-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v2
     appVersion: 0.2.0
     created: "2026-11-08T04:33:01.884902213Z"
     description: Mnemo Warden — a JVM-aware vertical right-sizing controller, plus
@@ -115,6 +129,22 @@ entries:
     version: 0.1.2
   warden-sidecar:
   - apiVersion: v2
+    appVersion: 0.2.1
+    created: "2026-11-09T13:51:26.136308049Z"
+    description: 'Reusable `warden.sidecar` named template (the native-sidecar pattern
+      from deploy/example-sidecar.yaml, parameterized) for an operator''s own app
+      chart to include. A library chart: it renders no resources of its own, so depending
+      on it never deploys a second Warden controller alongside your app.'
+    digest: 60206eb03479a31427decf26e24b625723498f5a5f3b123eea41c9b8fa433a8a
+    home: https://github.com/baokhang83/mnemo-jvm-warden
+    name: warden-sidecar
+    sources:
+    - https://github.com/baokhang83/mnemo-jvm-warden
+    type: library
+    urls:
+    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.2.1/warden-sidecar-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v2
     appVersion: 0.2.0
     created: "2026-11-08T04:33:02.137885682Z"
     description: 'Reusable `warden.sidecar` named template (the native-sidecar pattern
@@ -178,4 +208,4 @@ entries:
     urls:
     - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-sidecar-0.1.2.tgz
     version: 0.1.2
-generated: "2026-11-08T04:33:02.137940996Z"
+generated: "2026-11-09T13:51:26.136368903Z"
