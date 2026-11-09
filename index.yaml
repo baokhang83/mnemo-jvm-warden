@@ -13,7 +13,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.2.0/warden-0.2.0.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.2.0.tgz
     version: 0.2.0
   - apiVersion: v2
     appVersion: 0.1.0
@@ -27,7 +27,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.8/warden-0.1.8.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.8.tgz
     version: 0.1.8
   - apiVersion: v2
     appVersion: 0.1.0
@@ -41,7 +41,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.7/warden-0.1.7.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.7.tgz
     version: 0.1.7
   - apiVersion: v2
     appVersion: 0.1.0
@@ -55,7 +55,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.6/warden-0.1.6.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.6.tgz
     version: 0.1.6
   - apiVersion: v2
     appVersion: 0.1.0
@@ -69,7 +69,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.5/warden-0.1.5.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.5.tgz
     version: 0.1.5
   - apiVersion: v2
     appVersion: 0.1.4
@@ -83,7 +83,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.4/warden-0.1.4.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.4.tgz
     version: 0.1.4
   - apiVersion: v2
     appVersion: 0.1.0
@@ -97,7 +97,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.3/warden-0.1.3.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.3.tgz
     version: 0.1.3
   - apiVersion: v2
     appVersion: 0.1.0
@@ -111,7 +111,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: application
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-0.1.2/warden-0.1.2.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-0.1.2.tgz
     version: 0.1.2
   warden-sidecar:
   - apiVersion: v2
@@ -128,7 +128,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: library
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.2.0/warden-sidecar-0.2.0.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-sidecar-0.2.0.tgz
     version: 0.2.0
   - apiVersion: v2
     appVersion: 0.1.0
@@ -144,7 +144,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: library
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.1.5/warden-sidecar-0.1.5.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-sidecar-0.1.5.tgz
     version: 0.1.5
   - apiVersion: v2
     appVersion: 0.1.4
@@ -160,7 +160,7 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: library
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.1.4/warden-sidecar-0.1.4.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-sidecar-0.1.4.tgz
     version: 0.1.4
   - apiVersion: v2
     appVersion: 0.1.0
@@ -176,6 +176,6 @@ entries:
     - https://github.com/baokhang83/mnemo-jvm-warden
     type: library
     urls:
-    - https://github.com/baokhang83/mnemo-jvm-warden/releases/download/warden-sidecar-0.1.2/warden-sidecar-0.1.2.tgz
+    - https://baokhang83.github.io/mnemo-jvm-warden/charts/warden-sidecar-0.1.2.tgz
     version: 0.1.2
 generated: "2026-11-08T04:33:02.137940996Z"
