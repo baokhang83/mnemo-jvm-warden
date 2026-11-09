@@ -4,6 +4,8 @@ name: publish-charts
 # installable Helm repo: `helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/`.
 # Changed charts need a new, unpublished version. Pull-request CI checks chart versions;
 # this workflow publishes chart-only changes independently from application releases.
+# After it finishes, mirror-charts-to-pages serves the packages from GitHub Pages instead of
+# release assets (Artifact Hub times out on those).
 on:
   push:
     branches: [ main ]

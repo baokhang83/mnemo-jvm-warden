@@ -47,7 +47,7 @@ jobs:
             gh release download "$tag" --repo "$REPO" --pattern "$file.prov" --dir charts 2>/dev/null || true
           done
           sed -i -E "s#https://github.com/${REPO}/releases/download/[^/]+/#${base}/charts/#g" index.yaml
-          ! grep -q "releases/download" index.yaml
+          if grep -q "releases/download" index.yaml; then echo "index still references release assets"; exit 1; fi
           ls charts | head -50
 
       - name: Verify every indexed package is served from the mirror

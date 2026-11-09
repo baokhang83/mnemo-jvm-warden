@@ -40,7 +40,8 @@ jobs:
       # Derive the version: from the tag on a push (v0.1.4 -> 0.1.4), or from the manual input.
       # Stamp both chart `version` and `appVersion` so the published chart versions match the
       # app release. chart-releaser then packages them and creates warden-<v> / warden-sidecar-<v>
-      # GitHub releases + updates the gh-pages index. chart-releaser refuses to overwrite an
+      # GitHub releases + updates the gh-pages index. The mirror-charts-to-pages workflow then copies
+      # the packages to GitHub Pages and rewrites the index URLs (Artifact Hub times out on release assets). chart-releaser refuses to overwrite an
       # existing release tag, so a given version can only be published once — pick a version not
       # already released (existing chart releases at the time of writing: warden up to 0.1.3,
       # warden-sidecar up to 0.1.2, so start this flow at v0.1.4 or later).
