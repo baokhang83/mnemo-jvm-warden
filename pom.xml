@@ -103,6 +103,7 @@
     <netty.version>4.1.140.Final</netty.version>
     <vertx.version>4.5.29</vertx.version>
     <commons-lang3.version>3.20.0</commons-lang3.version>
+    <slf4j.version>2.0.17</slf4j.version>
     <caffeine.version>3.1.8</caffeine.version>
   </properties>
 
@@ -131,6 +132,16 @@
         <version>${vertx.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>${slf4j.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>

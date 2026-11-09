@@ -12,14 +12,12 @@ ZGC), proving two things no unit test can:
 2. A heapTarget above the JVM's launch-time -Xmx is rejected before any allocation grows --
    exactly as CorrelatedResize.java now enforces for every collector, G1 included.
 
-Full Releasing -> Completed is deliberately NOT asserted. Running this live against a real
-cluster surfaced a separate, pre-existing gap: nothing republishes a lower correlated
-resize-intent once a Boost enters Releasing, so the floor stays held indefinitely past that
-point -- traced through WardenPolicyReconciler / IntentEmitter / PreparedTransitionStore, none
-of which reference collector type at all, so this reproduces identically for ZGC/Shenandoah and
-is not a G1 issue or something B11 introduced. What this script does assert instead: the agent
-never throws G1's soft-max UnsupportedOperationException while the release attempt is live --
-the one failure mode actually specific to this collector.
+It also asserts the full Releasing -> Completed path. An earlier version of this script stalled
+in ReleasePending (issue #132) because the boosted profile kept 512Mi of non-heap allowance
+(limit 896Mi minus heap 384Mi) while the scheduled 'normal' limit is 320Mi: release preserves the
+boosted intent's allowance and refuses a lower target that cannot hold it. That was a profile
+mismatch, collector-agnostic and now reported as Ready=False/ReleaseBlocked with the numbers;
+the profiles below keep the allowance (640Mi - 384Mi = 256Mi) under the 320Mi normal limit.
 
 This intentionally skips the boost.security.enabled admission/RBAC package (already covered by
 verify-boost-security.py and verify-boost-acceptance.py); the manual-flow RBAC used here is the
@@ -171,7 +169,7 @@ try:
                        # to correlate growing into 'boosted'; leaving it unset stalls release in
                        # ReleasePending indefinitely (observed against this real cluster).
                        'profiles': {'normal': {'request': '128Mi', 'limit': '320Mi', 'heapTarget': '64Mi'},
-                                    'boosted': {'request': '256Mi', 'limit': '896Mi', 'heapTarget': '384Mi'}},
+                                    'boosted': {'request': '256Mi', 'limit': '640Mi', 'heapTarget': '384Mi'}},
                        'schedule': [{'cron': '* * * * *', 'profile': 'normal'}],
                        # 'feasible' fits under the JVM's own -Xmx (512m) below; 'infeasible' sits
                        # above -Xmx but still under the profile's own limit, so CRD/admission
@@ -180,7 +178,7 @@ try:
                        # check, not an earlier, collector-blind schema bound.
                        'boosts': {'feasible': {'profile': 'boosted', 'heapTarget': '384Mi',
                                                 'acquisitionTimeout': '2m', 'maxDuration': '2m'},
-                                  'infeasible': {'profile': 'boosted', 'heapTarget': '700Mi',
+                                  'infeasible': {'profile': 'boosted', 'heapTarget': '600Mi',
                                                  'acquisitionTimeout': '30s', 'maxDuration': '2m'}}}}
     create(policy)
     policy_uid = get('wardenpolicy', 'policy')['metadata']['uid']
@@ -261,22 +259,19 @@ try:
     releasing = wait('completion request observed as Releasing', lambda: phase('feasible-request', {'Releasing'}), timeout=60)
     agent_log_at_releasing = k('logs', 'worker', '-n', ns, '-c', 'warden', '--tail=20', allow_failure=True)
 
-    # Full Releasing -> Completed is NOT asserted here. Investigating it live surfaced a separate,
-    # collector-agnostic gap: nothing republishes a lower correlated resize-intent once Releasing
-    # is entered (traced through WardenPolicyReconciler / IntentEmitter / PreparedTransitionStore
-    # -- none of which reference collector type at all), so the floor stays held past this point
-    # on a real cluster regardless of ZGC/Shenandoah/G1. That is a real bug, but not a G1 one, and
-    # not something B11 introduced or needs to fix. Tracked separately; see the module docstring
-    # update this finding prompted.
+    # Release must finish: the lower correlated intent is republished and verified by the agent.
+    completed = wait('release to Completed', lambda: phase('feasible-request', {'Completed'}), timeout=180)
+    restored = memory().get('limits', {}).get('memory')
+    if restored != '320Mi':
+        raise AssertionError('release did not restore the normal limit: ' + restored)
     if 'collector has no soft max' in agent_log_at_releasing:
         raise AssertionError('G1 release path threw the soft-max UnsupportedOperationException '
                               'this script exists to catch:\n' + agent_log_at_releasing)
 
     print('PASS: real controller + real G1 JVM -- a feasible heapTarget reached Granted with '
-          'real committed-heap/RSS evidence and began releasing without the agent ever hitting '
+          'real committed-heap/RSS evidence and released back to Completed without the agent ever hitting '
           "G1's soft-max UnsupportedOperationException, and an over-sized heapTarget was rejected "
-          'before any grant. (Full Releasing -> Completed is a separate, non-collector-specific '
-          'gap -- see module docstring.)')
+          'before any grant. The release then reached Completed and restored the normal limit.')
 except Exception as exc:
     if created_ns:
         sys.stderr.write('agent log:\n' + k('logs', 'worker', '-n', ns, '-c', 'warden', '--tail=100', allow_failure=True) + '\n')
