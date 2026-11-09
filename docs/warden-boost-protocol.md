@@ -167,7 +167,9 @@ profile heap target. Configure it below the profile's memory limit and at or bel
 launch-time maximum heap. The agent rejects unsupported targets before resizing. If the
 profile omits `heapTarget`, Warden retains the previous explicit Boost heap target; a larger
 container allocation alone will not raise the JVM soft maximum. During release, Warden
-preserves the last target's non-heap allowance and refuses a target too small for it.
+preserves the last target's non-heap allowance and refuses a target too small for it. The
+Boost then stays in `Releasing` with `Ready=False`, reason `ReleaseBlocked`, and a message naming
+the profile and both byte counts, until the policy is corrected.
 
 The schema bounds policies to 64 profiles and 32 Boost definitions for CEL validation cost.
 A policy above either bound requires revision before CRD upgrade. Helm does not update

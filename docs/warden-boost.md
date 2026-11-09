@@ -403,6 +403,7 @@ while work might still be running; doing so bypasses the protection that retains
 | `Completed` | Release evidence is recorded, or no resource transition was needed. The controller cleans up the claim separately. |
 | `Orphaned` | The bound Pod or container instance changed. The old grant cannot authorize work on its replacement. |
 | `UnsupportedJvm` | The agent could not prepare the explicit heap target on this JVM. Check the collector, soft-max capability, and `-Xmx`. |
+| `ReleaseBlocked` (message names a scheduled profile) | The scheduled profile's `limit` cannot hold the non-heap allowance kept from the boosted target (boosted limit minus heap). Raise the scheduled limit or narrow the boosted gap; see the operations guide. |
 | `StaleAcknowledgement` / `ReleaseBlocked` | The evidence is for another transition, or release verification failed. Inspect controller and agent logs; do not force a shrink. |
 
 If a client times out or disconnects after submitting a request, the API server may still have

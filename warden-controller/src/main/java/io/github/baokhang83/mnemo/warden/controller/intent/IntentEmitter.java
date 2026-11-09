@@ -43,7 +43,22 @@ public final class IntentEmitter {
   /** Must match {@code PodIntentReader.ANNOTATION_LIMIT_BYTES} in warden-agent exactly. */
   public static final String ANNOTATION_LIMIT_BYTES = "warden.mnemo.io/target-limit-bytes";
 
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(IntentEmitter.class);
+
   private IntentEmitter() {}
+
+  /**
+   * Explains why a release cannot publish the lower target, or {@code null} when it can. Release
+   * keeps the non-heap allowance (limit minus heap) of the boosted intent, so the scheduled
+   * profile's limit must exceed it; otherwise the Boost would sit in {@code Releasing} forever.
+   */
+  public static String releaseBlockedDetail(String profileName, long profileLimitBytes, ResizeIntent held) {
+    long allowance = held.limitBytes() - held.heapBytes();
+    if (profileLimitBytes > allowance) return null;
+    return "scheduled profile '" + profileName + "' limit " + profileLimitBytes + " bytes must exceed the "
+        + allowance + " bytes of non-heap allowance kept from the boosted intent (limit " + held.limitBytes()
+        + " minus heap " + held.heapBytes() + "); raise that profile's limit or narrow the boosted limit/heap gap";
+  }
 
   /**
    * PATCHes {@code targetRef}'s live pod(s) with {@code profile}'s resolved request/limit bytes,
@@ -269,7 +284,11 @@ public final class IntentEmitter {
       heldRequest = requestBytes; heldLimit = limitBytes;
       // Retain at least the existing explicit non-heap allowance; never invent a larger heap.
       long allowance = existing.limitBytes() - existing.heapBytes();
-      if (heldLimit <= allowance) return;
+      if (heldLimit <= allowance) {
+        log.warn("Boost {} release blocked: {}", boost.getMetadata().getName(),
+            releaseBlockedDetail("current", heldLimit, existing));
+        return;
+      }
       heldHeap = profileHeap == null ? Math.min(existing.heapBytes(), heldLimit - allowance)
           : ResourceQuantity.parseBytes(profileHeap);
       if (heldHeap <= 0 || heldHeap > heldLimit - allowance) return;

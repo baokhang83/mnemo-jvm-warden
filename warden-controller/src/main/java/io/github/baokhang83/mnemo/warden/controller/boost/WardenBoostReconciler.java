@@ -118,7 +118,7 @@ public final class WardenBoostReconciler implements Reconciler<WardenBoost>, Cle
         blackout, evidence, releaseTarget, acquisition, execution, now));
     if (decision.phase() == phase) {
       if (phase == BoostPhase.Preparing || phase == BoostPhase.Releasing)
-        reportWaiting(client, boost, pod, decision.reason(), now);
+        reportWaiting(client, boost, pod, decision.reason(), now, releaseBlockedDetail(boost, policy, policyMatches));
       return;
     }
     var next = copy(client, status);
@@ -193,9 +193,26 @@ public final class WardenBoostReconciler implements Reconciler<WardenBoost>, Cle
     BoostStatusStore.compareAndSet(client, boost, next);
   }
 
+  /** Non-null when the policy's current profile can never accept this release (see IntentEmitter). */
+  private static String releaseBlockedDetail(WardenBoost boost, WardenPolicy policy, boolean policyMatches) {
+    var status = boost.getStatus();
+    if (status.getPhase() != BoostPhase.Releasing || !policyMatches || status.getPreparedIntent() == null
+        || status.getReleaseBaselineTransitionId() == null
+        || !status.getReleaseBaselineTransitionId().equals(status.getTransitionId())
+        || policy.getStatus() == null || policy.getStatus().getCurrentProfile() == null
+        || policy.getSpec().getProfiles() == null) return null;
+    String name = policy.getStatus().getCurrentProfile();
+    var profile = policy.getSpec().getProfiles().get(name);
+    if (profile == null || profile.getLimit() == null) return null;
+    return io.github.baokhang83.mnemo.warden.controller.intent.IntentEmitter.releaseBlockedDetail(name,
+        io.github.baokhang83.mnemo.warden.controller.schedule.ResourceQuantity.parseBytes(profile.getLimit()),
+        PreparedTransitionStore.current(boost));
+  }
+
   private static void reportWaiting(KubernetesClient client, WardenBoost boost, Pod pod,
-      String fallback, Instant now) {
+      String fallback, Instant now, String releaseBlocked) {
     String reason = fallback;
+    String detail = null;
     var status = boost.getStatus();
     var annotations = pod.getMetadata().getAnnotations();
     if (!"Blackout".equals(fallback) && status.getPreparedIntent() != null && annotations != null) {
@@ -213,12 +230,15 @@ public final class WardenBoostReconciler implements Reconciler<WardenBoost>, Cle
         } catch (IllegalArgumentException e) { reason = "StaleAcknowledgement"; }
       }
     }
+    if (releaseBlocked != null && "ReleasePending".equals(reason)) { reason = "ReleaseBlocked"; detail = releaseBlocked; }
     if (status.getConditions() != null) {
       String observedReason = reason;
       if (status.getConditions().stream().anyMatch(c -> "Ready".equals(c.getType())
           && "False".equals(c.getStatus()) && observedReason.equals(c.getReason()))) return;
     }
     var next = copy(client, status); condition(next, "Ready", false, reason, now);
+    if (detail != null) next.getConditions().stream().filter(c -> "Ready".equals(c.getType()))
+        .forEach(c -> c.setMessage(releaseBlocked));
     BoostStatusStore.compareAndSet(client, boost, next);
   }
 
