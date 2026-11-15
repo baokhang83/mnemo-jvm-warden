@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java Boost API: Request Temporary Memory for a Kubernetes Pod with a Lease | mnemo-jvm-warden</title>
+<meta name="description" content="Let a Java application request more memory in Kubernetes for a bounded job and release it afterwards: the WardenBoostClient try-with-resources lease, BoostRejectedException vs BoostAcquisitionTimeoutException, token security. Experimental.">
+<link rel="canonical" href="https://baokhang83.github.io/mnemo-jvm-warden/guides/boost-api/">
+<link rel="alternate" type="text/plain" href="../../llms.txt" title="llms.txt">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta property="og:title" content="Java Boost API: Request Temporary Memory for a Kubernetes Pod with a Lease | mnemo-jvm-warden">
+<meta property="og:description" content="Let a Java application request more memory in Kubernetes for a bounded job and release it afterwards: the WardenBoostClient try-with-resources lease, BoostRejectedException vs BoostAcquisitionTimeoutException, token security. Experimental.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baokhang83.github.io/mnemo-jvm-warden/guides/boost-api/">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../">mnemo-jvm-warden</a>
+  <nav aria-label="Primary"><a href="../../#handshake">Handshake</a><a href="../../#decision-matrix">Warden vs HPA vs VPA</a><a href="../../why-warden/">Why</a><a href="../../architecture/">Architecture</a><a href="../../guides/boost-api/">Boost API</a><a href="../../reference/configuration/">Reference</a><a href="../../security/threat-model/">Threat model</a><a href="../../coverage/">Coverage</a><a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a></nav>
+</div></header>
+<main class="wrap">
+<div class="crumbs"><a href="../../">mnemo-jvm-warden</a> / Guides / Boost API</div>
+
+<h1>Boost API: let a Java application request temporary memory in Kubernetes</h1>
+<p class="lede">A scheduled right-sizing curve cannot know about a bounded, named operation: an index rebuild, a nightly batch, a migration. Boost lets the application take a memory <em>lease</em> for exactly that, and give it back when done, with no <code>kubectl</code> and no Kubernetes credentials in the app.</p>
+<div class="status" role="note"><strong>Experimental.</strong> Treat Boost as a controlled evaluation for a trusted operator in a controlled cluster, not as a production multi-tenant interface. Scheduled right-sizing works exactly the same without ever creating a Boost request.</div>
+
+<h2>1. The operator approves what can be asked for</h2>
+<p>A named Boost is defined in the <code>WardenPolicy</code>; the application cannot supply its own quantities.</p>
+<pre><code>spec:
+  profiles:
+    maintenance: { request: 1Gi, limit: 2Gi }
+  boosts:
+    index-rebuild:
+      profile: maintenance
+      heapTarget: 1Gi
+      acquisitionTimeout: 2m
+      maxDuration: 20m</code></pre>
+
+<h2>2. The application takes a lease</h2>
+<p><code>warden-boost-client</code> (Java 21, no third-party dependencies) is on <a href="https://central.sonatype.com/artifact/io.github.baokhang83.mnemo/warden-boost-client">Maven Central</a>:</p>
+<pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;io.github.baokhang83.mnemo&lt;/groupId&gt;
+  &lt;artifactId&gt;warden-boost-client&lt;/artifactId&gt;
+  &lt;version&gt;0.2.1&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+<pre><code>WardenBoostClient warden = WardenBoostClient.discover();
+
+try (BoostLease lease = warden.acquireBoost(&quot;index-rebuild&quot;, Duration.ofMinutes(2))) {
+    // Reached only after a durable Granted, never for a merely pending request.
+    rebuildIndex();
+    // close() requests completion; it is idempotent and does not block on reclamation.
+} catch (BoostRejectedException e) {
+    // Definite: this request will not be granted. No lease was handed out.
+    log.warn(&quot;boost rejected: phase={} {}&quot;, e.phase(), e.getMessage());
+} catch (BoostAcquisitionTimeoutException e) {
+    // Uncertain, not failed: the grant may still be racing server-side.
+    reconcileLater(e.requestId());
+}</code></pre>
+<p><code>discover()</code> reads <code>WARDEN_BOOST_PORT</code> and <code>WARDEN_BOOST_TOKEN_PATH</code> from the environment, matching the agent’s defaults, so an app container usually needs <strong>no extra configuration</strong>, only the shared token volume mount.</p>
+
+<h2>BoostRejectedException vs BoostAcquisitionTimeoutException</h2>
+<p>They are separate types on purpose. A caller cannot treat “definitely rejected” as “might still be granted”, because an uncertain grant that gets released can mean an operation already running without its memory floor.</p>
+<div class="table-wrap"><table><thead><tr><th></th><th><code>BoostRejectedException</code></th><th><code>BoostAcquisitionTimeoutException</code></th></tr></thead><tbody><tr><td>Meaning</td><td>The client observed a terminal, non-granted phase. This call returned no lease.</td><td>This call gave up waiting before the request settled. <strong>Outcome uncertain.</strong></td></tr><tr><td>Client action</td><td>Nothing is released. Inspect the request: failed preparation can still need guarded cleanup, and an expired request can retain its allocation until the operation is known to have stopped and completion is requested.</td><td>Deliberately leaves the request alone (never releases it). Carries <code>requestId()</code>.</td></tr><tr><td>What you do</td><td>Log and fall back to doing the work without a boost, or fail the job.</td><td>Persist the ID; reconcile with <code>warden.inspect(id)</code>, or resume with <code>acquireBoost(name, id, timeout)</code>.</td></tr></tbody></table></div>
+<p>The client checks its timeout between HTTP calls, so a call already in flight can make the elapsed time exceed it. <code>lease.status()</code> re-fetches the current phase. Close the lease only after the boosted operation <em>and its child work</em> finish; there is no async or cancellation wrapper yet.</p>
+
+<h2>How it stays safe</h2>
+<ul>
+ <li><strong>Loopback only.</strong> The client talks to a local API on <code>127.0.0.1</code> served by the Warden sidecar (default port <code>8090</code>). The app never holds Kubernetes credentials.</li>
+ <li><strong>Pod-bound bearer token.</strong> The agent generates a fresh random token at every start and writes it (<code>0600</code>) to an <code>emptyDir</code> shared with the app. Loopback alone does not separate containers in one pod, so every call needs <code>Authorization: Bearer &lt;token&gt;</code>, compared in constant time. Run the app and sidecar as the same UID, or use another verified credential-sharing arrangement. Read the token fresh per call (or on a <code>401</code>), because a sidecar restart regenerates it.</li>
+ <li><strong>Admission binding.</strong> A <code>ValidatingAdmissionPolicy</code> (<code>boost-request-guard</code>) binds every self-requested boost to the requesting Pod’s own identity. Agent RBAC on <code>wardenboosts</code> is <code>get/list/watch/create/patch</code>, never <code>delete</code> and never the <code>status</code> subresource.</li>
+ <li><strong>Prepared before granted.</strong> Warden prepares the allocation and the JVM before it records a grant, then returns the Pod to its current policy target once the lease closes. Expiry does not stop your Java code and does not release the floor.</li>
+</ul>
+
+<h2>Enable it</h2>
+<p>On the <code>warden</code> sidecar container, <code>WARDEN_BOOST_POLICY_REF</code> (the policy name to stamp on requests; its presence is the feature flag) and <code>WARDEN_POD_UID</code> (Downward API <code>metadata.uid</code>). Mount the token volume read-write in the sidecar and read-only in the app, and install the chart with the opt-in security package:</p>
+<pre><code>helm upgrade warden warden/warden --set boost.security.enabled=true</code></pre>
+<p>The security package is scoped to namespaces carrying the <code>warden.mnemo.io/boost-enabled: "true"</code> label, and role bindings are operator-managed. Without it, acquire calls reach the Kubernetes API and are denied by RBAC. Existing installations must apply updated CRDs before <code>helm upgrade</code>, because Helm does not upgrade installed CRDs.</p>
+
+<h2>Local API endpoints</h2>
+<div class="table-wrap"><table><thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead><tbody><tr><td><code>POST /v1/boost/acquire</code></td><td>Body <code>{"boost":"&lt;name&gt;","requestId":"&lt;optional&gt;"}</code>. Blocks up to <code>WARDEN_BOOST_ACQUIRE_WAIT_SECONDS</code> (25), then returns <code>202</code> so the caller polls. Reusing a <code>requestId</code> never creates a second <code>WardenBoost</code>. One outstanding request per agent: a second one gets <code>409</code>.</td></tr><tr><td><code>GET /v1/boost/status?requestId=</code></td><td>Current phase; <code>404</code> if unknown.</td></tr><tr><td><code>POST /v1/boost/release</code></td><td>Idempotent completion request.</td></tr></tbody></table></div>
+<p>The app never supplies a pod name, container name, policy name or Kubernetes API path; those come from the sidecar’s own configuration.</p>
+<p>Source: <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/warden-boost.md">Boost guide</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/warden-boost-operations.md">operations runbook</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/examples/src/main/java/io/github/baokhang83/mnemo/warden/examples/boost/IndexRebuildExample.java">runnable example</a>.</p>
+
+</main>
+<footer class="site"><div class="wrap">
+  Apache-2.0 · beta software · <a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a> ·
+  <a href="../../llms.txt">llms.txt</a> · <a href="../../sitemap.xml">sitemap</a> ·
+  <a href="../../coverage/">Coverage report</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">Report a vulnerability</a>
+</div></footer>
+
+</body>
+</html>

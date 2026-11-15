@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threat Model for a Kubernetes JVM Right-Sizing Sidecar: Trust Boundaries, RBAC, Admission | mnemo-jvm-warden</title>
+<meta name="description" content="Warden threat model for platform teams: host cgroup mount, JMX, shared process namespace, least-privilege RBAC mapping, ValidatingAdmissionPolicy token binding, Boost local API, and a hardening checklist.">
+<link rel="canonical" href="https://baokhang83.github.io/mnemo-jvm-warden/security/threat-model/">
+<link rel="alternate" type="text/plain" href="../../llms.txt" title="llms.txt">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta property="og:title" content="Threat Model for a Kubernetes JVM Right-Sizing Sidecar: Trust Boundaries, RBAC, Admission | mnemo-jvm-warden">
+<meta property="og:description" content="Warden threat model for platform teams: host cgroup mount, JMX, shared process namespace, least-privilege RBAC mapping, ValidatingAdmissionPolicy token binding, Boost local API, and a hardening checklist.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baokhang83.github.io/mnemo-jvm-warden/security/threat-model/">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../">mnemo-jvm-warden</a>
+  <nav aria-label="Primary"><a href="../../#handshake">Handshake</a><a href="../../#decision-matrix">Warden vs HPA vs VPA</a><a href="../../why-warden/">Why</a><a href="../../architecture/">Architecture</a><a href="../../guides/boost-api/">Boost API</a><a href="../../reference/configuration/">Reference</a><a href="../../security/threat-model/">Threat model</a><a href="../../coverage/">Coverage</a><a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a></nav>
+</div></header>
+<main class="wrap">
+<div class="crumbs"><a href="../../">mnemo-jvm-warden</a> / Security / Threat model</div>
+
+<h1>Threat model: trust boundaries, RBAC and hardening for Warden</h1>
+<p class="lede">Warden mounts the host cgroup filesystem, attaches to a JVM over JMX and patches Pod resources. This page summarises what it can touch, who could abuse that, what already stops them, and which gaps are accepted rather than hidden. It is a summary: the full document is linked at the end.</p>
+<div class="note"><strong>How to read “verified”.</strong> A claim marked verified is proven by a unit test or a <code>deploy/verify-*.sh</code> script against a real kind cluster, not just by the YAML looking right. Warden is beta and pre-1.0; the project has no external security audit.</div>
+
+<h2>Trust boundaries</h2>
+<div class="table-wrap"><table><thead><tr><th>Boundary</th><th>What crosses it</th><th>How it is controlled</th></tr></thead><tbody><tr><td>Namespace → cluster scope</td><td>The controller’s <code>ClusterRole</code> reads <code>wardenpolicies</code> and gets/lists/patches <code>pods</code> cluster-wide.</td><td>The code path only acts inside the policy’s own namespace (derived from the policy object; no CRD field can name another). Enforced in application code, not RBAC, so it needs a regression test.</td></tr><tr><td>Pod → node</td><td>A read-only <code>hostPath</code> mount of <code>/sys/fs/cgroup</code> gives read visibility into <strong>every</strong> cgroup on the node.</td><td>Read-only; Kubernetes has no native way to scope it to one pod’s subtree. An explicit, accepted cost. PodSecurity <code>restricted</code>/<code>baseline</code> forbid it, so an exemption is needed.</td></tr><tr><td>app container → sidecar</td><td><code>shareProcessNamespace: true</code> exposes the process table; JMX and the Boost API share the pod’s network namespace.</td><td>Sidecar runs non-root; JMX bound to <code>127.0.0.1</code>; Boost API needs a bearer token on a shared <code>emptyDir</code>. Run <code>app</code> non-root.</td></tr><tr><td>Replica → replica</td><td>Same ServiceAccount, different pod: a Deployment sidecar could try to resize its sibling.</td><td>Closed by the <code>warden-resize-admission-policy</code> ValidatingAdmissionPolicy (verified: replica A resizing replica B is denied with HTTP 422).</td></tr></tbody></table></div>
+
+<h2>RBAC least privilege</h2>
+<p>Every verb is mapped to the code path that needs it; a grant without a caller is a bug. <code>deploy/verify-rbac-boundaries.sh</code> asserts, with <code>kubectl auth can-i --as=</code>, that these grants hold and that a set of others is denied.</p>
+<div class="table-wrap"><table><thead><tr><th>Identity</th><th>Granted</th><th>Notably absent</th></tr></thead><tbody><tr><td><strong>warden-controller</strong> (<code>ClusterRole</code>)</td><td><code>wardenpolicies</code> get/list/watch and status get/patch; <code>wardenboosts</code> get/list/watch/patch and status get/patch; <code>apps</code> deployments/statefulsets <code>get</code>; core <code>pods</code> get/list/patch (annotations and claims); <code>events</code> create only when Boost observability is on.</td><td>any verb on <code>secrets</code>; <code>pods/exec</code>; <code>pods/resize</code>; <code>delete</code> on workloads; <code>nodes</code>; RBAC and certificates groups.</td></tr><tr><td><strong>sidecar agent</strong> (namespaced <code>Role</code>)</td><td><code>pods/resize</code> patch and <code>pods</code> get, both scoped by <code>resourceNames</code> to its own pod.</td><td>any verb on <code>secrets</code>; <code>pods/exec</code>; any other pod.</td></tr><tr><td>Deployment/StatefulSet agents</td><td>Replica names are generated, so <code>resourceNames</code> cannot be used: a namespace-wide <code>get/patch</code> on pods is bound by a <code>RoleBinding</code>.</td><td>The write side is narrowed back by the admission policy; the read side cannot be narrowed (admission never intercepts reads). A real, documented tradeoff.</td></tr></tbody></table></div>
+
+<h2>ValidatingAdmissionPolicy and token binding</h2>
+<ul>
+ <li><strong>Resize policy.</strong> It requires the caller’s bound service-account token’s <code>authentication.kubernetes.io/pod-name</code> claim to equal the pod being resized. It is <strong>not installed by the Helm chart</strong>; apply it for any Deployment or StatefulSet target.</li>
+ <li><strong>Boost policies</strong> (opt-in, <code>boost.security.enabled=true</code>, selected namespaces only) bind every self-requested <code>WardenBoost</code> to the agent token’s Pod UID and name, restrict Pod metadata edits to the acknowledgement, limit resize to that Pod, protect status and request ownership metadata, and require automatic token mounting to be disabled with projected service-account tokens mounted only in the Warden init container.</li>
+ <li>Neither controller nor agent has any verb on <code>secrets</code>, and the agent’s bearer token and JMX responses are never logged. The agent re-reads its projected token on every call instead of caching it.</li>
+</ul>
+
+<h2>Abuse cases, in one line each</h2>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Case</th><th>Mitigation</th><th>Accepted risk</th></tr></thead><tbody><tr><td>1</td><td>Controller compromise</td><td>No secrets/exec/delete/node verbs (verified); non-root image; shaded, auditable jar.</td><td><code>pods</code> <code>patch</code> cannot be narrowed to annotations or the caller’s namespace by RBAC alone.</td></tr><tr><td>2</td><td>Malicious or misconfigured policy</td><td>The agent’s RSS gate still refuses to lower the cgroup unverified, so the blast radius is a wrong schedule, not an OOMKill.</td><td>No shipped RBAC for who may write <code>wardenpolicies</code>, and no opt-in for a target to be named by a <code>targetRef</code>.</td></tr><tr><td>3</td><td>Compromised target workload</td><td>The sidecar’s API token is never on a volume the app mounts.</td><td>A root <code>app</code> is roughly equivalent to the sidecar at the process level.</td></tr><tr><td>4</td><td>Shared process namespace</td><td>Sidecar is non-root, limiting reverse inspection to what <code>ptrace_scope</code> allows.</td><td>Operators must run <code>app</code> non-root.</td></tr><tr><td>5</td><td>JMX access</td><td><code>jmxremote.host=127.0.0.1</code>; verified that another pod’s connection is refused.</td><td>Warden does not verify a target’s JMX flags; <code>authenticate=false</code> is only safe because of that binding.</td></tr><tr><td>6</td><td>Host cgroup mount</td><td>Read-only; PodSecurity makes the exemption an explicit decision.</td><td>Node-wide read visibility.</td></tr><tr><td>7</td><td>Prometheus spoofing</td><td>The URL is controller-wide config, not policy-controlled.</td><td>No mTLS or response integrity: secure the path (mesh or NetworkPolicy).</td></tr><tr><td>8</td><td>Cross-pod resize</td><td>Admission policy token binding (verified).</td><td>Not auto-installed by the chart.</td></tr><tr><td>9</td><td>Cross-namespace targeting</td><td>The emitter derives the namespace from the policy.</td><td>Enforced in code, not RBAC.</td></tr><tr><td>10</td><td>Denial of service</td><td>No path for actors outside a namespace to affect loop timing.</td><td>A second <code>java</code> process blocks attach: availability traded for safety.</td></tr><tr><td>11</td><td>Secret or log leakage</td><td>No verb on secrets; static log strings only.</td><td>No automated log-redaction test yet.</td></tr><tr><td>12</td><td>Boost local API</td><td>Loopback bind, constant-time bearer check, fresh 256-bit token per start.</td><td>No token expiry within one sidecar lifetime.</td></tr></tbody></table></div>
+
+<h2>Network exposure</h2>
+<div class="table-wrap"><table><thead><tr><th>Listener</th><th>Bind</th><th>Auth</th></tr></thead><tbody><tr><td>Agent <code>/healthz</code>, <code>/readyz</code>, <code>/metrics</code></td><td>all interfaces in the pod’s network namespace</td><td>none (no secrets exposed): scope with a NetworkPolicy</td></tr><tr><td>Target JVM JMX</td><td><code>127.0.0.1</code> only</td><td>none needed given loopback</td></tr><tr><td>Agent Boost API (optional)</td><td><code>127.0.0.1</code>, enforced in code</td><td>bearer token on a shared <code>emptyDir</code></td></tr><tr><td>Controller</td><td>no inbound listener</td><td>—</td></tr></tbody></table></div>
+
+<h2>Operator hardening checklist</h2>
+<h3>Required for the trust model to hold</h3>
+<ul>
+ <li>Target JVMs use exactly the documented JMX flags, especially <code>jmxremote.host=127.0.0.1</code>. Test the binding from a second pod rather than trusting the launch command.</li>
+ <li><code>app</code> containers run non-root wherever <code>shareProcessNamespace: true</code> is set.</li>
+ <li>The resize admission policy is applied for every Deployment/StatefulSet target.</li>
+ <li>A <code>hostPath</code> exemption exists if the cluster enforces PodSecurity <code>restricted</code> or <code>baseline</code>.</li>
+</ul>
+<h3>Recommended</h3>
+<ul>
+ <li>A NetworkPolicy around the agent’s port <code>8080</code>, and a secured path to Prometheus.</li>
+ <li>Restrict write access to <code>wardenpolicies</code> and who may target whose workloads.</li>
+ <li>Restrict <code>pods/exec</code> into the <code>warden</code> container: the image bundles harness entry points that can drive a resize with the sidecar’s token.</li>
+ <li>For Boost: restrict <code>pods/exec</code>, <code>pods/ephemeralcontainers</code> and <code>serviceaccounts/token</code>; a user able to create a Pod with the dedicated agent service account can impersonate the agent with another image.</li>
+</ul>
+<p>Re-run <code>deploy/verify-rbac-boundaries.sh</code> after any RBAC change, and <code>deploy/verify-cross-pod-resize-denied.sh</code> for Deployment/StatefulSet targets, to confirm enforcement in <em>your</em> cluster.</p>
+<p><strong>Reporting a vulnerability:</strong> see <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">SECURITY.md</a>. Only the latest <code>0.x</code> release is supported; fixes land on <code>main</code> and ship in the next release.</p>
+<p>Full documents: <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/threat-model.md">threat-model.md</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/rbac-mapping.md">rbac-mapping.md</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/hardening.md">hardening.md</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/security-review-checklist.md">security-review-checklist.md</a>.</p>
+
+</main>
+<footer class="site"><div class="wrap">
+  Apache-2.0 · beta software · <a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a> ·
+  <a href="../../llms.txt">llms.txt</a> · <a href="../../sitemap.xml">sitemap</a> ·
+  <a href="../../coverage/">Coverage report</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">Report a vulnerability</a>
+</div></footer>
+
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JVM-Aware In-Place Pod Right-Sizing for Kubernetes (Zero Restarts) | mnemo-jvm-warden</title>
+<meta name="description" content="Shrink and grow running JVM pods in place on Kubernetes 1.35+ without restarts or OOMKills. Warden makes the JVM release memory first, verifies RSS, then lowers the cgroup. Compare with HPA and VPA.">
+<meta name="google-site-verification" content="Q7SKsA-JukICYFV0a1XTQDHq_ZciLmj43Pjui4xJ_9Y" />
+<meta name="msvalidate.01" content="F8E60EFE3EC283577A2A0DADE4A5D82E" />
+<link rel="canonical" href="https://baokhang83.github.io/mnemo-jvm-warden/">
+<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt">
+<link rel="stylesheet" href="assets/site.css">
+<meta property="og:title" content="JVM-Aware In-Place Pod Right-Sizing for Kubernetes (Zero Restarts) | mnemo-jvm-warden">
+<meta property="og:description" content="Shrink and grow running JVM pods in place on Kubernetes 1.35+ without restarts or OOMKills. Warden makes the JVM release memory first, verifies RSS, then lowers the cgroup. Compare with HPA and VPA.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baokhang83.github.io/mnemo-jvm-warden/">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "SoftwareApplication",
+ "name": "mnemo-jvm-warden",
+ "applicationCategory": "DeveloperApplication",
+ "operatingSystem": "Kubernetes",
+ "license": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+ "url": "https://baokhang83.github.io/mnemo-jvm-warden/",
+ "codeRepository": "https://github.com/baokhang83/mnemo-jvm-warden",
+ "description": "JVM-aware in-place vertical memory right-sizing for Kubernetes: shrinks and grows running JVM pods without restarts or OOMKills."
+}
+</script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "FAQPage",
+ "mainEntity": [
+  {
+   "@type": "Question",
+   "name": "Why does Kubernetes in-place Pod resize OOMKill Java applications?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Two different causes. First, the memory limit was lowered while the JVM still held more committed heap than the new limit: the kernel kills the process when it touches memory that no longer fits. The kubelet tries to hold a limit decrease back while usage is above it, but Kubernetes documents that check as best-effort, and a JVM's committed heap counts as used even when mostly free. Second, the new limit is below what -Xmx plus non-heap memory needs: -Xmx cannot change on a running JVM, so the pod survives the shrink and is killed later when the working set grows. Warden fixes the first by making the JVM release memory and verifying RSS before it lowers the cgroup; you fix the second by sizing the smallest profile limit above -Xmx plus non-heap overhead."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Does mnemo-jvm-warden work with G1GC or only ZGC and Shenandoah?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "It works with G1, ZGC and Shenandoah for scheduled right-sizing. ZGC and Shenandoah expose a settable soft heap ceiling (SoftMaxHeapSize) at runtime. G1 has no live soft-max, so Warden forces a GC and relies on G1 periodic GC to uncommit, which is safe but slower, and a G1 workload must launch with -Xmx already covering its largest target. Serial, Parallel and Epsilon cannot uncommit freed pages, so the agent stays read-only for them."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How does Warden prevent a sidecar from escalating privileges across Pods?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "The sidecar's Role grants pods/resize patch and pods get only on its own pod name (resourceNames). Deployments and StatefulSets have generated replica names, so they need a namespace-wide grant; a ValidatingAdmissionPolicy then requires the caller's bound service-account token pod-name claim to match the pod being resized, and replica A resizing replica B is denied. That policy is not installed by the Helm chart: apply it yourself for any Deployment or StatefulSet target. Neither the controller nor the agent is granted any verb on secrets."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Do I still need a Cluster Autoscaler?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes, or an equivalent that consolidates nodes. Warden lowers the Pod's resource request, which frees schedulable capacity, but it never changes the number of pods or nodes. Without node consolidation the freed capacity is not billed capacity."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Why not just set resizePolicy to RestartContainer?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "RestartContainer is safe for a JVM and needs no extra tooling, but it restarts the JVM: compiled code, loaded classes, pools and in-process caches are lost. Warden is for slow-starting applications, minimum-replica setups and stateful or cache-heavy workloads where that is not acceptable."
+   }
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./">mnemo-jvm-warden</a>
+  <nav aria-label="Primary"><a href="#handshake">Handshake</a><a href="#decision-matrix">Warden vs HPA vs VPA</a><a href="why-warden/">Why</a><a href="architecture/">Architecture</a><a href="guides/boost-api/">Boost API</a><a href="reference/configuration/">Reference</a><a href="security/threat-model/">Threat model</a><a href="coverage/">Coverage</a><a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a></nav>
+</div></header>
+<main class="wrap">
+
+
+<section class="hero">
+  <span class="pill">Apache-2.0 · beta · Kubernetes 1.35+ · Java</span>
+  <h1>JVM-aware in-place Pod right-sizing for Kubernetes, with zero restarts</h1>
+  <p class="lede">Warden makes a running JVM give memory back to the OS during predictable quiet windows, <em>then</em> lowers the Pod’s
+  request and limit in place. The pod stays up, its warm state stays intact, and your replica count never changes.</p>
+</section>
+
+<div class="status" role="note" aria-label="Status and compatibility">
+  <strong>Status and compatibility</strong>
+  <ul>
+    <li><strong>Beta.</strong> Controller, agent, CRDs and both Helm charts are released and work end to end on a real cluster; not battle-tested under production load, APIs (<code>v1alpha1</code>) may change. <strong>Boost is experimental.</strong></li>
+    <li><strong>Kubernetes 1.35+</strong> (in-place Pod resize is GA), or earlier with the <code>InPlacePodVerticalScaling</code> feature gate. Nodes must use <strong>cgroup v2</strong>.</li>
+    <li><strong>ZGC / Shenandoah:</strong> a settable soft heap ceiling at runtime. <strong>G1:</strong> periodic GC, no live soft-max, so launch with an <code>-Xmx</code> that already covers your largest target. Serial/Parallel/Epsilon: read-only.</li>
+    <li>A <strong>Cluster Autoscaler</strong> (or equivalent) is what turns lower requests into a smaller bill.</li>
+  </ul>
+</div>
+
+<h2 id="handshake">The safety handshake, step by step</h2>
+<p>Shrink and grow are <strong>not symmetric</strong>. Pick a scenario and step through it, or click a message.</p>
+<div class="diagram" id="seq">
+  <div class="tabs" role="group" aria-label="Scenario">
+    <button type="button" data-mode="shrink" aria-pressed="true">Shrink (off-peak)</button>
+    <button type="button" data-mode="grow" aria-pressed="false">Grow (traffic returns)</button>
+    <button type="button" data-mode="wrong" aria-pressed="false">Wrong order: OOMKilled</button>
+  </div>
+  <svg viewBox="0 0 760 400" role="img" aria-label="Sequence diagram of the Warden shrink and grow handshake between controller, agent, JVM and kubelet. Shrink: lower the JVM first, verify RSS, then lower the cgroup. Grow: raise the cgroup first, then the JVM soft max.">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g class="scenario" data-name="shrink"><g class="actor"><rect x="28" y="8" width="124" height="30" rx="8"/><text x="90" y="28" text-anchor="middle">Controller</text></g><line class="life" x1="90" y1="38" x2="90" y2="390"/><g class="actor"><rect x="218" y="8" width="124" height="30" rx="8"/><text x="280" y="28" text-anchor="middle">Warden agent</text></g><line class="life" x1="280" y1="38" x2="280" y2="390"/><g class="actor"><rect x="408" y="8" width="124" height="30" rx="8"/><text x="470" y="28" text-anchor="middle">JVM</text></g><line class="life" x1="470" y1="38" x2="470" y2="390"/><g class="actor"><rect x="598" y="8" width="124" height="30" rx="8"/><text x="660" y="28" text-anchor="middle">Kubelet (cgroup)</text></g><line class="life" x1="660" y1="38" x2="660" y2="390"/><g class="step"><path class="msg" d="M90 80 H277"/><text class="lbl" x="185.0" y="74" text-anchor="middle">intent: off-peak profile</text></g><g class="step"><path class="msg" d="M280 124 H467"/><text class="lbl" x="375.0" y="118" text-anchor="middle">lower SoftMaxHeapSize, flush evictable</text></g><g class="step"><path class="msg" d="M280 168 H467"/><text class="lbl" x="375.0" y="162" text-anchor="middle">force deep GC + uncommit</text></g><g class="step"><path class="msg" d="M470 212 H283"/><text class="lbl" x="375.0" y="206" text-anchor="middle">RSS dropped, pages returned</text></g><g class="step"><path class="msg" d="M280 256 H324 V276 H284"/><text class="lbl" x="332" y="266" text-anchor="start">verify RSS &lt; target: GATE</text></g><g class="step"><path class="msg" d="M280 310 H657"/><text class="lbl" x="470.0" y="304" text-anchor="middle">resize DOWN (request + limit)</text></g><g class="step"><path class="msg" d="M660 354 H283"/><text class="lbl" x="470.0" y="348" text-anchor="middle">resize confirmed</text></g></g><g class="scenario" data-name="grow" hidden><g class="actor"><rect x="28" y="8" width="124" height="30" rx="8"/><text x="90" y="28" text-anchor="middle">Controller</text></g><line class="life" x1="90" y1="38" x2="90" y2="300"/><g class="actor"><rect x="218" y="8" width="124" height="30" rx="8"/><text x="280" y="28" text-anchor="middle">Warden agent</text></g><line class="life" x1="280" y1="38" x2="280" y2="300"/><g class="actor"><rect x="408" y="8" width="124" height="30" rx="8"/><text x="470" y="28" text-anchor="middle">JVM</text></g><line class="life" x1="470" y1="38" x2="470" y2="300"/><g class="actor"><rect x="598" y="8" width="124" height="30" rx="8"/><text x="660" y="28" text-anchor="middle">Kubelet (cgroup)</text></g><line class="life" x1="660" y1="38" x2="660" y2="300"/><g class="step"><path class="msg" d="M90 80 H277"/><text class="lbl" x="185.0" y="74" text-anchor="middle">intent: peak profile</text></g><g class="step"><path class="msg" d="M280 124 H657"/><text class="lbl" x="470.0" y="118" text-anchor="middle">resize UP (request + limit) FIRST</text></g><g class="step"><path class="msg" d="M660 168 H283"/><text class="lbl" x="470.0" y="162" text-anchor="middle">headroom granted</text></g><g class="step"><path class="msg" d="M280 212 H467"/><text class="lbl" x="375.0" y="206" text-anchor="middle">raise SoftMaxHeapSize</text></g><g class="step"><path class="msg" d="M280 256 H467"/><text class="lbl" x="375.0" y="250" text-anchor="middle">(optional) pre-warm cache</text></g></g><g class="scenario" data-name="wrong" hidden><g class="actor"><rect x="28" y="8" width="124" height="30" rx="8"/><text x="90" y="28" text-anchor="middle">Controller</text></g><line class="life" x1="90" y1="38" x2="90" y2="220"/><g class="actor"><rect x="218" y="8" width="124" height="30" rx="8"/><text x="280" y="28" text-anchor="middle">Warden agent</text></g><line class="life" x1="280" y1="38" x2="280" y2="220"/><g class="actor"><rect x="408" y="8" width="124" height="30" rx="8"/><text x="470" y="28" text-anchor="middle">JVM</text></g><line class="life" x1="470" y1="38" x2="470" y2="220"/><g class="actor"><rect x="598" y="8" width="124" height="30" rx="8"/><text x="660" y="28" text-anchor="middle">Kubelet (cgroup)</text></g><line class="life" x1="660" y1="38" x2="660" y2="220"/><g class="step"><path class="msg bad" d="M280 100 H657"/><text class="lbl" x="470.0" y="94" text-anchor="middle">lower limit; JVM still holds heap</text></g><g class="step"><path class="msg bad" d="M660 160 H473"/><text class="lbl" x="565.0" y="154" text-anchor="middle">kernel OOM kill: exit 137</text></g></g>
+</svg>
+  <div class="ctl"><button type="button" class="prev">← Previous</button><button type="button" class="next">Next →</button><span class="count"></span></div>
+  <div class="detail" aria-live="polite"></div>
+</div>
+<ul>
+  <li><strong>Shrinking:</strong> shrink the JVM first, <em>verify RSS actually fell</em>, then lower the cgroup.</li>
+  <li><strong>Growing:</strong> raise the cgroup first, then the JVM’s soft max.</li>
+  <li><strong>Aborting is a normal outcome:</strong> if RSS will not drop, the soft max is restored and the cgroup is never touched. See the <a href="architecture/">state machine</a>.</li>
+</ul>
+
+<h2 id="decision-matrix">When to use Warden, HPA or VPA</h2>
+<div class="table-wrap"><table><thead><tr><th></th><th>HPA</th><th>VPA (in-place)</th><th><code>resizePolicy: RestartContainer</code></th><th>Warden</th></tr></thead><tbody><tr><td><strong>What it changes</strong></td><td>Number of replicas</td><td>Container resources, from observed usage</td><td>Container resources, by restarting the container</td><td>Pod request/limit <em>and</em> the JVM’s own memory, in a fixed order</td></tr><tr><td><strong>Best for</strong></td><td>Stateless services that can scale down, even toward zero</td><td>Right-sizing steady workloads from history</td><td>JVMs where a restart is acceptable</td><td>Minimum-replica HA baselines, slow-booting monoliths, stateful nodes and caches where a restart is unacceptable</td></tr><tr><td><strong>JVM-aware</strong></td><td>No</td><td>No: observes RSS, cannot move it</td><td>Indirectly: new process, new heap</td><td>Yes: soft max, GC, uncommit, RSS verification</td></tr><tr><td><strong>JVM restarts</strong></td><td>Pods are replaced</td><td>Not for in-place updates</td><td>Yes</td><td>No</td></tr><tr><td><strong>Driven by</strong></td><td>Load metrics</td><td>Reactive to observed usage</td><td>A resize request</td><td>A timezone-aware schedule, optional metric guardrails, optional application Boost leases</td></tr><tr><td><strong>Where it hurts</strong></td><td>Cannot go below an HA floor; cold pods on a spike</td><td>Resizes the box and hopes the JVM cooperates</td><td>Warm state lost; capacity dips while it restarts</td><td>Beta; needs 1.35+, cgroup v2, a sidecar per pod, a Cluster Autoscaler for savings</td></tr></tbody></table></div>
+<p class="note">Warden does <strong>not</strong> compete with HPA. In most environments HPA is the right answer. Warden is for the cases where removing replicas is not an option and shrinking the pods you keep is the only lever left.
+<a href="why-warden/">Worked economics →</a></p>
+
+<h2>Go to…</h2>
+<div class="cards">
+  <a class="card" href="why-warden/"><strong>Why Warden</strong><span>The gap, requests vs limits, per-collector JVM knobs.</span></a>
+  <a class="card" href="architecture/"><strong>Architecture</strong><span>Components, state machine, RSS gate, invariants.</span></a>
+  <a class="card" href="guides/boost-api/"><strong>Boost API</strong><span>Ask for memory from Java with a try-with-resources lease.</span></a>
+  <a class="card" href="reference/configuration/"><strong>Configuration</strong><span>WardenPolicy, WardenBoost, Helm values, runbook.</span></a>
+  <a class="card" href="security/threat-model/"><strong>Threat model</strong><span>Trust boundaries, RBAC mapping, hardening checklist.</span></a>
+  <a class="card" href="coverage/"><strong>Coverage report</strong><span>JaCoCo aggregate for every module.</span></a>
+</div>
+
+<h2>Install in three steps</h2>
+<pre><code>helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/
+helm repo update
+helm install warden warden/warden</code></pre>
+<p>Then include the <code>warden-sidecar</code> library chart in your app’s chart and add a <code>WardenPolicy</code>. Neither chart makes Warden act on its own; it acts only once a policy targets the workload.</p>
+<pre><code>apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: my-app-policy
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: my-app }
+  timezone: Europe/Paris
+  profiles:
+    off-peak: { request: 512Mi, limit: 768Mi }
+    peak: { request: 2Gi, limit: 3Gi }
+  schedule:
+    - { cron: &quot;0 22 * * *&quot;, profile: off-peak }
+    - { cron: &quot;0 7 * * *&quot;, profile: peak }</code></pre>
+
+<h2 id="faq">FAQ</h2>
+<details><summary>Why does Kubernetes in-place Pod resize OOMKill Java applications?</summary><p>Two different causes. First, the memory limit was lowered while the JVM still held more committed heap than the new limit: the kernel kills the process when it touches memory that no longer fits. The kubelet tries to hold a limit decrease back while usage is above it, but Kubernetes documents that check as best-effort, and a JVM&#x27;s committed heap counts as used even when mostly free. Second, the new limit is below what -Xmx plus non-heap memory needs: -Xmx cannot change on a running JVM, so the pod survives the shrink and is killed later when the working set grows. Warden fixes the first by making the JVM release memory and verifying RSS before it lowers the cgroup; you fix the second by sizing the smallest profile limit above -Xmx plus non-heap overhead.</p></details><details><summary>Does mnemo-jvm-warden work with G1GC or only ZGC and Shenandoah?</summary><p>It works with G1, ZGC and Shenandoah for scheduled right-sizing. ZGC and Shenandoah expose a settable soft heap ceiling (SoftMaxHeapSize) at runtime. G1 has no live soft-max, so Warden forces a GC and relies on G1 periodic GC to uncommit, which is safe but slower, and a G1 workload must launch with -Xmx already covering its largest target. Serial, Parallel and Epsilon cannot uncommit freed pages, so the agent stays read-only for them.</p></details><details><summary>How does Warden prevent a sidecar from escalating privileges across Pods?</summary><p>The sidecar&#x27;s Role grants pods/resize patch and pods get only on its own pod name (resourceNames). Deployments and StatefulSets have generated replica names, so they need a namespace-wide grant; a ValidatingAdmissionPolicy then requires the caller&#x27;s bound service-account token pod-name claim to match the pod being resized, and replica A resizing replica B is denied. That policy is not installed by the Helm chart: apply it yourself for any Deployment or StatefulSet target. Neither the controller nor the agent is granted any verb on secrets.</p></details><details><summary>Do I still need a Cluster Autoscaler?</summary><p>Yes, or an equivalent that consolidates nodes. Warden lowers the Pod&#x27;s resource request, which frees schedulable capacity, but it never changes the number of pods or nodes. Without node consolidation the freed capacity is not billed capacity.</p></details><details><summary>Why not just set resizePolicy to RestartContainer?</summary><p>RestartContainer is safe for a JVM and needs no extra tooling, but it restarts the JVM: compiled code, loaded classes, pools and in-process caches are lost. Warden is for slow-starting applications, minimum-replica setups and stateful or cache-heavy workloads where that is not acceptable.</p></details>
+
+<h2>Further reading</h2>
+<ul>
+  <li><a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/shrink-jvm-memory-kubernetes.md">How to shrink JVM memory in Kubernetes without a restart</a> (OOMKilled after in-place resize, sizing the memory limit)</li>
+  <li><a href="https://baokhang.hashnode.dev/shrink-jvm-memory-kubernetes-in-place-resize">Your JVMs Are Burning Money Overnight</a> (walkthrough on kind)</li>
+  <li><a href="https://baokhang.hashnode.dev/why-kubernetes-1-35-resizepolicy-restartcontainer-isn-t-required-for-zgc-shenandoah">Does a JVM need RestartContainer? Not with ZGC/Shenandoah</a></li>
+  <li><a href="https://baokhang.hashnode.dev/your-g1-pod-ignores-softmaxheapsize-here-s-what-works-instead">How to make G1 release memory to the OS in Kubernetes</a></li>
+</ul>
+
+</main>
+<footer class="site"><div class="wrap">
+  Apache-2.0 · beta software · <a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a> ·
+  <a href="llms.txt">llms.txt</a> · <a href="sitemap.xml">sitemap</a> ·
+  <a href="coverage/">Coverage report</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">Report a vulnerability</a>
+</div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

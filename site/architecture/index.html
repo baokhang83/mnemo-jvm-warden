@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warden Architecture: the Safe In-Place Resize Handshake, RSS Gate and State Machine | mnemo-jvm-warden</title>
+<meta name="description" content="How mnemo-jvm-warden shrinks and grows JVM pods without OOMKills: controller and sidecar agent, the asymmetric shrink and grow sequences, RSS verification gate, cgroup v2 monitoring, JMX controls and invariants.">
+<link rel="canonical" href="https://baokhang83.github.io/mnemo-jvm-warden/architecture/">
+<link rel="alternate" type="text/plain" href="../llms.txt" title="llms.txt">
+<link rel="stylesheet" href="../assets/site.css">
+<meta property="og:title" content="Warden Architecture: the Safe In-Place Resize Handshake, RSS Gate and State Machine | mnemo-jvm-warden">
+<meta property="og:description" content="How mnemo-jvm-warden shrinks and grows JVM pods without OOMKills: controller and sidecar agent, the asymmetric shrink and grow sequences, RSS verification gate, cgroup v2 monitoring, JMX controls and invariants.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baokhang83.github.io/mnemo-jvm-warden/architecture/">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../">mnemo-jvm-warden</a>
+  <nav aria-label="Primary"><a href="../#handshake">Handshake</a><a href="../#decision-matrix">Warden vs HPA vs VPA</a><a href="../why-warden/">Why</a><a href="../architecture/">Architecture</a><a href="../guides/boost-api/">Boost API</a><a href="../reference/configuration/">Reference</a><a href="../security/threat-model/">Threat model</a><a href="../coverage/">Coverage</a><a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a></nav>
+</div></header>
+<main class="wrap">
+<div class="crumbs"><a href="../">mnemo-jvm-warden</a> / Architecture</div>
+
+<h1>Architecture: the safe resize handshake and its internals</h1>
+<p class="lede">Components, the asymmetric shrink and grow sequences, the RSS verification gate, how Warden reads the cgroup and controls the JVM, and the invariants that keep a resize from OOMKilling a pod.</p>
+
+<h2>Components</h2>
+<div class="table-wrap"><table><thead><tr><th>Component</th><th>Scope</th><th>What it does</th></tr></thead><tbody><tr><td><strong>warden-controller</strong></td><td>Cluster-wide, one replica</td><td>Reconciles <code>WardenPolicy</code> and <code>WardenBoost</code>: resolves the schedule, lead time, blackout and guardrail precedence, and writes the target request/limit as annotations on the pods it owns. It never resizes a pod itself.</td></tr><tr><td><strong>warden-agent</strong></td><td>Native sidecar, one per JVM pod</td><td>The safety-critical part. Polls its own pod’s intent, drives the JVM, verifies RSS, issues the in-place resize and confirms the kubelet applied it. Needs <code>shareProcessNamespace: true</code>, JMX on loopback and a read-only host cgroup mount.</td></tr><tr><td><strong>Kubelet</strong></td><td>Node</td><td>Applies the <code>pods/resize</code> PATCH and lowers or raises the cgroup v2 <code>memory.max</code>.</td></tr><tr><td><strong>Cluster Autoscaler</strong></td><td>Cluster (not Warden)</td><td>Turns the freed requests into drained nodes.</td></tr></tbody></table></div>
+<p>The sidecar is deliberately simple about policy and strict about safety: the controller says <em>what</em> and <em>when</em>; the agent decides whether it is <em>safe now</em>.</p>
+
+<h2>The state machine</h2>
+<p>Every transition is a state machine in the agent, not a linear script, because a shrink can legitimately abort if the JVM will not give memory back, for example when real load arrives mid-shrink.</p>
+<svg class="sm" viewBox="0 0 760 230" role="img" aria-label="Resize state machine. Steady goes to Shrinking, Draining, Verifying. Verifying either passes to Resizing then SteadyLow, or aborts back to Steady. SteadyLow goes to Growing, Expanding, Warming, then back to Steady.">
+<defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs>
+<rect x="10" y="30" width="90" height="34" rx="8"/><text x="55" y="52" text-anchor="middle">Steady</text>
+<rect x="130" y="30" width="100" height="34" rx="8"/><text x="180" y="52" text-anchor="middle">Shrinking</text>
+<rect x="260" y="30" width="100" height="34" rx="8"/><text x="310" y="52" text-anchor="middle">Draining</text>
+<rect x="390" y="30" width="100" height="34" rx="8"/><text x="440" y="52" text-anchor="middle">Verifying</text>
+<rect x="520" y="30" width="100" height="34" rx="8" class="ok"/><text x="570" y="52" text-anchor="middle">Resizing</text>
+<rect x="640" y="30" width="100" height="34" rx="8" class="ok"/><text x="690" y="52" text-anchor="middle">SteadyLow</text>
+<rect x="390" y="100" width="100" height="34" rx="8" class="bad"/><text x="440" y="122" text-anchor="middle">Aborted</text>
+<rect x="640" y="100" width="100" height="34" rx="8"/><text x="690" y="122" text-anchor="middle">Growing</text>
+<rect x="640" y="165" width="100" height="34" rx="8"/><text x="690" y="187" text-anchor="middle">Expanding</text>
+<rect x="520" y="165" width="100" height="34" rx="8"/><text x="570" y="187" text-anchor="middle">Warming</text>
+<path d="M100 47 H128"/><path d="M230 47 H258"/><path d="M360 47 H388"/><path d="M490 47 H518"/><path d="M620 47 H638"/>
+<path d="M440 64 V98"/><path d="M390 117 C 200 117, 60 110, 55 66"/>
+<path d="M690 64 V98"/><path d="M690 134 V163"/><path d="M640 182 H622"/>
+<path d="M520 182 C 300 215, 60 200, 55 66"/>
+<text x="447" y="86">RSS still high / load: abort</text>
+<text x="500" y="22">RSS &lt; target: gate passes</text>
+<text x="696" y="86">peak intent</text>
+<text x="684" y="152" text-anchor="end">cgroup raised FIRST</text>
+</svg>
+<h3>Shrink path</h3>
+<ol>
+ <li><strong>Shrinking:</strong> lower <code>SoftMaxHeapSize</code> and ask the cache hook to flush <em>evictable</em> entries. No cgroup change yet.</li>
+ <li><strong>Draining:</strong> force a deep GC and uncommit; pages return to the OS.</li>
+ <li><strong>Verifying (the gate):</strong> read actual RSS. Only if it is below the new limit, with a safety margin, does the agent proceed.</li>
+ <li><strong>Resizing:</strong> PATCH <code>pods/resize</code>, lowering request and limit together. The request is what frees capacity for the autoscaler.</li>
+ <li><strong>Aborted:</strong> if RSS will not drop, restore the soft max and leave the cgroup untouched. A rejected shrink is a no-op, not a degraded state.</li>
+</ol>
+<h3>Grow path, asymmetric on purpose</h3>
+<ol>
+ <li><strong>Expanding:</strong> raise the cgroup (request and limit) <strong>first</strong>. Headroom must exist before the JVM reaches for it.</li>
+ <li><strong>Warming:</strong> raise <code>SoftMaxHeapSize</code>, then optionally pre-warm the cache ahead of the predicted traffic.</li>
+</ol>
+<p><strong>Emergency path:</strong> a guardrail metric above <code>emergencyGrowAbove</code> in the low state skips the schedule and goes straight to Expanding. The pod is already warm, so recovery is a resize, not a cold start.</p>
+
+<h2>RSS verification and cgroup monitoring</h2>
+<ul>
+ <li>The agent reads resident memory from the cgroup v2 <code>memory.current</code> file through a read-only <code>hostPath</code> mount of <code>/sys/fs/cgroup</code> at <code>/host-cgroup</code>, plus JVM GC/NMT telemetry. cgroup v1 is out of scope.</li>
+ <li>Some collectors uncommit asynchronously, so the gate waits for pages to actually return, not just for the GC to finish. On timeout (<code>WARDEN_GC_TIMEOUT_SECONDS</code>, default 30) it aborts.</li>
+ <li>If the cgroup cannot be found, the agent says which of two things is wrong: the mount is missing, or the node is on cgroup v1.</li>
+</ul>
+
+<h2>JMX and JVM controls</h2>
+<p>The agent drives the runtime knobs through the Attach API / JMX (<code>HotSpotDiagnosticMXBean</code>-style controls such as <code>SoftMaxHeapSize</code>, <code>GC.run</code>, native memory tracking). It never touches <code>-Xmx</code>. The target must expose JMX on <code>127.0.0.1</code> only: the loopback binding is what makes unauthenticated JMX acceptable. See the <a href="../security/threat-model/">threat model</a>.</p>
+
+<h2>Intent handoff and timing</h2>
+<ul>
+ <li>The controller writes two byte-count annotations, <code>warden.mnemo.io/target-request-bytes</code> and <code>target-limit-bytes</code>, on the target pods. The agent reads only its <em>own</em> pod.</li>
+ <li>Precedence per reconcile: <strong>blackout &gt; metric &gt; schedule</strong>.</li>
+ <li>The controller resyncs at least every 30 s; the agent polls every 5 s by default. A transition can therefore lag its cron edge by up to ~35 s: budget for it in <code>spec.leadTime</code>.</li>
+</ul>
+
+<h2>Invariants</h2>
+<div class="table-wrap"><table><thead><tr><th>Invariant</th><th>Why</th><th>Enforced by</th></tr></thead><tbody><tr><td>The cgroup is never lowered before RSS is verified below target</td><td>prevents OOMKill</td><td>the <code>Verifying</code> gate</td></tr><tr><td>The cgroup is always raised before the JVM soft max</td><td>no allocation into non-existent headroom</td><td>grow ordering</td></tr><tr><td>A workload never drops below its HA replica floor</td><td>Warden is vertical-only and must not fight PodDisruptionBudgets</td><td>the agent refuses replica changes</td></tr><tr><td>The hot working set is never flushed</td><td>avoids a self-inflicted cold cache</td><td>the cache hook flushes evictable entries only</td></tr><tr><td>A rejected shrink is a no-op</td><td>safety over savings</td><td><code>Aborted</code> restores the soft max</td></tr></tbody></table></div>
+
+<h2>What can still go wrong</h2>
+<ul>
+ <li><strong>Uncommit lag:</strong> the gate must wait for pages, not for GC completion; timeout means abort.</li>
+ <li><strong>No node consolidation:</strong> lower requests free schedulable capacity but not billed capacity.</li>
+ <li><strong>cgroup v1 nodes:</strong> unsupported.</li>
+</ul>
+
+<h2>Boost path (experimental)</h2>
+<p>A <code>WardenBoost</code> asks for a named, operator-approved memory floor for one Pod and container. The controller validates admission, claims the Pod, and grants only after matching agent evidence. The policy reconciler remains the single intent writer: it combines the floor with scheduled and emergency targets, respects blackout and shrink guards, and the agent applies the normal grow/shrink ordering. Scheduled-only operation is unchanged without any Boost. See the <a href="../guides/boost-api/">Boost guide</a>.</p>
+<p>Source: <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/architecture.md">architecture.md</a>.</p>
+
+</main>
+<footer class="site"><div class="wrap">
+  Apache-2.0 · beta software · <a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a> ·
+  <a href="../llms.txt">llms.txt</a> · <a href="../sitemap.xml">sitemap</a> ·
+  <a href="../coverage/">Coverage report</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">Report a vulnerability</a>
+</div></footer>
+
+</body>
+</html>
