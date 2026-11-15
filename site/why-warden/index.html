@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Make a JVM Release Memory to the OS in Kubernetes: ZGC vs Shenandoah vs G1 | mnemo-jvm-warden</title>
+<meta name="description" content="Why Kubernetes pods keep JVM memory reserved overnight, where in-place right-sizing savings really come from (requests and the Cluster Autoscaler), and what ZGC, Shenandoah and G1 can return to the OS at runtime.">
+<link rel="canonical" href="https://baokhang83.github.io/mnemo-jvm-warden/why-warden/">
+<link rel="alternate" type="text/plain" href="../llms.txt" title="llms.txt">
+<link rel="stylesheet" href="../assets/site.css">
+<meta property="og:title" content="How to Make a JVM Release Memory to the OS in Kubernetes: ZGC vs Shenandoah vs G1 | mnemo-jvm-warden">
+<meta property="og:description" content="Why Kubernetes pods keep JVM memory reserved overnight, where in-place right-sizing savings really come from (requests and the Cluster Autoscaler), and what ZGC, Shenandoah and G1 can return to the OS at runtime.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baokhang83.github.io/mnemo-jvm-warden/why-warden/">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../">mnemo-jvm-warden</a>
+  <nav aria-label="Primary"><a href="../#handshake">Handshake</a><a href="../#decision-matrix">Warden vs HPA vs VPA</a><a href="../why-warden/">Why</a><a href="../architecture/">Architecture</a><a href="../guides/boost-api/">Boost API</a><a href="../reference/configuration/">Reference</a><a href="../security/threat-model/">Threat model</a><a href="../coverage/">Coverage</a><a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a></nav>
+</div></header>
+<main class="wrap">
+<div class="crumbs"><a href="../">mnemo-jvm-warden</a> / Why Warden</div>
+
+<h1>Why Warden: how to make a JVM release memory to the OS in Kubernetes</h1>
+<p class="lede">The economics (where the money really comes from), the three workloads where removing replicas is not an option, and the JVM mechanisms that make a running heap shrinkable at all.</p>
+
+<h2>The gap: three cases HPA cannot touch</h2>
+<p>In most production environments, <a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">Horizontal Pod Autoscaling</a> is the right answer: scale from ten replicas to two when traffic drops. Warden does not compete with that. It exists for the cases where scaling in is not possible.</p>
+<ol>
+ <li><strong>Minimum-replica HA baselines.</strong> 3 services × 3 replicas × 3 availability zones is 27 pods that cannot scale to zero; the floor is for failover, not load. Worked example from the project docs: nine replicas at 4 GB per JVM reserve <strong>36 GB overnight to serve no requests</strong>. Shrinking each replica to roughly 1 GB while keeping all nine alive turns that into about 9 GB. This is an illustration of the arithmetic, not a measurement.</li>
+ <li><strong>Slow-booting monoliths.</strong> A 2 to 5 minute boot makes scale-to-few a liability at the next spike. Warden keeps pods warm (JVM up, classes loaded, pools primed); growing back is a sub-second resize, not a cold start.</li>
+ <li><strong>Stateful nodes and distributed caches.</strong> Killing a replica forces rebalancing and cache loss. Warden shrinks in place: it flushes evictable entries and idle pages, runs a deep GC, uncommits the freed pages, and keeps the hot working set.</li>
+</ol>
+
+<h2>Where the money comes from: requests, not limits</h2>
+<p>Lowering a Pod’s memory <em>limit</em> saves nothing: you still pay for the node. Cost follows <strong>requests</strong>, because that is what the scheduler bin-packs against and what the <a href="https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler">Cluster Autoscaler</a> uses to decide a node can be drained.</p>
+<p>Warden’s action boundary ends at “lower the request”. It resizes an existing pod in place; it never changes the number of pods (that is HPA) or nodes (that is the autoscaler). On a fixed node pool with no autoscaler, a lower request frees schedulable capacity but zero billed capacity.</p>
+<div class="table-wrap"><table><thead><tr><th>Step</th><th>Who does it</th><th>Required for savings?</th></tr></thead><tbody><tr><td>Release JVM memory (GC + uncommit)</td><td>Warden</td><td>yes</td></tr><tr><td>Verify RSS actually dropped</td><td>Warden (safety gate)</td><td>yes</td></tr><tr><td>Lower the Pod’s request in place</td><td>Warden</td><td>yes</td></tr><tr><td>Bin-pack the freed reservation, drain a node</td><td>Kubernetes scheduler + Cluster Autoscaler</td><td>yes, or nothing is billed-saved</td></tr></tbody></table></div>
+
+<h2>The JVM knobs: ZGC vs Shenandoah vs G1 in a container</h2>
+<p><strong>You cannot change <code>-Xmx</code> on a running JVM.</strong> What is movable at runtime is the soft ceiling and the committed memory.</p>
+<div class="table-wrap"><table><thead><tr><th>Collector</th><th>Runtime soft max</th><th>Uncommit</th><th>How Warden gets memory back</th><th>Warden support</th></tr></thead><tbody><tr><td><strong>ZGC</strong></td><td>yes: <code>SoftMaxHeapSize</code>, settable live (<code>jcmd VM.set_flag</code>)</td><td>yes, automatic for unused heap</td><td>lower the soft max, force GC, uncommit</td><td>full (shrink + grow)</td></tr><tr><td><strong>Shenandoah</strong></td><td>yes</td><td>yes: aggressive, <code>-XX:ShenandoahUncommitDelay</code></td><td>lower the soft max, force GC, uncommit</td><td>full (shrink + grow)</td></tr><tr><td><strong>G1</strong></td><td>no</td><td>yes, via periodic GC (<code>-XX:G1PeriodicGCInterval</code>, <code>-XX:G1PeriodicGCSystemLoadThreshold</code>)</td><td>force GC and wait for committed memory to drop: safe but slower</td><td>full for scheduled resize; launch with an <code>-Xmx</code> covering your largest target</td></tr><tr><td>Serial / Parallel / Epsilon</td><td>—</td><td>no</td><td>cannot return pages</td><td><strong>read-only</strong>: the agent declines to act</td></tr></tbody></table></div>
+<p>The JVM already does half of this. Warden’s job is the orchestration: drive these knobs from a schedule <em>and</em> coordinate them with a Kubernetes <a href="https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/">in-place Pod resize</a>, which the JVM cannot do on its own. For the order and the gate, see the <a href="../architecture/">architecture</a>.</p>
+
+<h2>How small can the limit go?</h2>
+<pre><code>smallest profile limit
+    &gt;= -Xmx
+    + non-heap overhead (commonly 100-150 MiB for a Spring Boot service)
+    + working-set headroom</code></pre>
+<p>Example: <code>-Xmx200m</code> plus about 130 MiB non-heap is about 330 MiB expected RSS, so a 400 MiB off-peak limit leaves about 70 MiB of headroom. Warden does not squeeze an application into a smaller container than it needs; it follows the working set down in quiet hours. Lower the <strong>request</strong>, not only the limit.</p>
+
+<h2>Warden vs VPA in one line</h2>
+<p>VPA now also resizes in place but is JVM-blind: it observes RSS and cannot move it. <strong>VPA resizes the box and hopes the JVM cooperates; Warden makes the JVM cooperate first, then resizes.</strong> The full comparison is on the <a href="../#decision-matrix">home page</a>.</p>
+<p>Source: <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/why-warden.md">why-warden.md</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/shrink-jvm-memory-kubernetes.md">shrink guide</a>.</p>
+
+</main>
+<footer class="site"><div class="wrap">
+  Apache-2.0 · beta software · <a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a> ·
+  <a href="../llms.txt">llms.txt</a> · <a href="../sitemap.xml">sitemap</a> ·
+  <a href="../coverage/">Coverage report</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">Report a vulnerability</a>
+</div></footer>
+
+</body>
+</html>
