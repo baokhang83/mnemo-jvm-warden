@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WardenPolicy, WardenBoost and Helm Chart Reference with Runbook | mnemo-jvm-warden</title>
+<meta name="description" content="Canonical reference for mnemo-jvm-warden: WardenPolicy fields (profiles, schedule, leadTime, blackout, guardrail), WardenBoost, agent and controller environment, Helm chart values for warden and warden-sidecar, and troubleshooting.">
+<link rel="canonical" href="https://baokhang83.github.io/mnemo-jvm-warden/reference/configuration/">
+<link rel="alternate" type="text/plain" href="../../llms.txt" title="llms.txt">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta property="og:title" content="WardenPolicy, WardenBoost and Helm Chart Reference with Runbook | mnemo-jvm-warden">
+<meta property="og:description" content="Canonical reference for mnemo-jvm-warden: WardenPolicy fields (profiles, schedule, leadTime, blackout, guardrail), WardenBoost, agent and controller environment, Helm chart values for warden and warden-sidecar, and troubleshooting.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baokhang83.github.io/mnemo-jvm-warden/reference/configuration/">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../">mnemo-jvm-warden</a>
+  <nav aria-label="Primary"><a href="../../#handshake">Handshake</a><a href="../../#decision-matrix">Warden vs HPA vs VPA</a><a href="../../why-warden/">Why</a><a href="../../architecture/">Architecture</a><a href="../../guides/boost-api/">Boost API</a><a href="../../reference/configuration/">Reference</a><a href="../../security/threat-model/">Threat model</a><a href="../../coverage/">Coverage</a><a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a></nav>
+</div></header>
+<main class="wrap">
+<div class="crumbs"><a href="../../">mnemo-jvm-warden</a> / Reference / Configuration</div>
+
+<h1>Configuration reference: WardenPolicy, WardenBoost, Helm values and runbook</h1>
+<p class="lede">Everything an operator can set, outside in: the <code>WardenPolicy</code> you author, the environment of the agent and controller, the Helm values, then the failure modes you will actually hit.</p>
+<div class="toc"><ul>
+ <li><a href="#policy">WardenPolicy</a></li><li><a href="#precedence">Precedence and timing</a></li><li><a href="#env">Agent and controller environment</a></li>
+ <li><a href="#helm">Helm charts: warden vs warden-sidecar</a></li><li><a href="#runbook">Runbook</a></li></ul></div>
+
+<h2 id="policy">WardenPolicy (<code>warden.mnemo.io/v1alpha1</code>)</h2>
+<pre><code>apiVersion: warden.mnemo.io/v1alpha1
+kind: WardenPolicy
+metadata:
+  name: warden-policy-sample
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: my-app }
+  timezone: Europe/Paris
+  profiles:
+    off-peak: { request: 128Mi, limit: 256Mi }
+    peak: { request: 384Mi, limit: 512Mi }
+  schedule:
+    - { cron: &quot;0 22 * * *&quot;, profile: off-peak }
+    - { cron: &quot;0 7 * * *&quot;, profile: peak }
+  leadTime: { shrink: 5m, warm: 10m }
+  blackout:
+    - { start: &quot;2026-12-24T00:00:00Z&quot;, end: &quot;2026-12-26T00:00:00Z&quot; }
+  guardrail:
+    metric: &#x27;sum(rate(http_requests_total[5m]))&#x27;
+    shrinkBelow: &quot;1&quot;
+    emergencyGrowAbove: &quot;100&quot;</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type / required</th><th>Notes</th></tr></thead><tbody><tr><td><code>spec.targetRef</code></td><td>apiVersion, kind (<code>Pod</code>, <code>Deployment</code>, <code>StatefulSet</code>), name</td><td>Same shape as an HPA’s <code>scaleTargetRef</code>; the target is in the policy’s own namespace. For Deployments/StatefulSets the controller re-patches every owned pod each resync.</td></tr><tr><td><code>spec.timezone</code></td><td>IANA zone, <strong>required</strong></td><td>Every <code>cron</code> window is evaluated in this zone, DST-correctly.</td></tr><tr><td><code>spec.profiles</code></td><td>map of name → <code>request</code>, <code>limit</code>, optional <code>heapTarget</code>; max 64</td><td>Quantities as Kubernetes strings. <code>heapTarget</code> (positive integral bytes, below <code>limit</code>) only affects correlated Boost transitions.</td></tr><tr><td><code>spec.boosts</code></td><td>optional map; max 32</td><td>Each names an approved profile with <code>heapTarget</code>, <code>acquisitionTimeout</code>, <code>maxDuration</code>. See the <a href="../../guides/boost-api/">Boost guide</a>.</td></tr><tr><td><code>spec.schedule[]</code></td><td><code>cron</code> (5-field), <code>profile</code></td><td>The window whose cron most recently fired wins; order does not matter.</td></tr><tr><td><code>spec.leadTime</code></td><td><code>shrink</code>, <code>warm</code> durations</td><td>Fire at <code>window_start − shrink</code> and <code>peak_start − warm</code>, so the resize finishes before the traffic shift.</td></tr><tr><td><code>spec.blackout[]</code></td><td><code>start</code>, <code>end</code> ISO-8601</td><td>Hard “do not touch”; <strong>UTC</strong> regardless of <code>timezone</code>. Beats every other signal.</td></tr><tr><td><code>spec.guardrail</code></td><td><code>metric</code> (PromQL), <code>shrinkBelow</code>, <code>emergencyGrowAbove</code></td><td>Needs the controller’s <code>WARDEN_PROMETHEUS_URL</code>. If the query fails or returns nothing, the metric is “unverified”: <code>shrinkBelow</code> <strong>vetoes</strong> the shrink (fails closed) and the emergency grow never fires.</td></tr><tr><td><code>status</code></td><td>read-only</td><td><code>currentProfile</code>, <code>currentMetricValue</code>. A profile in status is not confirmation that the resize applied.</td></tr></tbody></table></div>
+<p>CRDs: <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/charts/warden/crds/wardenpolicy-crd.yaml">WardenPolicy</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/charts/warden/crds/wardenboost-crd.yaml">WardenBoost</a> (experimental, created by the Boost client or an operator for a named Boost) · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/deploy/wardenpolicy-sample-valid.yaml">sample policy</a>.</p>
+
+<h2 id="precedence">Precedence and timing</h2>
+<ol>
+ <li><strong>Blacked out:</strong> nothing changes.</li>
+ <li>Metric above <code>emergencyGrowAbove</code>: grow immediately, skipping the schedule.</li>
+ <li>Candidate is a shrink and the metric is not below <code>shrinkBelow</code>: the shrink is vetoed.</li>
+ <li>Otherwise the schedule’s candidate, adjusted for lead time, applies.</li>
+</ol>
+<p>The controller reconciles on every change and at least every <strong>30 s</strong>; the agent polls every <strong>5 s</strong>. Budget up to ~35 s of lag in <code>leadTime</code>.</p>
+
+<h2 id="env">Agent and controller environment</h2>
+<div class="table-wrap"><table><thead><tr><th>Variable</th><th>Component</th><th>Default</th><th>Notes</th></tr></thead><tbody><tr><td><code>WARDEN_POD_NAME</code></td><td>agent</td><td>required</td><td>Downward API <code>metadata.name</code>. The agent fails fast if unset.</td></tr><tr><td><code>WARDEN_TARGET_CONTAINER_NAME</code></td><td>agent</td><td>required</td><td>The sibling container to resize.</td></tr><tr><td><code>WARDEN_HEALTH_PORT</code></td><td>agent</td><td><code>8080</code></td><td><code>/healthz</code>, <code>/readyz</code>, <code>/metrics</code>.</td></tr><tr><td><code>WARDEN_GC_TIMEOUT_SECONDS</code></td><td>agent</td><td><code>30</code></td><td>How long the deep-GC-and-uncommit step waits.</td></tr><tr><td><code>WARDEN_RESIZE_TIMEOUT_SECONDS</code></td><td>agent</td><td><code>30</code></td><td>How long a resize waits for kubelet confirmation.</td></tr><tr><td><code>WARDEN_INTENT_POLL_INTERVAL_SECONDS</code></td><td>agent</td><td><code>5</code></td><td>How often the agent re-reads its pod’s intent.</td></tr><tr><td><code>WARDEN_PROMETHEUS_URL</code></td><td>controller</td><td>unset</td><td>Only needed if a policy uses a guardrail.</td></tr><tr><td><code>WARDEN_BOOST_OBSERVABILITY_ENABLED</code>, <code>WARDEN_BOOST_METRICS_PORT</code>, <code>WARDEN_BOOST_EVENTS_ENABLED</code></td><td>controller</td><td>unset / <code>8081</code> / unset</td><td>Optional Boost metrics and Events.</td></tr></tbody></table></div>
+<p>The agent also needs a read-only <code>hostPath</code> mount of <code>/sys/fs/cgroup</code> at <code>/host-cgroup</code>, and <code>shareProcessNamespace: true</code> on the Pod.</p>
+
+<h2 id="helm">Helm charts: <code>warden</code> vs <code>warden-sidecar</code></h2>
+<div class="table-wrap"><table><thead><tr><th>Chart</th><th>Type</th><th>What it installs</th></tr></thead><tbody><tr><td><code>warden</code></td><td>application chart</td><td>The <code>WardenPolicy</code> and <code>WardenBoost</code> CRDs, controller RBAC and the controller Deployment (one replica, <code>Recreate</code>, no leader election yet). Also exposes the sidecar as an includable named template.</td></tr><tr><td><code>warden-sidecar</code></td><td><strong>library</strong> chart</td><td>Renders nothing itself, so depending on it can never deploy a second controller. Your app chart includes <code>warden.sidecar</code> (the native-sidecar init container) and <code>warden.sidecar.volumes</code>; your chart still sets <code>shareProcessNamespace</code> and the host-cgroup volume.</td></tr></tbody></table></div>
+<pre><code>helm repo add warden https://baokhang83.github.io/mnemo-jvm-warden/
+helm repo update
+helm install warden warden/warden</code></pre>
+<pre><code>controller:
+  image: { repository: ghcr.io/baokhang83/mnemo-jvm-warden-controller, tag: latest }
+  prometheusUrl: &quot;&quot;        # -&gt; WARDEN_PROMETHEUS_URL
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+sidecar:                   # reference defaults for the warden.sidecar template
+  enabled: true
+  image: { repository: ghcr.io/baokhang83/mnemo-jvm-warden, tag: latest }
+  targetContainerName: app # -&gt; WARDEN_TARGET_CONTAINER_NAME, no default
+  healthPort: 8080
+  gc: { timeoutSeconds: 30 }
+  resize: { timeoutSeconds: 30 }
+  intentPollIntervalSeconds: 5
+boost:
+  security: { enabled: false, namespaceSelector: { matchLabels: { warden.mnemo.io/boost-enabled: &quot;true&quot; } } }
+  observability: { enabled: false, port: 8081 }</code></pre>
+<p>In your app chart: add the dependency <code>warden-sidecar</code> from <code>https://baokhang83.github.io/mnemo-jvm-warden/</code> (match the published version, see <code>helm search repo warden</code>), a <code>warden:</code> values block with <code>targetContainerName</code> and <code>resources</code> (no defaults), and include the template under <code>initContainers</code>. A hand-authored equivalent is <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/deploy/example-sidecar.yaml">deploy/example-sidecar.yaml</a>. <strong>Helm does not upgrade installed CRDs</strong> on <code>helm upgrade</code>: apply updated CRDs first. <code>controller.resources</code> defaults are deliberately not tight: a 256Mi limit OOMKilled the controller under load.</p>
+<p>The Boost observability setting exposes an unauthenticated metrics Service and grants Events creation; protect it with a NetworkPolicy.</p>
+
+<h2 id="runbook">Runbook</h2>
+<p>Start at the agent: <code>GET /healthz</code> (liveness), <code>/readyz</code> (<code>200</code> once attached to the JVM), <code>/metrics</code> (Prometheus: <code>warden_resizes_total</code>, <code>warden_aborts_total</code>, <code>warden_bytes_reclaimed_total</code>, <code>warden_target_rss_working_set_bytes</code>, <code>warden_gc_supported</code>).</p>
+<div class="table-wrap"><table><thead><tr><th>Symptom</th><th>What it means / what to check</th></tr></thead><tbody><tr><td><code>/readyz</code> stays <code>503</code></td><td>The agent has not attached to the target JVM. Check <code>WARDEN_TARGET_CONTAINER_NAME</code> matches a sibling container; the agent retries with backoff for the first seconds.</td></tr><tr><td>“Agent is read-only for this target”; <code>warden_gc_supported{collector="OTHER"}</code> is <code>0</code></td><td>The collector cannot uncommit (Serial, Parallel, Epsilon). Not a bug: switch the target to G1, Shenandoah or ZGC. There is no flag to force it.</td></tr><tr><td><code>warden_aborts_total</code> climbing, no shrink recorded</td><td>The verification gate refused: the working set genuinely does not fit the profile yet. Compare <code>warden_target_rss_working_set_bytes</code> with the profile’s <code>limit</code>; raise the profile, check cache shedding, or increase <code>leadTime.shrink</code>. The cgroup was left untouched.</td></tr><tr><td>“could not find a cgroup directory … is the hostPath mount configured?”</td><td>The sidecar lacks the read-only <code>/sys/fs/cgroup</code> mount (the chart wires it; hand-written manifests may not).</td></tr><tr><td>“not on cgroup v2 (no memory.current)”</td><td>The node runs cgroup v1, which is unsupported.</td></tr><tr><td>Guardrail never evaluates; shrink vetoed forever</td><td>Check, in order: <code>WARDEN_PROMETHEUS_URL</code> is set on the controller; the PromQL returns a series (empty equals failure, and fails closed); controller logs for “failed to evaluate guardrail metric”.</td></tr><tr><td>Blackout at the wrong time</td><td>Blackout timestamps are absolute and evaluated in UTC; convert local times to <code>Z</code>.</td></tr><tr><td><code>status.currentProfile</code> updates but pod limits never change</td><td>Check controller logs for “failed to emit intent”, the <code>targetRef</code> name/kind/namespace, and the agent’s <code>/readyz</code>.</td></tr></tbody></table></div>
+<p>Source: <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/docs/configuration.md">configuration.md</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/deploy/README.md">deploy/README.md</a>.</p>
+
+</main>
+<footer class="site"><div class="wrap">
+  Apache-2.0 · beta software · <a href="https://github.com/baokhang83/mnemo-jvm-warden">GitHub</a> ·
+  <a href="../../llms.txt">llms.txt</a> · <a href="../../sitemap.xml">sitemap</a> ·
+  <a href="../../coverage/">Coverage report</a> · <a href="https://github.com/baokhang83/mnemo-jvm-warden/blob/main/SECURITY.md">Report a vulnerability</a>
+</div></footer>
+
+</body>
+</html>
